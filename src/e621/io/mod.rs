@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use chrono::{DateTime, Local};
 use serde_json::to_string_pretty;
-use std::fs::File;
+use std::fs::{File, read_to_string, write};
 use std::error::Error;
 use std::io::Write;
+
+mod tag;
 
 pub static CONFIG_NAME: &'static str = "config.json";
 
@@ -34,7 +36,7 @@ pub struct Config {
 /// ```
 /// let config_exists = check_config();
 /// ```
-pub fn check_config() -> bool {
+pub fn config_exists() -> bool {
     if !Path::new(CONFIG_NAME).exists() {
         println!("config.json: does not exist!");
         return false;
@@ -66,4 +68,35 @@ pub fn create_config() -> Result<(), Box<Error>> {
     config.write(&json.as_bytes())?;
 
     Ok(())
+}
+
+/// Checks if config exist and, if not, creates config template.
+///
+/// ```
+/// check_config();
+/// let config = get_config();
+/// ```
+pub fn check_config() -> Result<(), Box<Error>> {
+    let config_exists = config_exists();
+    if !config_exists {
+        return create_config()?
+    }
+
+    Ok(())
+}
+
+/// Loads and returns `config` for quick management and settings.
+///
+/// ```rust
+/// # check_config();
+/// let config = get_config();
+/// ```
+pub fn get_config() -> Result<Config, Box<Error>> {
+    serde_json::from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?
+}
+
+/// Saves new configuration for future run.
+pub fn save_config(config: &Config) {
+    let json = serde_json::to_string_pretty(config)?;
+    write(Path::new(CONFIG_NAME), json)?;
 }

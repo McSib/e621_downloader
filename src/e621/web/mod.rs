@@ -137,7 +137,7 @@ impl EWeb {
     /// # Example
     ///
     /// ```
-    /// let tags: Vec<&str> = vec!(["Hello", "What", "Yay"]);
+    /// let tags: Vec<&str> = vec!["Hello", "What", "Yay"];
     /// let connector = EWeb::new();
     /// connector.add_tags(&tags);
     /// ```
