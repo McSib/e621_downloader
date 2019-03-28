@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
 use std::error::Error;
-use self::reqwest::Url;
-use self::pbr::ProgressBar;
+use self::reqwest::Client;
+use self::reqwest::header::USER_AGENT;
 use crate::e621::io::tag::Tag;
 
 /// Time the post was created.
@@ -99,6 +99,8 @@ pub struct EWeb {
     safe: bool,
     /// Configuration data used for downloading images and tag searches
     config: Config,
+    /// Web client to connect and download images.
+    client: Client,
 }
 
 impl EWeb {
@@ -114,6 +116,7 @@ impl EWeb {
             url: "https://e621.net/post/index.json".to_string(),
             safe: false,
             config: config.clone(),
+            client: Client::new(),
         }
     }
 
@@ -130,75 +133,34 @@ impl EWeb {
         self.update_to_safe_url();
     }
 
-
-    /// Adds array of tags into url.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let tags: Vec<&str> = vec!["Hello", "What", "Yay"];
-    /// let connector = EWeb::new();
-    /// connector.add_tags(&tags);
-    /// ```
-    pub fn add_tags(&mut self, tags: &Vec<Tag>) {
-        if tags.len() > 0 {
-            let mut url_tags = String::new();
-            for i in 0..tags.len() {
-                if i != tags.len() - 1 {
-                    url_tags.push_str(format!("{} ", tags[i].value).as_str());
-                } else {
-                    url_tags.push_str(tags[i].value.as_str());
-                }
-            }
-
-            self.url.push_str(format!("?tags={} date:>={}&page=1", url_tags, self.config.last_run).as_str());
-        }
-    }
-
     /// Gets posts with tags supplied and iterates through pages until no more posts available.
-    pub fn get_posts(&mut self) -> Result<Vec<Post>, Box<Error>> {
-        let mut count = 0;
-        self.get_count(&mut count)?;
-
+    pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<Vec<Post>, Box<Error>> {
         let mut page = 1;
         let mut posts: Vec<Post> = Vec::new();
-        let mut json: Vec<Post> = reqwest::get(Url::parse(&self.url)?.as_str())?.json()?;
-        let mut progress_bar = ProgressBar::new(count as u64);
-        while json.len() > 0 {
-            posts.append(&mut json);
-            progress_bar.set(posts.len() as u64);
-            page += 1;
-            self.update_url_page(&page);
-            json = reqwest::get(Url::parse(&self.url)?.as_str())?.json()?;
+        let mut json: Vec<Post>;
+
+        let mut tag_string = String::new();
+        for tag in &tags {
+            tag_string.push_str(format!("{} ", tag.value).as_str());
         }
 
-        progress_bar.finish_println("Posts indexed...");
+        loop {
+            json = self.client.get(&self.url)
+                            .header(USER_AGENT, "e621_downloader/0.0.1 (by McSib on e621)")
+                .query(&[("tags", format!("{}date:>={}", tag_string, self.config.last_run)),
+                    ("page", format!("{}", page)),
+                    ("limit", String::from("1000"))])
+                .send()?
+                .json::<Vec<Post>>()?;
+            if json.len() <= 0 {
+                break;
+            }
+
+            posts.append(&mut json);
+            page += 1;
+        }
 
         Ok(posts)
-    }
-
-    /// TODO: Remove this function when it is no longer needed!
-    ///
-    /// Gets the count of all posts about to be grabbed.
-    fn get_count(&mut self, count: &mut usize) -> Result<(), Box<Error>> {
-        let mut page = 1;
-        let mut count_finder: Vec<Post> = reqwest::get(Url::parse(&self.url)?.as_str())?.json()?;
-        while count_finder.len() > 0 {
-            *count += count_finder.len();
-            page += 1;
-            self.update_url_page(&page);
-            count_finder = reqwest::get(Url::parse(&self.url)?.as_str())?.json()?;
-        }
-
-        Ok(())
-    }
-
-    /// TODO: Find a better method to replace this function!
-    ///
-    /// Updates the url with new page to be used.
-    fn update_url_page(&mut self, new_page: &i32) {
-        self.url = self.url.trim_end_matches(char::is_numeric).to_string();
-        self.url.push_str(format!("{}", new_page).as_str());
     }
 
     /// Updates the url for safe mode.
