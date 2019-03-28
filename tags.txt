@@ -1,3 +1,0 @@
-# This is a testing comment to ensure the parser is working correctly.
-# This is the second comment to ensure it know that it will end on a new line
-fluff-kevlar
