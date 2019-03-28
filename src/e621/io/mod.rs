@@ -61,7 +61,7 @@ pub fn create_config() -> Result<(), Box<Error>> {
     let date_time: DateTime<Local> = Local::now();
     let json = to_string_pretty(&Config {
         create_directories: true,
-        download_directory: String::from("download/"),
+        download_directory: String::from("downloads/"),
         last_run: date_time.format("%Y-%m-%d").to_string(),
         part_used_as_name: String::from("md5"),
     })?;

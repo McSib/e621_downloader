@@ -20,8 +20,8 @@ fn main() -> Result<(), Box<Error>> {
 
     // Connect to e621, grab the posts, then download all of them.
     let mut connector = EWeb::new(&config);
-    let posts = connector.get_posts(&tags)?;
-    println!("{:?}", posts);
+    connector.get_posts(&tags)?;
+    connector.download_posts()?;
 
     Ok(())
 }

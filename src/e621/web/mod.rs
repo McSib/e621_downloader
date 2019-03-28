@@ -9,6 +9,10 @@ use std::error::Error;
 use self::reqwest::Client;
 use self::reqwest::header::USER_AGENT;
 use crate::e621::io::tag::Tag;
+use std::io::{Read, Write};
+use std::fs::{File, create_dir};
+use std::path::Path;
+use self::pbr::ProgressBar;
 
 static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621";
 
@@ -30,7 +34,7 @@ pub struct Post {
     /// The ID of the post
     pub id: i64,
     /// Tags from the post
-    pub  tags: String,
+    pub tags: String,
     /// Tags that are locked by the admins
     pub locked_tags: Option<String>,
     /// Description of the post
@@ -103,6 +107,8 @@ pub struct EWeb {
     config: Config,
     /// Web client to connect and download images.
     client: Client,
+    /// All posts grabbed from e621 search.
+    posts: Vec<Post>,
 }
 
 impl EWeb {
@@ -114,12 +120,20 @@ impl EWeb {
     /// let connector = EWeb::new();
     /// ```
     pub fn new(config: &Config) -> EWeb {
-        EWeb {
+        let eweb = EWeb {
             url: "https://e621.net/post/index.json".to_string(),
             safe: false,
             config: config.clone(),
             client: Client::new(),
+            posts: Vec::new(),
+        };
+
+        if eweb.config.part_used_as_name != "md5" && eweb.config.part_used_as_name != "id" {
+            println!("Config `part_used_as_name` is set incorrectly!");
+            println!("This will auto set to `md5` for this image, but you should fix the config when done with the program.");
         }
+
+        eweb
     }
 
     /// Sets the site into safe mode so no NSFW images popup in the course of downloading.
@@ -136,9 +150,8 @@ impl EWeb {
     }
 
     /// Gets posts with tags supplied and iterates through pages until no more posts available.
-    pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<Vec<Post>, Box<Error>> {
+    pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<(), Box<Error>> {
         let mut page = 1;
-        let mut posts: Vec<Post> = Vec::new();
         let mut json: Vec<Post>;
 
         let mut tag_string = String::new();
@@ -152,17 +165,65 @@ impl EWeb {
                 .query(&[("tags", format!("{}date:>={}", tag_string, self.config.last_run)),
                     ("page", format!("{}", page)),
                     ("limit", String::from("1000"))])
-                .send()?
+                .send()
+                .expect("Unable to make connection to e621!")
                 .json::<Vec<Post>>()?;
             if json.len() <= 0 {
                 break;
             }
 
-            posts.append(&mut json);
+            self.posts.append(&mut json);
             page += 1;
         }
 
-        Ok(posts)
+        Ok(())
+    }
+
+    /// Downloads images from collected posts.
+    pub fn download_posts(&self) -> Result<(), Box<Error>> {
+        let mut progress_bar = ProgressBar::new(self.posts.len() as u64);
+
+        for post in &self.posts {
+            let name = self.get_name_for_image(&post);
+            let mut image: Vec<u8> = Vec::new();
+            self.client.get(post.file_url.as_str())
+                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+                .send()?.read_to_end(&mut image)?;
+            self.save_image(&name, &image, &post.file_ext.as_ref().unwrap(), &post.artist[0])?;
+            progress_bar.inc();
+        }
+
+        progress_bar.finish_println("Posts downloaded!");
+
+        Ok(())
+    }
+
+    /// Saves image to directory described in config.
+    fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, artist: &String) -> Result<(), Box<Error>> {
+        let download_dest = format!("{}{}", self.config.download_directory, artist);
+        if !Path::new(download_dest.as_str()).exists() {
+            create_dir(Path::new(download_dest.as_str()));
+        }
+
+        let mut file: File;
+        if self.config.create_directories {
+            file = File::create(Path::new(format!("{}{}/{}.{}", self.config.download_directory, artist, name, image_type).as_str()))?;
+            file.write(source);
+        } else {
+            file = File::create(Path::new(format!("{}{}.{}", self.config.download_directory, name, image_type).as_str()))?;
+            file.write(source);
+        }
+
+        Ok(())
+    }
+
+    /// Gets name that will be used for saving image.
+    fn get_name_for_image(&self, post: &Post) -> String {
+        match self.config.part_used_as_name.as_str() {
+            "md5" => post.md5.as_ref().unwrap().clone(),
+            "id" => format!("{}", post.id),
+            _ => post.md5.as_ref().unwrap().clone(),
+        }
     }
 
     /// Updates the url for safe mode.
