@@ -100,7 +100,7 @@ pub struct Post {
 /// Basic web connector for e621.
 pub struct EWeb {
     /// Url used for connecting and downloading images
-    pub url: String,
+    url: String,
     /// Whether the site is the safe version or note. If true, it will force connection to E926 instead of E621
     safe: bool,
     /// Configuration data used for downloading images and tag searches
@@ -120,7 +120,7 @@ impl EWeb {
     /// let connector = EWeb::new();
     /// ```
     pub fn new(config: &Config) -> EWeb {
-        let eweb = EWeb {
+        let connector = EWeb {
             url: "https://e621.net/post/index.json".to_string(),
             safe: false,
             config: config.clone(),
@@ -128,12 +128,12 @@ impl EWeb {
             posts: Vec::new(),
         };
 
-        if eweb.config.part_used_as_name != "md5" && eweb.config.part_used_as_name != "id" {
+        if connector.config.part_used_as_name != "md5" && connector.config.part_used_as_name != "id" {
             println!("Config `part_used_as_name` is set incorrectly!");
             println!("This will auto set to `md5` for this image, but you should fix the config when done with the program.");
         }
 
-        eweb
+        connector
     }
 
     /// Sets the site into safe mode so no NSFW images popup in the course of downloading.
