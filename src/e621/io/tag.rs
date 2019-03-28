@@ -66,7 +66,7 @@ impl Parser {
         }
     }
 
-    /// Parses comment then ignores it.
+    /// Skips over comment.
     fn parse_comment(&mut self) {
         self.consume_while(|c| match c {
             'a'...'z' | 'A'...'Z' | '0'...'9' | ' '...'/' | ':'...'@' | '['...'`' | '{'...'~' => true,
