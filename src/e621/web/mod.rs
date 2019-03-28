@@ -10,6 +10,8 @@ use self::reqwest::Client;
 use self::reqwest::header::USER_AGENT;
 use crate::e621::io::tag::Tag;
 
+static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621";
+
 /// Time the post was created.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreatedAt {
@@ -140,13 +142,13 @@ impl EWeb {
         let mut json: Vec<Post>;
 
         let mut tag_string = String::new();
-        for tag in &tags {
+        for tag in tags {
             tag_string.push_str(format!("{} ", tag.value).as_str());
         }
 
         loop {
             json = self.client.get(&self.url)
-                            .header(USER_AGENT, "e621_downloader/0.0.1 (by McSib on e621)")
+                            .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
                 .query(&[("tags", format!("{}date:>={}", tag_string, self.config.last_run)),
                     ("page", format!("{}", page)),
                     ("limit", String::from("1000"))])
