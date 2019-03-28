@@ -7,4 +7,4 @@ E621 is a mature image board replacement for the image board Sidechan. A general
 E621 has over 1,681,997+ images and videos hosted on its platform, with this overwhelming number, it can be hard to find images you enjoy or artist you like.
 
 ## Goal
-The goal of this application is to keep up-to-date with your favorite artist and for archival purposes.
+The goal of this application is to keep up-to-date with your favorite artist and to use it for archival purposes.
