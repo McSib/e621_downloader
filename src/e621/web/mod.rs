@@ -14,7 +14,7 @@ use std::fs::{File, create_dir};
 use std::path::Path;
 use self::pbr::ProgressBar;
 
-static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621";
+static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621)";
 
 /// Time the post was created.
 #[derive(Serialize, Deserialize, Debug)]
