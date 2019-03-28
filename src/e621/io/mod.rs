@@ -1,4 +1,6 @@
 extern crate serde;
+extern crate serde_json;
+extern crate chrono;
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -8,7 +10,7 @@ use std::fs::{File, read_to_string, write};
 use std::error::Error;
 use std::io::Write;
 
-mod tag;
+pub mod tag;
 
 pub static CONFIG_NAME: &'static str = "config.json";
 
@@ -79,7 +81,7 @@ pub fn create_config() -> Result<(), Box<Error>> {
 pub fn check_config() -> Result<(), Box<Error>> {
     let config_exists = config_exists();
     if !config_exists {
-        return create_config()?
+        return create_config()
     }
 
     Ok(())
@@ -92,11 +94,14 @@ pub fn check_config() -> Result<(), Box<Error>> {
 /// let config = get_config();
 /// ```
 pub fn get_config() -> Result<Config, Box<Error>> {
-    serde_json::from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?
+    let config = serde_json::from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?;
+    Ok(config)
 }
 
 /// Saves new configuration for future run.
-pub fn save_config(config: &Config) {
+pub fn save_config(config: &Config) -> Result<(), Box<Error>> {
     let json = serde_json::to_string_pretty(config)?;
     write(Path::new(CONFIG_NAME), json)?;
+
+    Ok(())
 }

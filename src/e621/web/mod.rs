@@ -1,15 +1,14 @@
 extern crate reqwest;
 extern crate serde;
-extern crate serde_json;
 extern crate pbr;
 
 use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
 use std::error::Error;
-use core::borrow::BorrowMut;
 use self::reqwest::Url;
 use self::pbr::ProgressBar;
+use crate::e621::io::tag::Tag;
 
 /// Time the post was created.
 #[derive(Serialize, Deserialize, Debug)]
@@ -141,14 +140,14 @@ impl EWeb {
     /// let connector = EWeb::new();
     /// connector.add_tags(&tags);
     /// ```
-    pub fn add_tags(&mut self, tags: &Vec<&str>) {
+    pub fn add_tags(&mut self, tags: &Vec<Tag>) {
         if tags.len() > 0 {
             let mut url_tags = String::new();
             for i in 0..tags.len() {
                 if i != tags.len() - 1 {
-                    url_tags.push_str(format!("{} ", tags[i]).as_str());
+                    url_tags.push_str(format!("{} ", tags[i].value).as_str());
                 } else {
-                    url_tags.push_str(tags[i]);
+                    url_tags.push_str(tags[i].value.as_str());
                 }
             }
 
