@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::e621::io::{check_config, get_config};
-use crate::e621::web::{EWeb};
+use crate::e621::{EWeb};
 use crate::e621::io::tag::{parse_tag_file, TAG_NAME, create_tag_file};
 use std::path::Path;
 
