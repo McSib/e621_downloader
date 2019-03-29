@@ -1,18 +1,20 @@
+extern crate pbr;
 extern crate reqwest;
 extern crate serde;
-extern crate pbr;
 
+use std::error::Error;
+use std::fs::{create_dir, File};
+use std::io::{Read, Write};
+use std::path::Path;
+
+use pbr::ProgressBar;
+use reqwest::Client;
+use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
 use io::Config;
-use std::error::Error;
-use self::reqwest::Client;
-use self::reqwest::header::USER_AGENT;
+
 use crate::e621::io::tag::Tag;
-use std::io::{Read, Write};
-use std::fs::{File, create_dir};
-use std::path::Path;
-use self::pbr::ProgressBar;
 
 pub mod io;
 
@@ -163,7 +165,7 @@ impl EWeb {
 
         loop {
             json = self.client.get(&self.url)
-                            .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
                 .query(&[("tags", format!("{}date:>={}", tag_string, self.config.last_run)),
                     ("page", format!("{}", page)),
                     ("limit", String::from("1000"))])

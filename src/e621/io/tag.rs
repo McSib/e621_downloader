@@ -1,6 +1,6 @@
-use std::path::Path;
 use std::error::Error;
-use std::fs::{read_to_string, File};
+use std::fs::{File, read_to_string};
+use std::path::Path;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
@@ -23,7 +23,7 @@ pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
 /// Creates instance of the parser and parses tags.
 pub fn parse_tag_file(p: &Path) -> Result<Vec<Tag>, Box<Error>> {
     let source = read_to_string(p)?;
-    Ok(Parser{pos: 0, input: source}.parse_tags())
+    Ok(Parser { pos: 0, input: source }.parse_tags())
 }
 
 /// Parser that reads a tag file and parses the tags.

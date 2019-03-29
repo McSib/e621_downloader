@@ -1,14 +1,15 @@
+extern crate chrono;
 extern crate serde;
 extern crate serde_json;
-extern crate chrono;
 
-use serde::{Deserialize, Serialize};
-use std::path::Path;
-use chrono::{DateTime, Local};
-use serde_json::to_string_pretty;
-use std::fs::{File, read_to_string, write};
 use std::error::Error;
+use std::fs::{File, read_to_string, write};
 use std::io::Write;
+use std::path::Path;
+
+use chrono::{DateTime, Local};
+use serde::{Deserialize, Serialize};
+use serde_json::to_string_pretty;
 
 pub mod tag;
 
@@ -81,7 +82,7 @@ pub fn create_config() -> Result<(), Box<Error>> {
 pub fn check_config() -> Result<(), Box<Error>> {
     let config_exists = config_exists();
     if !config_exists {
-        return create_config()
+        return create_config();
     }
 
     Ok(())
