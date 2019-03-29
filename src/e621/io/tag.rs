@@ -1,9 +1,12 @@
 use std::error::Error;
 use std::fs::{File, read_to_string};
+use std::io::{stdin, Write};
 use std::path::Path;
+use std::process::exit;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
+static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
 
 /// Tag object used for searching e621.
 pub struct Tag {
@@ -14,10 +17,22 @@ pub struct Tag {
 /// Creates tag file if it doesn't exist.
 pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
     if !p.exists() {
-        File::create(p)?;
+        let mut file = File::create(p)?;
+        file.write(TAG_FILE_EXAMPLE.as_bytes())?;
+
+        emergency_exit("The tag file is created, I recommend closing the application to include the artist you wish to download.");
     }
 
     Ok(())
+}
+
+/// Exits the program after message explaining the error and prompting the user to press `ENTER`.
+fn emergency_exit(error: &str) {
+    println!("{}", error);
+    println!("Press ENTER to close the application...");
+    let mut line = String::new();
+    stdin().read_line(&mut line).unwrap_or_default();
+    exit(0);
 }
 
 /// Creates instance of the parser and parses tags.

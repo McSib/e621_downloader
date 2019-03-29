@@ -80,8 +80,8 @@ pub fn create_config() -> Result<(), Box<Error>> {
 /// let config = get_config();
 /// ```
 pub fn check_config() -> Result<(), Box<Error>> {
-    let config_exists = config_exists();
-    if !config_exists {
+    if !config_exists() {
+        println!("Creating config...");
         return create_config();
     }
 

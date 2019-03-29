@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<Error>> {
     connector.get_posts(&tags)?;
     connector.download_posts()?;
 
+    // Update the date for future runs.
     let date_time: DateTime<Local> = Local::now();
     config.last_run = date_time.format("%Y-%m-%d").to_string();
     save_config(&config)?;

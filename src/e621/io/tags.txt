@@ -1,0 +1,6 @@
+# This is the tag that you will use so the program can know what tags to search.
+# Currently, it will search all tags from `config.json` last_run date to today.
+# If you wish to comment in this file, simply put `#` at the beginning of the line and the parser will ignore the current line.
+
+# Insert tags here (remove the example artist with an artist you wish to keep track of):
+fluff-kevlar
