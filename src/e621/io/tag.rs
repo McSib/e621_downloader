@@ -3,6 +3,7 @@ use std::fs::{File, read_to_string};
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::process::exit;
+use crate::e621::io::emergency_exit;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
@@ -24,15 +25,6 @@ pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
     }
 
     Ok(())
-}
-
-/// Exits the program after message explaining the error and prompting the user to press `ENTER`.
-fn emergency_exit(error: &str) {
-    println!("{}", error);
-    println!("Press ENTER to close the application...");
-    let mut line = String::new();
-    stdin().read_line(&mut line).unwrap_or_default();
-    exit(0);
 }
 
 /// Creates instance of the parser and parses tags.

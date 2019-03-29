@@ -4,12 +4,13 @@ extern crate serde_json;
 
 use std::error::Error;
 use std::fs::{File, read_to_string, write};
-use std::io::Write;
+use std::io::{Write, stdin};
 use std::path::Path;
 
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
+use std::process::exit;
 
 pub mod tag;
 
@@ -105,4 +106,13 @@ pub fn save_config(config: &Config) -> Result<(), Box<Error>> {
     write(Path::new(CONFIG_NAME), json)?;
 
     Ok(())
+}
+
+/// Exits the program after message explaining the error and prompting the user to press `ENTER`.
+fn emergency_exit(error: &str) {
+    println!("{}", error);
+    println!("Press ENTER to close the application...");
+    let mut line = String::new();
+    stdin().read_line(&mut line).unwrap_or_default();
+    exit(0);
 }

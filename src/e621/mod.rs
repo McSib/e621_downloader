@@ -3,7 +3,7 @@ extern crate reqwest;
 extern crate serde;
 
 use std::error::Error;
-use std::fs::{create_dir, File};
+use std::fs::{create_dir, File, create_dir_all};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -206,7 +206,7 @@ impl EWeb {
     fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, artist: &String) -> Result<(), Box<Error>> {
         let download_dest = format!("{}{}", self.config.download_directory, artist);
         if !Path::new(download_dest.as_str()).exists() {
-            create_dir(Path::new(download_dest.as_str()))?;
+            create_dir_all(Path::new(download_dest.as_str()))?;
         }
 
         let mut file: File;
