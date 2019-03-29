@@ -1,8 +1,12 @@
+extern crate chrono;
+
 use std::error::Error;
 use std::path::Path;
 
+use chrono::{DateTime, Local};
+
 use crate::e621::EWeb;
-use crate::e621::io::{check_config, get_config};
+use crate::e621::io::{check_config, get_config, save_config};
 use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
 
 mod e621;
@@ -11,7 +15,7 @@ mod e621;
 fn main() -> Result<(), Box<Error>> {
     // Check the config and load it.
     check_config()?;
-    let config = get_config()?;
+    let mut config = get_config()?;
 
     // Create tag if it doesn't exist, then parse it.
     let tag_path = Path::new(TAG_NAME);
@@ -22,6 +26,10 @@ fn main() -> Result<(), Box<Error>> {
     let mut connector = EWeb::new(&config);
     connector.get_posts(&tags)?;
     connector.download_posts()?;
+
+    let date_time: DateTime<Local> = Local::now();
+    config.last_run = date_time.format("%Y-%m-%d").to_string();
+    save_config(&config)?;
 
     Ok(())
 }
