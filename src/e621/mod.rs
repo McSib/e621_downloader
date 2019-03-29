@@ -3,7 +3,7 @@ extern crate reqwest;
 extern crate serde;
 
 use std::error::Error;
-use std::fs::{create_dir, File, create_dir_all};
+use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -155,29 +155,28 @@ impl EWeb {
 
     /// Gets posts with tags supplied and iterates through pages until no more posts available.
     pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<(), Box<Error>> {
-        let mut page = 1;
-        let mut json: Vec<Post>;
-
-        let mut tag_string = String::new();
         for tag in tags {
-            tag_string.push_str(format!("{} ", tag.value).as_str());
-        }
+            println!("Grabbing post tagged: {}", tag.value);
+            let mut page = 1;
+            let mut json: Vec<Post>;
 
-        loop {
-            json = self.client.get(&self.url)
-                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                .query(&[("tags", format!("{}date:>={}", tag_string, self.config.last_run)),
-                    ("page", format!("{}", page)),
-                    ("limit", String::from("1000"))])
-                .send()
-                .expect("Unable to make connection to e621!")
-                .json::<Vec<Post>>()?;
-            if json.len() <= 0 {
-                break;
+            loop {
+                json = self.client.get(&self.url)
+                    .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+                    .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run)),
+                        ("page", format!("{}", page)),
+                        ("limit", String::from("1000"))])
+                    .send()
+                    .expect("Unable to make connection to e621!")
+                    .json::<Vec<Post>>()?;
+                if json.len() <= 0 {
+                    break;
+                }
+
+
+                self.posts.append(&mut json);
+                page += 1;
             }
-
-            self.posts.append(&mut json);
-            page += 1;
         }
 
         Ok(())

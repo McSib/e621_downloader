@@ -4,13 +4,13 @@ extern crate serde_json;
 
 use std::error::Error;
 use std::fs::{File, read_to_string, write};
-use std::io::{Write, stdin};
+use std::io::{stdin, Write};
 use std::path::Path;
+use std::process::exit;
 
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
-use std::process::exit;
 
 pub mod tag;
 
