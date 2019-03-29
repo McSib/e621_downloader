@@ -1,3 +1,4 @@
+extern crate chrono;
 extern crate pbr;
 extern crate reqwest;
 extern crate serde;
@@ -7,18 +8,19 @@ use std::fs::{create_dir_all, File};
 use std::io::{Read, Write};
 use std::path::Path;
 
+use chrono::{Date, Local};
 use pbr::ProgressBar;
 use reqwest::Client;
 use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
-use io::Config;
-
+use crate::e621::io::Config;
 use crate::e621::io::tag::Tag;
 
 pub mod io;
 
 static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621)";
+static DEFAULT_DATE: &'static str = "2006-01-01";
 
 /// Time the post was created.
 #[derive(Serialize, Deserialize, Debug)]
@@ -102,20 +104,20 @@ pub struct Post {
 }
 
 /// Basic web connector for e621.
-pub struct EWeb {
+pub struct EWeb<'a> {
     /// Url used for connecting and downloading images
     url: String,
     /// Whether the site is the safe version or note. If true, it will force connection to E926 instead of E621
     safe: bool,
     /// Configuration data used for downloading images and tag searches
-    config: Config,
+    config: &'a mut Config,
     /// Web client to connect and download images.
     client: Client,
     /// All posts grabbed from e621 search.
     posts: Vec<Post>,
 }
 
-impl EWeb {
+impl<'a> EWeb<'a> {
     /// Creates new EWeb object for connecting and downloading images.
     ///
     /// # Example
@@ -123,11 +125,11 @@ impl EWeb {
     /// ```
     /// let connector = EWeb::new();
     /// ```
-    pub fn new(config: &Config) -> EWeb {
+    pub fn new(config: &mut Config) -> EWeb {
         let connector = EWeb {
             url: "https://e621.net/post/index.json".to_string(),
             safe: false,
-            config: config.clone(),
+            config,
             client: Client::new(),
             posts: Vec::new(),
         };
@@ -157,13 +159,15 @@ impl EWeb {
     pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<(), Box<Error>> {
         for tag in tags {
             println!("Grabbing post tagged: {}", tag.value);
+            self.update_tag_date(tag);
+
             let mut page = 1;
             let mut json: Vec<Post>;
 
             loop {
                 json = self.client.get(&self.url)
                     .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                    .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run)),
+                    .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
                         ("page", format!("{}", page)),
                         ("limit", String::from("1000"))])
                     .send()
@@ -180,6 +184,19 @@ impl EWeb {
         }
 
         Ok(())
+    }
+
+    /// Updates config `last_run` to hold new date.
+    fn update_tag_date(&mut self, tag: &Tag) {
+        let date: Date<Local> = Local::today();
+
+        let key_date = self.config.last_run.entry(tag.value.clone()).or_insert(DEFAULT_DATE.to_string());
+        if key_date != DEFAULT_DATE {
+            *key_date = date.format("%Y-%m-%d").to_string();
+        } else {
+            key_date.remove(key_date.len() - 1);
+            key_date.push_str("2");
+        }
     }
 
     /// Downloads images from collected posts.

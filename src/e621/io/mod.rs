@@ -1,14 +1,13 @@
-extern crate chrono;
 extern crate serde;
 extern crate serde_json;
 
+use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{File, read_to_string, write};
 use std::io::{stdin, Write};
 use std::path::Path;
 use std::process::exit;
 
-use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
 
@@ -25,9 +24,9 @@ pub struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
     pub download_directory: String,
-    /// The last time the program was ran
+    /// Holds all dates for every tag used.
     #[serde(rename = "lastRun")]
-    pub last_run: String,
+    pub last_run: HashMap<String, String>,
     /// Which part should be used as the name, that of which are: "id", or "md5"
     #[serde(rename = "partUsedAsName")]
     pub part_used_as_name: String,
@@ -60,11 +59,10 @@ pub fn config_exists() -> bool {
 /// }
 /// ```
 pub fn create_config() -> Result<(), Box<Error>> {
-    let date_time: DateTime<Local> = Local::now();
     let json = to_string_pretty(&Config {
         create_directories: true,
         download_directory: String::from("downloads/"),
-        last_run: date_time.format("%Y-%m-%d").to_string(),
+        last_run: HashMap::new(),
         part_used_as_name: String::from("md5"),
     })?;
 

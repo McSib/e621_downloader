@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::{File, read_to_string};
-use std::io::{Write};
+use std::io::Write;
 use std::path::Path;
 
 use crate::e621::io::emergency_exit;
