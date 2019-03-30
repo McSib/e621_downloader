@@ -13,6 +13,7 @@ use serde_json::to_string_pretty;
 
 pub mod tag;
 
+/// Name of the configuration file.
 pub static CONFIG_NAME: &'static str = "config.json";
 
 /// Config that is used to do general setup.

@@ -15,7 +15,7 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
-use crate::e621::io::tag::Tag;
+use crate::e621::io::tag::{Tag};
 
 pub mod io;
 
@@ -191,6 +191,8 @@ impl<'a> EWeb<'a> {
         let date: Date<Local> = Local::today();
 
         let key_date = self.config.last_run.entry(tag.value.clone()).or_insert(DEFAULT_DATE.to_string());
+
+        // TODO: This looks wrong for me, is there a way to improve this?
         if key_date != DEFAULT_DATE {
             *key_date = date.format("%Y-%m-%d").to_string();
         } else {

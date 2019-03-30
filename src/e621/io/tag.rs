@@ -15,6 +15,14 @@ pub struct Tag {
     pub value: String,
 }
 
+/// Groups contains tags given to it.
+pub struct Group {
+    /// Name of group
+    pub group_name: String,
+    /// Tags in group
+    pub tags: Vec<Tag>,
+}
+
 /// Creates tag file if it doesn't exist.
 pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
     if !p.exists() {
@@ -28,9 +36,9 @@ pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
 }
 
 /// Creates instance of the parser and parses tags.
-pub fn parse_tag_file(p: &Path) -> Result<Vec<Tag>, Box<Error>> {
+pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Box<Error>> {
     let source = read_to_string(p)?;
-    Ok(Parser { pos: 0, input: source }.parse_tags())
+    Ok(Parser { pos: 0, input: source }.parse_groups())
 }
 
 /// Parser that reads a tag file and parses the tags.
@@ -43,30 +51,79 @@ struct Parser {
 
 impl Parser {
     /// Parses input.
-    pub fn parse_tags(&mut self) -> Vec<Tag> {
-        let mut tags: Vec<Tag> = Vec::new();
+    pub fn parse_groups(&mut self) -> Vec<Group> {
+        let mut groups: Vec<Group> = Vec::new();
         loop {
             self.consume_whitespace();
             if self.eof() {
                 break;
             }
 
-            if self.starts_with("#") {
-                self.parse_comment();
-            } else {
-                tags.push(self.parse_tag());
+            if self.check_and_parse_comment() {
+                continue;
             }
+
+            if self.starts_with("[") {
+                groups.push(self.parse_group());
+            } else {
+                println!("Tags can't be outside of a group!");
+            }
+        }
+
+        groups
+    }
+
+    /// Parses group in input.
+    fn parse_group(&mut self) -> Group {
+        assert_eq!(self.consume_char(), '[');
+        let name = self.get_group_name();
+        assert_eq!(self.consume_char(), ']');
+        let tags = self.parse_tags();
+
+        Group {
+            group_name: name,
+            tags
+        }
+    }
+
+    /// Gets group name.
+    fn get_group_name(&mut self) -> String {
+        self.consume_while(|c| valid_group_name(c))
+    }
+
+    /// Parses tags in group.
+    fn parse_tags(&mut self) -> Vec<Tag> {
+        let mut tags: Vec<Tag> = Vec::new();
+
+        while !self.eof() {
+            self.consume_whitespace();
+            if self.check_and_parse_comment() {
+                continue;
+            }
+
+            if self.starts_with("[") {
+                break;
+            }
+
+            tags.push(self.parse_tag());
         }
 
         tags
     }
 
+    /// Checks if next character is comment identifier and parses it if it is.
+    fn check_and_parse_comment(&mut self) -> bool {
+        if self.starts_with("#") {
+            self.parse_comment();
+            return true;
+        }
+
+        false
+    }
+
     /// Parses tag from input.
     fn parse_tag(&mut self) -> Tag {
-        let tag_value = self.consume_while(|c| match c {
-            ' '...'~' => true,
-            _ => false
-        });
+        let tag_value = self.consume_while(|c| valid_tag(c));
 
         Tag {
             value: tag_value,
@@ -75,10 +132,7 @@ impl Parser {
 
     /// Skips over comment.
     fn parse_comment(&mut self) {
-        self.consume_while(|c| match c {
-            'a'...'z' | 'A'...'Z' | '0'...'9' | ' '...'/' | ':'...'@' | '['...'`' | '{'...'~' => true,
-            _ => false
-        });
+        self.consume_while(|c| valid_comment(c));
     }
 
     /// Consume and discard zero or more whitespace characters.
@@ -124,5 +178,29 @@ impl Parser {
     /// Checks whether or not `pos` is at end of file.
     fn eof(&self) -> bool {
         self.pos >= self.input.len()
+    }
+}
+
+/// Validates character for group name.
+fn valid_group_name(c: char) -> bool {
+    match c {
+        ' '...'\\' | '^'...'~' => true,
+        _ => false
+    }
+}
+
+/// Validates character for tag.
+fn valid_tag(c: char) -> bool {
+    match c {
+        ' '...'\"' | '$'...'~' => true,
+        _ => false
+    }
+}
+
+/// Validates character for comment.
+fn valid_comment(c: char) -> bool {
+    match c {
+        ' '...'~' => true,
+        _ => false
     }
 }
