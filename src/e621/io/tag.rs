@@ -82,13 +82,13 @@ impl Parser {
 
         Group {
             group_name: name,
-            tags
+            tags,
         }
     }
 
     /// Gets group name.
     fn get_group_name(&mut self) -> String {
-        self.consume_while(|c| valid_group_name(c))
+        self.consume_while(valid_group_name)
     }
 
     /// Parses tags in group.
@@ -123,16 +123,16 @@ impl Parser {
 
     /// Parses tag from input.
     fn parse_tag(&mut self) -> Tag {
-        let tag_value = self.consume_while(|c| valid_tag(c));
+        let tag_value = self.consume_while(valid_tag);
 
         Tag {
-            value: tag_value,
+            value: tag_value.trim_end_matches(' ').to_string(),
         }
     }
 
     /// Skips over comment.
     fn parse_comment(&mut self) {
-        self.consume_while(|c| valid_comment(c));
+        self.consume_while(valid_comment);
     }
 
     /// Consume and discard zero or more whitespace characters.
