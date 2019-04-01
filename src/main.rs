@@ -17,14 +17,15 @@ fn main() -> Result<(), Box<Error>> {
     let tag_path = Path::new(TAG_NAME);
     create_tag_file(&tag_path)?;
     let groups = parse_tag_file(&tag_path)?;
+    println!("{:?}", groups);
 
     // Connect to e621, grab the posts, then download all of them.
     let mut connector = EWeb::new(&mut config);
-    connector.get_posts(&groups[0].tags)?;
-    connector.download_posts()?;
+    connector.get_posts(&groups)?;
+//    connector.download_posts()?;
 
     // Update the date for future runs.
-    save_config(&config)?;
+//    save_config(&config)?;
 
     Ok(())
 }

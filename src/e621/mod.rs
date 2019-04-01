@@ -15,7 +15,7 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
-use crate::e621::io::tag::{Tag};
+use crate::e621::io::tag::{Tag, Group};
 
 pub mod io;
 
@@ -48,7 +48,7 @@ pub struct Post {
     /// When the post was uploaded
     pub created_at: CreatedAt,
     /// User ID of the user who uploaded the post
-    pub creator_id: i64,
+    pub creator_id: Option<i64>,
     /// Username of the user who uploaded the post
     pub author: String,
     /// The amount of changes that the post went through since uploaded
@@ -103,6 +103,14 @@ pub struct Post {
     pub sources: Option<Vec<String>>,
 }
 
+/// Contains posts tied to a specific group.
+struct GroupPosts {
+    /// Name of group
+    pub group_name: String,
+    /// All posts in group
+    pub posts: Vec<Post>,
+}
+
 /// Basic web connector for e621.
 pub struct EWeb<'a> {
     /// Url used for connecting and downloading images
@@ -114,7 +122,7 @@ pub struct EWeb<'a> {
     /// Web client to connect and download images.
     client: Client,
     /// All posts grabbed from e621 search.
-    posts: Vec<Post>,
+    posts: Vec<GroupPosts>,
 }
 
 impl<'a> EWeb<'a> {
@@ -156,30 +164,41 @@ impl<'a> EWeb<'a> {
     }
 
     /// Gets posts with tags supplied and iterates through pages until no more posts available.
-    pub fn get_posts(&mut self, tags: &Vec<Tag>) -> Result<(), Box<Error>> {
-        for tag in tags {
-            println!("Grabbing post tagged: {}", tag.value);
-            self.update_tag_date(tag);
+    pub fn get_posts(&mut self, groups: &Vec<Group>) -> Result<(), Box<Error>> {
+        for group in groups {
+            if group.tags.is_empty() {
+                continue;
+            }
 
-            let mut page = 1;
-            let mut json: Vec<Post>;
+            for tag in &group.tags {
+                println!("Grabbing post tagged: {}", tag.value);
+                self.update_tag_date(tag);
 
-            loop {
-                json = self.client.get(&self.url)
-                    .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                    .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
-                        ("page", format!("{}", page)),
-                        ("limit", String::from("1000"))])
-                    .send()
-                    .expect("Unable to make connection to e621!")
-                    .json::<Vec<Post>>()?;
-                if json.len() <= 0 {
-                    break;
+                let mut page = 1;
+                let mut json: Vec<Post>;
+
+                let mut posts: Vec<Post> = Vec::new();
+                loop {
+                    json = self.client.get(&self.url)
+                        .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+                        .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
+                                ("page", format!("{}", page)),
+                                ("limit", String::from("320"))])
+                        .send()
+                        .expect("Unable to make connection to e621!")
+                        .json::<Vec<Post>>()?;
+                    if json.len() <= 0 {
+                        break;
+                    }
+
+                    posts.append(&mut json);
+                    page += 1;
                 }
 
-
-                self.posts.append(&mut json);
-                page += 1;
+                self.posts.push(GroupPosts {
+                    group_name: group.group_name.clone(),
+                    posts,
+                });
             }
         }
 
@@ -202,23 +221,23 @@ impl<'a> EWeb<'a> {
     }
 
     /// Downloads images from collected posts.
-    pub fn download_posts(&self) -> Result<(), Box<Error>> {
-        let mut progress_bar = ProgressBar::new(self.posts.len() as u64);
-
-        for post in &self.posts {
-            let name = self.get_name_for_image(&post);
-            let mut image: Vec<u8> = Vec::new();
-            self.client.get(post.file_url.as_str())
-                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                .send()?.read_to_end(&mut image)?;
-            self.save_image(&name, &image, &post.file_ext.as_ref().unwrap(), &post.artist[0])?;
-            progress_bar.inc();
-        }
-
-        progress_bar.finish_println("Posts downloaded!");
-
-        Ok(())
-    }
+//    pub fn download_posts(&self) -> Result<(), Box<Error>> {
+//        let mut progress_bar = ProgressBar::new(self.posts.len() as u64);
+//
+//        for post in &self.posts {
+//            let name = self.get_name_for_image(&post);
+//            let mut image: Vec<u8> = Vec::new();
+//            self.client.get(post.file_url.as_str())
+//                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+//                .send()?.read_to_end(&mut image)?;
+//            self.save_image(&name, &image, &post.file_ext.as_ref().unwrap(), &post.artist[0])?;
+//            progress_bar.inc();
+//        }
+//
+//        progress_bar.finish_println("Posts downloaded!");
+//
+//        Ok(())
+//    }
 
     /// Saves image to directory described in config.
     fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, artist: &String) -> Result<(), Box<Error>> {
