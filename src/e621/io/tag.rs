@@ -16,23 +16,15 @@ pub struct Tag {
     pub value: String,
 }
 
-/// Linker object links to another group as a child.
-/// The parent group will inherit all tags tied to the child.
-#[derive(Debug)]
-pub struct Linker {
-    /// Target group to become child to
-    pub target: String,
-}
-
 /// Groups contains tags given to it.
 #[derive(Debug)]
 pub struct Group {
     /// Name of group
     pub group_name: String,
+    /// All groups this group links to
+    pub parent: String,
     /// Tags in group
     pub tags: Vec<Tag>,
-    /// All groups this group links to
-    pub links: Vec<Linker>,
 }
 
 /// Creates tag file if it doesn't exist.
@@ -89,47 +81,35 @@ impl Parser {
     fn parse_group(&mut self) -> Group {
         assert_eq!(self.consume_char(), '[');
         let name = self.get_group_name();
+        self.consume_whitespace();
+
+        let mut parent = String::new();
+        if self.starts_with(":") {
+            parent = self.get_extension_target();
+        }
+
         assert_eq!(self.consume_char(), ']');
-        let links = self.parse_links();
         let tags = self.parse_tags();
 
         Group {
             group_name: name,
+            parent,
             tags,
-            links
         }
+    }
+
+    /// Gets extension target of group
+    fn get_extension_target(&mut self) -> String {
+        assert_eq!(self.consume_char(), ':');
+        self.consume_whitespace();
+        let parent = self.consume_while(valid_group_name);
+        self.consume_whitespace();
+        parent
     }
 
     /// Gets group name.
     fn get_group_name(&mut self) -> String {
         self.consume_while(valid_group_name)
-    }
-
-    /// Parses all links in group.
-    fn parse_links(&mut self) -> Vec<Linker> {
-        let mut links: Vec<Linker> = Vec::new();
-
-        let old_pos = self.pos;
-        while !self.eof() {
-            self.consume_whitespace();
-            if self.check_and_parse_comment() {
-                continue;
-            }
-
-            if self.starts_with("[") {
-                break;
-            }
-
-            if self.starts_with("@") {
-                links.push(self.parse_link());
-            } else {
-                self.skip_line();
-            }
-        }
-
-        self.pos = old_pos;
-
-        links
     }
 
     /// Parses tags in group.
@@ -144,11 +124,6 @@ impl Parser {
 
             if self.starts_with("[") {
                 break;
-            }
-
-            if self.starts_with("@") {
-                self.skip_line();
-                continue;
             }
 
             tags.push(self.parse_tag());
@@ -167,19 +142,6 @@ impl Parser {
         false
     }
 
-    /// Parses linker from input.
-    fn parse_link(&mut self) -> Linker {
-        assert_eq!(self.consume_char(), '@');
-        assert_eq!(self.consume_while(char::is_alphabetic), "link");
-        assert_eq!(self.consume_char(), '(');
-        let target = self.consume_while(valid_group_target);
-        assert_eq!(self.consume_char(), ')');
-
-        Linker {
-            target
-        }
-    }
-
     /// Parses tag from input.
     fn parse_tag(&mut self) -> Tag {
         let tag_value = self.consume_while(valid_tag);
@@ -192,14 +154,6 @@ impl Parser {
     /// Skips over comment.
     fn parse_comment(&mut self) {
         self.consume_while(valid_comment);
-    }
-
-    /// Skips line.
-    fn skip_line(&mut self) {
-        self.consume_while(|c| match c {
-            ' '...'~' => true,
-            _ => false
-        });
     }
 
     /// Consume and discard zero or more whitespace characters.
@@ -248,18 +202,10 @@ impl Parser {
     }
 }
 
-/// Validates character for linker target name.
+/// Validates character for group name.
 fn valid_group_name(c: char) -> bool {
     match c {
-        ' '...'\\' | '^'...'~' => true,
-        _ => false
-    }
-}
-
-/// Validates character for group name.
-fn valid_group_target(c: char) -> bool {
-    match c {
-        ' '...'(' | '*'...'~' => true,
+        '!'...'\\' | '^'...'~' => true,
         _ => false
     }
 }
