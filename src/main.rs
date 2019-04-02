@@ -2,7 +2,7 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::e621::EWeb;
-use crate::e621::io::{check_config, get_config, save_config};
+use crate::e621::io::{check_config, get_config, save_config, find_dir};
 use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
 
 mod e621;
@@ -18,6 +18,9 @@ fn main() -> Result<(), Box<Error>> {
     create_tag_file(&tag_path)?;
     let groups = parse_tag_file(&tag_path)?;
     println!("{:?}", groups);
+
+    let found_dir = find_dir(&"downloads".to_string(), Path::new(".")).unwrap();
+    println!("{}", found_dir);
 
     // Connect to e621, grab the posts, then download all of them.
     let mut connector = EWeb::new(&mut config);
