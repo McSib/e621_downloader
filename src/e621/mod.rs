@@ -5,7 +5,7 @@ extern crate serde;
 
 use std::error::Error;
 use std::fs::{create_dir_all, File};
-use std::io::{Read, Write};
+use std::io::{Read, Write, stdin};
 use std::path::Path;
 
 use chrono::{Date, Local};
@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
 use crate::e621::io::tag::{Tag, Group};
+use std::thread::sleep;
+use std::time::Duration;
+use console::Term;
 
 pub mod io;
 
@@ -163,6 +166,28 @@ impl<'a> EWeb<'a> {
         self.update_to_safe_url();
     }
 
+    /// Checks if the user wants to use safe mode.
+    pub fn check_for_safe_mode(&mut self) -> Result<(), Box<Error>>{
+        let mut response = String::new();
+        loop {
+            println!("Do you want to use safe mode (e926)? (Y/N)");
+            response.clear();
+            stdin().read_line(&mut response)?;
+            match response.to_lowercase().as_str() {
+                "y" => self.set_safe(),
+                "n" => break,
+                _ => {
+                    let term = Term::stdout();
+                    println!("Input invalid!");
+                    sleep(Duration::from_millis(1000));
+                    term.clear_screen()?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Gets posts with tags supplied and iterates through pages until no more posts available.
     pub fn get_posts(&mut self, groups: &Vec<Group>) -> Result<(), Box<Error>> {
         for group in groups {
@@ -171,24 +196,27 @@ impl<'a> EWeb<'a> {
             }
 
             for tag in &group.tags {
-                println!("Grabbing post tagged: {}", tag.value);
+                println!("Grabbing posts tagged: {}", tag.value);
                 self.update_tag_date(tag);
 
                 let mut page = 1;
                 let mut json: Vec<Post>;
-
-                let mut posts: Vec<Post> = Vec::new();
+                let mut posts: Vec<Post> = vec![];
                 loop {
                     json = self.client.get(&self.url)
                         .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
                         .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
-                                ("page", format!("{}", page)),
-                                ("limit", String::from("320"))])
+                            ("page", format!("{}", page)),
+                            ("limit", String::from("320"))])
                         .send()
                         .expect("Unable to make connection to e621!")
                         .json::<Vec<Post>>()?;
                     if json.len() <= 0 {
                         break;
+                    }
+
+                    for post in &json {
+                        println!("url: {}", post.file_url);
                     }
 
                     posts.append(&mut json);
@@ -208,16 +236,9 @@ impl<'a> EWeb<'a> {
     /// Updates config `last_run` to hold new date.
     fn update_tag_date(&mut self, tag: &Tag) {
         let date: Date<Local> = Local::today();
-
-        let key_date = self.config.last_run.entry(tag.value.clone()).or_insert(DEFAULT_DATE.to_string());
-
-        // TODO: This looks wrong for me, is there a way to improve this?
-        if key_date != DEFAULT_DATE {
-            *key_date = date.format("%Y-%m-%d").to_string();
-        } else {
-            key_date.remove(key_date.len() - 1);
-            key_date.push_str("2");
-        }
+        self.config.last_run.entry(tag.value.clone())
+            .and_modify(|e| *e = date.format("%Y-%m-%d").to_string())
+            .or_insert(DEFAULT_DATE.to_string());
     }
 
     /// Downloads images from collected posts.

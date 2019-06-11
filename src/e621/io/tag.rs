@@ -4,25 +4,25 @@ use std::io::Write;
 use std::path::Path;
 
 use crate::e621::io::emergency_exit;
+use std::thread::sleep;
+use std::time::Duration;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
 static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
 
 /// Tag object used for searching e621.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tag {
     /// Value of the tag.
     pub value: String,
 }
 
 /// Groups contains tags given to it.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Group {
     /// Name of group
     pub group_name: String,
-    /// All groups this group links to
-    pub parent: String,
     /// Tags in group
     pub tags: Vec<Tag>,
 }
@@ -83,28 +83,13 @@ impl Parser {
         let name = self.get_group_name();
         self.consume_whitespace();
 
-        let mut parent = String::new();
-        if self.starts_with(":") {
-            parent = self.get_extension_target();
-        }
-
         assert_eq!(self.consume_char(), ']');
         let tags = self.parse_tags();
 
         Group {
             group_name: name,
-            parent,
             tags,
         }
-    }
-
-    /// Gets extension target of group
-    fn get_extension_target(&mut self) -> String {
-        assert_eq!(self.consume_char(), ':');
-        self.consume_whitespace();
-        let parent = self.consume_while(valid_group_name);
-        self.consume_whitespace();
-        parent
     }
 
     /// Gets group name.
@@ -223,5 +208,58 @@ fn valid_comment(c: char) -> bool {
     match c {
         ' '...'~' => true,
         _ => false
+    }
+}
+
+/// Validates tags parsed from the parser.
+pub struct TagValidator {
+    groups: Vec<Group>,
+    tags: Vec<Tag>,
+}
+
+impl TagValidator {
+    /// Constructs new instance of `TagValidator`
+    pub fn new(groups: &Vec<Group>) -> TagValidator {
+        /// Collects all tags in a vector
+        fn collect_tags(groups: &Vec<Group>) -> Vec<Tag> {
+            let mut tags: Vec<Tag> = vec![];
+            for group in groups {
+                let mut group_tags = group.tags.to_vec();
+                tags.append(&mut group_tags);
+            }
+
+            tags
+        }
+
+        let tags: Vec<Tag> = collect_tags(groups);
+
+        TagValidator {
+            groups: groups.to_vec(),
+            tags,
+        }
+    }
+
+    /// Checks for any groups that aren't the default and checks for missing groups that are default
+    pub fn validate_groups(&self) -> bool {
+        if self.groups.len() < 3 {
+            println!("There are less than three groups! Make sure that all groups are in tags.txt!");
+            sleep(Duration::from_millis(1000));
+            return false;
+        }
+
+        for group in &self.groups {
+            match group.group_name.as_str() {
+                "artists" => continue,
+                "normal-tags" => continue,
+                "pools" => continue,
+                _ => {
+                    println!("Group {} is unknown!", group.group_name);
+                    sleep(Duration::from_millis(1000));
+                    return false;
+                },
+            }
+        }
+
+        true
     }
 }

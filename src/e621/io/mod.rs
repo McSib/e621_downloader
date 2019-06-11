@@ -3,7 +3,7 @@ extern crate serde_json;
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::{File, read_to_string, write, read_dir};
+use std::fs::{File, read_to_string, write};
 use std::io;
 use std::path::Path;
 use std::process::exit;
@@ -115,23 +115,4 @@ fn emergency_exit(error: &str) {
     let mut line = String::new();
     io::stdin().read_line(&mut line).unwrap_or_default();
     exit(0);
-}
-
-pub fn find_dir(target: &String, dir: &Path) -> io::Result<String> {
-    for path in read_dir(dir)? {
-        let dir_path = path?;
-        if dir_path.path().is_dir() {
-            let path_str = dir_path.path().to_str().unwrap();
-            println!("{:?}", path_str);
-            if path_str.contains(target) {
-                return Ok(path_str.to_string());
-            }
-            return find_dir(&target, &dir_path.path());
-        }
-//        if dir_path.file_name().into_string()?.contains(dir) == dir {
-//
-//        }
-    }
-
-    Ok(String::from("Hello"))
 }

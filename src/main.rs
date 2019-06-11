@@ -2,8 +2,8 @@ use std::error::Error;
 use std::path::Path;
 
 use crate::e621::EWeb;
-use crate::e621::io::{check_config, get_config, save_config, find_dir};
-use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
+use crate::e621::io::{check_config, get_config, save_config};
+use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME, TagValidator};
 
 mod e621;
 
@@ -16,19 +16,23 @@ fn main() -> Result<(), Box<Error>> {
     // Create tag if it doesn't exist, then parse it.
     let tag_path = Path::new(TAG_NAME);
     create_tag_file(&tag_path)?;
+
+    // Parse tag file
     let groups = parse_tag_file(&tag_path)?;
     println!("{:?}", groups);
 
-    let found_dir = find_dir(&"downloads".to_string(), Path::new(".")).unwrap();
-    println!("{}", found_dir);
+    // Validate tags and group names
+    let validator = TagValidator::new(&groups);
+    if validator.validate_groups() {
+        // Connect to e621, grab the posts, then download all of them.
+        let mut connector = EWeb::new(&mut config);
+        connector.check_for_safe_mode()?;
+        connector.get_posts(&groups)?;
+//        connector.download_posts()?;
 
-    // Connect to e621, grab the posts, then download all of them.
-    let mut connector = EWeb::new(&mut config);
-    connector.get_posts(&groups)?;
-//    connector.download_posts()?;
-
-    // Update the date for future runs.
-//    save_config(&config)?;
+        // Update the date for future runs.
+        save_config(&config)?;
+    }
 
     Ok(())
 }
