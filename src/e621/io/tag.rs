@@ -214,7 +214,7 @@ fn valid_comment(c: char) -> bool {
 /// Validates tags parsed from the parser.
 pub struct TagValidator {
     groups: Vec<Group>,
-    tags: Vec<Tag>,
+    tags: Vec<Tag>, // TODO: This is unused right now, but will be used when I make the tag validator.
 }
 
 impl TagValidator {

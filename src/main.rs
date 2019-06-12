@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use crate::e621::EWeb;
+use crate::e621::EsixWebConnector;
 use crate::e621::io::{check_config, get_config, save_config};
 use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME, TagValidator};
 
@@ -25,10 +25,10 @@ fn main() -> Result<(), Box<Error>> {
     let validator = TagValidator::new(&groups);
     if validator.validate_groups() {
         // Connect to e621, grab the posts, then download all of them.
-        let mut connector = EWeb::new(&mut config);
+        let mut connector = EsixWebConnector::new(&mut config);
         connector.check_for_safe_mode()?;
         connector.get_posts(&groups)?;
-//        connector.download_posts()?;
+        connector.download_posts()?;
 
         // Update the date for future runs.
         save_config(&config)?;

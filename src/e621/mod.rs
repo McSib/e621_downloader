@@ -106,16 +106,24 @@ pub struct Post {
     pub sources: Option<Vec<String>>,
 }
 
+#[derive(Debug)]
+/// Stores all posts from searched parsed tag.
+struct TagPosts {
+    pub searching_tag: String,
+    pub posts: Vec<Post>,
+}
+
+#[derive(Debug)]
 /// Contains posts tied to a specific group.
 struct GroupPosts {
     /// Name of group
     pub group_name: String,
     /// All posts in group
-    pub posts: Vec<Post>,
+    pub tag_posts: Vec<TagPosts>,
 }
 
 /// Basic web connector for e621.
-pub struct EWeb<'a> {
+pub struct EsixWebConnector<'a> {
     /// Url used for connecting and downloading images
     url: String,
     /// Whether the site is the safe version or note. If true, it will force connection to E926 instead of E621
@@ -128,7 +136,7 @@ pub struct EWeb<'a> {
     posts: Vec<GroupPosts>,
 }
 
-impl<'a> EWeb<'a> {
+impl<'a> EsixWebConnector<'a> {
     /// Creates new EWeb object for connecting and downloading images.
     ///
     /// # Example
@@ -136,8 +144,8 @@ impl<'a> EWeb<'a> {
     /// ```
     /// let connector = EWeb::new();
     /// ```
-    pub fn new(config: &mut Config) -> EWeb {
-        let connector = EWeb {
+    pub fn new(config: &mut Config) -> EsixWebConnector {
+        let connector = EsixWebConnector {
             url: "https://e621.net/post/index.json".to_string(),
             safe: false,
             config,
@@ -173,8 +181,11 @@ impl<'a> EWeb<'a> {
             println!("Do you want to use safe mode (e926)? (Y/N)");
             response.clear();
             stdin().read_line(&mut response)?;
-            match response.to_lowercase().as_str() {
-                "y" => self.set_safe(),
+            match response.to_lowercase().trim() {
+                "y" => {
+                    self.set_safe();
+                    break;
+                },
                 "n" => break,
                 _ => {
                     let term = Term::stdout();
@@ -195,6 +206,7 @@ impl<'a> EWeb<'a> {
                 continue;
             }
 
+            let mut tag_posts: Vec<TagPosts> = vec![];
             for tag in &group.tags {
                 println!("Grabbing posts tagged: {}", tag.value);
                 self.update_tag_date(tag);
@@ -215,19 +227,22 @@ impl<'a> EWeb<'a> {
                         break;
                     }
 
-                    for post in &json {
-                        println!("url: {}", post.file_url);
-                    }
-
                     posts.append(&mut json);
                     page += 1;
                 }
 
-                self.posts.push(GroupPosts {
-                    group_name: group.group_name.clone(),
-                    posts,
+                tag_posts.push(TagPosts {
+                    searching_tag: tag.value.clone(),
+                    posts
                 });
             }
+
+            self.posts.push(GroupPosts {
+                group_name: group.group_name.clone(),
+                tag_posts
+            });
+
+            println!("{:#?}", self.posts);
         }
 
         Ok(())
@@ -242,34 +257,38 @@ impl<'a> EWeb<'a> {
     }
 
     /// Downloads images from collected posts.
-//    pub fn download_posts(&self) -> Result<(), Box<Error>> {
-//        let mut progress_bar = ProgressBar::new(self.posts.len() as u64);
-//
-//        for post in &self.posts {
-//            let name = self.get_name_for_image(&post);
-//            let mut image: Vec<u8> = Vec::new();
-//            self.client.get(post.file_url.as_str())
-//                .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-//                .send()?.read_to_end(&mut image)?;
-//            self.save_image(&name, &image, &post.file_ext.as_ref().unwrap(), &post.artist[0])?;
-//            progress_bar.inc();
-//        }
-//
-//        progress_bar.finish_println("Posts downloaded!");
-//
-//        Ok(())
-//    }
+    pub fn download_posts(&self) -> Result<(), Box<Error>> {
+        // TODO: Program different treatment of groups.
+        for tag_post in &self.posts[0].tag_posts {
+            let mut progress_bar = ProgressBar::new(tag_post.posts.len() as u64);
+            progress_bar.message(tag_post.searching_tag.as_str());
+
+            for post in &tag_post.posts {
+                let name = self.get_name_for_image(post);
+                let mut image: Vec<u8> = Vec::new();
+                self.client.get(post.file_url.as_str())
+                    .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+                    .send()?.read_to_end(&mut image)?;
+                self.save_image(&name, &image, post.file_ext.as_ref().unwrap(), &tag_post.searching_tag.clone())?;
+                progress_bar.inc();
+            }
+
+            progress_bar.finish_println("Posts downloaded!");
+        }
+
+        Ok(())
+    }
 
     /// Saves image to directory described in config.
-    fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, artist: &String) -> Result<(), Box<Error>> {
-        let download_dest = format!("{}{}", self.config.download_directory, artist);
+    fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, tag: &String) -> Result<(), Box<Error>> {
+        let download_dest = format!("{}{}", self.config.download_directory, tag);
         if !Path::new(download_dest.as_str()).exists() {
             create_dir_all(Path::new(download_dest.as_str()))?;
         }
 
         let mut file: File;
         if self.config.create_directories {
-            file = File::create(Path::new(format!("{}{}/{}.{}", self.config.download_directory, artist, name, image_type).as_str()))?;
+            file = File::create(Path::new(format!("{}{}/{}.{}", self.config.download_directory, tag, name, image_type).as_str()))?;
             file.write(source)?;
         } else {
             file = File::create(Path::new(format!("{}{}.{}", self.config.download_directory, name, image_type).as_str()))?;
