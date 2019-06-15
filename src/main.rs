@@ -18,21 +18,23 @@ fn main() -> Result<(), Box<Error>> {
     create_tag_file(&tag_path)?;
 
     // Parse tag file
-    let groups = parse_tag_file(&tag_path)?;
-    println!("{:?}", groups);
+    let mut tags = parse_tag_file(&tag_path)?;
+    println!("{:?}", tags);
 
     // Validate tags and group names
-    let validator = TagValidator::new(&groups);
-    if validator.validate_groups() {
-        // Connect to e621, grab the posts, then download all of them.
-        let mut connector = EsixWebConnector::new(&mut config);
-        connector.check_for_safe_mode()?;
-        connector.get_posts(&groups)?;
-        connector.download_posts()?;
-
-        // Update the date for future runs.
-        save_config(&config)?;
-    }
+    let mut validator = TagValidator::new();
+    validator.validate_and_identify_tags(&mut tags);
+    println!("{:?}", tags);
+//    if validator.validate_groups() {
+//        // Connect to e621, grab the posts, then download all of them.
+//        let mut connector = EsixWebConnector::new(&mut config);
+//        connector.check_for_safe_mode()?;
+//        connector.get_posts(&groups)?;
+//        connector.download_posts()?;
+//
+//        // Update the date for future runs.
+//        save_config(&config)?;
+//    }
 
     Ok(())
 }

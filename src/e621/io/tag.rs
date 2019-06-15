@@ -1,30 +1,53 @@
+extern crate serde;
+extern crate serde_json;
+
 use std::error::Error;
 use std::fs::{File, read_to_string};
 use std::io::Write;
 use std::path::Path;
-
-use crate::e621::io::emergency_exit;
 use std::thread::sleep;
 use std::time::Duration;
+
+use serde::Deserialize;
+
+use crate::e621::io::emergency_exit;
+
+use super::super::reqwest::Client;
+use std::process::exit;
+use core::borrow::BorrowMut;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
 static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
+
+/// All the type the tag can be (this will help in identifying how to treat the tag).
+#[derive(Debug, Clone)]
+pub enum TagType {
+    None,
+    General,
+    Artist,
+    Copyright,
+    Character,
+    Species,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct TagJsonData {
+    id: u32,
+    name: String,
+    count: u32,
+    #[serde(rename = "type")]
+    tag_type: u8,
+    type_locked: Option<bool>,
+}
 
 /// Tag object used for searching e621.
 #[derive(Debug, Clone)]
 pub struct Tag {
     /// Value of the tag.
     pub value: String,
-}
-
-/// Groups contains tags given to it.
-#[derive(Debug, Clone)]
-pub struct Group {
-    /// Name of group
-    pub group_name: String,
-    /// Tags in group
-    pub tags: Vec<Tag>,
+    /// The type of tag it is.
+    pub tag_type: TagType,
 }
 
 /// Creates tag file if it doesn't exist.
@@ -40,9 +63,9 @@ pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Box<Error>> {
+pub fn parse_tag_file(p: &Path) -> Result<Vec<Tag>, Box<Error>> {
     let source = read_to_string(p)?;
-    Ok(Parser { pos: 0, input: source }.parse_groups())
+    Ok(Parser { pos: 0, input: source }.parse_tags())
 }
 
 /// Parser that reads a tag file and parses the tags.
@@ -55,8 +78,8 @@ struct Parser {
 
 impl Parser {
     /// Parses groups.
-    pub fn parse_groups(&mut self) -> Vec<Group> {
-        let mut groups: Vec<Group> = Vec::new();
+    pub fn parse_tags(&mut self) -> Vec<Tag> {
+        let mut tags: Vec<Tag> = Vec::new();
         loop {
             self.consume_whitespace();
             if self.eof() {
@@ -65,50 +88,6 @@ impl Parser {
 
             if self.check_and_parse_comment() {
                 continue;
-            }
-
-            if self.starts_with("[") {
-                groups.push(self.parse_group());
-            } else {
-                println!("Tags can't be outside of a group!");
-            }
-        }
-
-        groups
-    }
-
-    /// Parses group in input.
-    fn parse_group(&mut self) -> Group {
-        assert_eq!(self.consume_char(), '[');
-        let name = self.get_group_name();
-        self.consume_whitespace();
-
-        assert_eq!(self.consume_char(), ']');
-        let tags = self.parse_tags();
-
-        Group {
-            group_name: name,
-            tags,
-        }
-    }
-
-    /// Gets group name.
-    fn get_group_name(&mut self) -> String {
-        self.consume_while(valid_group_name)
-    }
-
-    /// Parses tags in group.
-    fn parse_tags(&mut self) -> Vec<Tag> {
-        let mut tags: Vec<Tag> = Vec::new();
-
-        while !self.eof() {
-            self.consume_whitespace();
-            if self.check_and_parse_comment() {
-                continue;
-            }
-
-            if self.starts_with("[") {
-                break;
             }
 
             tags.push(self.parse_tag());
@@ -133,6 +112,7 @@ impl Parser {
 
         Tag {
             value: tag_value.trim_end_matches(' ').to_string(),
+            tag_type: TagType::None
         }
     }
 
@@ -187,14 +167,6 @@ impl Parser {
     }
 }
 
-/// Validates character for group name.
-fn valid_group_name(c: char) -> bool {
-    match c {
-        '!'...'\\' | '^'...'~' => true,
-        _ => false
-    }
-}
-
 /// Validates character for tag.
 fn valid_tag(c: char) -> bool {
     match c {
@@ -213,53 +185,44 @@ fn valid_comment(c: char) -> bool {
 
 /// Validates tags parsed from the parser.
 pub struct TagValidator {
-    groups: Vec<Group>,
-    tags: Vec<Tag>, // TODO: This is unused right now, but will be used when I make the tag validator.
 }
 
 impl TagValidator {
     /// Constructs new instance of `TagValidator`
-    pub fn new(groups: &Vec<Group>) -> TagValidator {
-        /// Collects all tags in a vector
-        fn collect_tags(groups: &Vec<Group>) -> Vec<Tag> {
-            let mut tags: Vec<Tag> = vec![];
-            for group in groups {
-                let mut group_tags = group.tags.to_vec();
-                tags.append(&mut group_tags);
-            }
-
-            tags
-        }
-
-        let tags: Vec<Tag> = collect_tags(groups);
-
-        TagValidator {
-            groups: groups.to_vec(),
-            tags,
-        }
+    pub fn new() -> TagValidator {
+        TagValidator {}
     }
 
-    /// Checks for any groups that aren't the default and checks for missing groups that are default
-    pub fn validate_groups(&self) -> bool {
-        if self.groups.len() < 3 {
-            println!("There are less than three groups! Make sure that all groups are in tags.txt!");
-            sleep(Duration::from_millis(1000));
-            return false;
-        }
-
-        for group in &self.groups {
-            match group.group_name.as_str() {
-                "artists" => continue,
-                "normal-tags" => continue,
-                "pools" => continue,
-                _ => {
-                    println!("Group {} is unknown!", group.group_name);
-                    sleep(Duration::from_millis(1000));
-                    return false;
-                },
+    pub fn validate_and_identify_tags(&mut self, tags: &mut Vec<Tag>) -> Result<(), Box<Error>> {
+        let url = "https://e621.net/tag/index.json";
+        let client = Client::new();
+        for tag in tags.iter_mut() {
+            let collected_tag_data: Vec<TagJsonData> = client.get(url)
+                                                    .query(&[("name", tag.value.clone())])
+                                                    .send()?
+                .json()?;
+            if collected_tag_data.is_empty() {
+                println!("{} is invalid!", tag.value);
+                println!("Validation failed!");
+                sleep(Duration::from_secs(2));
+                exit(-1);
             }
+
+            let data = &collected_tag_data[0];
+            tag.tag_type = self.get_tag_type(&data.tag_type);
         }
 
-        true
+        Ok(())
+    }
+
+    fn get_tag_type(&self, tag_data: &u8) -> TagType {
+        match tag_data {
+            0 => return TagType::General,
+            1 => return TagType::Artist,
+            2 => return TagType::Copyright,
+            3 => return TagType::Character,
+            4 => return TagType::Species,
+            _ => return TagType::None,
+        }
     }
 }

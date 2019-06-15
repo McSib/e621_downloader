@@ -1,24 +1,25 @@
 extern crate chrono;
+extern crate console;
 extern crate pbr;
 extern crate reqwest;
 extern crate serde;
 
 use std::error::Error;
 use std::fs::{create_dir_all, File};
-use std::io::{Read, Write, stdin};
+use std::io::{Read, stdin, Write};
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 
 use chrono::{Date, Local};
+use console::Term;
 use pbr::ProgressBar;
 use reqwest::Client;
 use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
 use crate::e621::io::Config;
-use crate::e621::io::tag::{Tag, Group};
-use std::thread::sleep;
-use std::time::Duration;
-use console::Term;
+use crate::e621::io::tag::{Tag};
 
 pub mod io;
 
@@ -133,7 +134,7 @@ pub struct EsixWebConnector<'a> {
     /// Web client to connect and download images.
     client: Client,
     /// All posts grabbed from e621 search.
-    posts: Vec<GroupPosts>,
+    groups: Vec<GroupPosts>,
 }
 
 impl<'a> EsixWebConnector<'a> {
@@ -150,7 +151,7 @@ impl<'a> EsixWebConnector<'a> {
             safe: false,
             config,
             client: Client::new(),
-            posts: Vec::new(),
+            groups: Vec::new(),
         };
 
         if connector.config.part_used_as_name != "md5" && connector.config.part_used_as_name != "id" {
@@ -175,7 +176,7 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Checks if the user wants to use safe mode.
-    pub fn check_for_safe_mode(&mut self) -> Result<(), Box<Error>>{
+    pub fn check_for_safe_mode(&mut self) -> Result<(), Box<Error>> {
         let mut response = String::new();
         loop {
             println!("Do you want to use safe mode (e926)? (Y/N)");
@@ -199,54 +200,54 @@ impl<'a> EsixWebConnector<'a> {
         Ok(())
     }
 
-    /// Gets posts with tags supplied and iterates through pages until no more posts available.
-    pub fn get_posts(&mut self, groups: &Vec<Group>) -> Result<(), Box<Error>> {
-        for group in groups {
-            if group.tags.is_empty() {
-                continue;
-            }
-
-            let mut tag_posts: Vec<TagPosts> = vec![];
-            for tag in &group.tags {
-                println!("Grabbing posts tagged: {}", tag.value);
-                self.update_tag_date(tag);
-
-                let mut page = 1;
-                let mut json: Vec<Post>;
-                let mut posts: Vec<Post> = vec![];
-                loop {
-                    json = self.client.get(&self.url)
-                        .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                        .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
-                            ("page", format!("{}", page)),
-                            ("limit", String::from("320"))])
-                        .send()
-                        .expect("Unable to make connection to e621!")
-                        .json::<Vec<Post>>()?;
-                    if json.len() <= 0 {
-                        break;
-                    }
-
-                    posts.append(&mut json);
-                    page += 1;
-                }
-
-                tag_posts.push(TagPosts {
-                    searching_tag: tag.value.clone(),
-                    posts
-                });
-            }
-
-            self.posts.push(GroupPosts {
-                group_name: group.group_name.clone(),
-                tag_posts
-            });
-
-            println!("{:#?}", self.posts);
-        }
-
-        Ok(())
-    }
+//    /// Gets posts with tags supplied and iterates through pages until no more posts available.
+//    pub fn get_posts(&mut self, groups: &Vec<Group>) -> Result<(), Box<Error>> {
+//        for group in groups {
+//            if group.tags.is_empty() {
+//                continue;
+//            }
+//
+//            let mut tag_posts: Vec<TagPosts> = vec![];
+//            for tag in &group.tags {
+//                println!("Grabbing posts tagged: {}", tag.value);
+//                self.update_tag_date(tag);
+//
+//                let mut page = 1;
+//                let mut json: Vec<Post>;
+//                let mut posts: Vec<Post> = vec![];
+//                loop {
+//                    json = self.client.get(&self.url)
+//                               .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
+//                               .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
+//                                   ("page", format!("{}", page)),
+//                                   ("limit", String::from("320"))])
+//                               .send()
+//                               .expect("Unable to make connection to e621!")
+//                               .json::<Vec<Post>>()?;
+//                    if json.len() <= 0 {
+//                        break;
+//                    }
+//
+//                    posts.append(&mut json);
+//                    page += 1;
+//                }
+//
+//                tag_posts.push(TagPosts {
+//                    searching_tag: tag.value.clone(),
+//                    posts
+//                });
+//            }
+//
+//            self.groups.push(GroupPosts {
+//                group_name: group.group_name.clone(),
+//                tag_posts
+//            });
+//
+//            println!("{:#?}", self.groups);
+//        }
+//
+//        Ok(())
+//    }
 
     /// Updates config `last_run` to hold new date.
     fn update_tag_date(&mut self, tag: &Tag) {
@@ -257,18 +258,23 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Downloads images from collected posts.
+    ///
+    /// # Warning
+    /// Since request are sent through a single thread, the progress bar may slow down progress.
+    /// This, along with other issues, is causing the program to take longer to download images (about 20+ minutes for 2000+ images).
     pub fn download_posts(&self) -> Result<(), Box<Error>> {
         // TODO: Program different treatment of groups.
-        for tag_post in &self.posts[0].tag_posts {
+        for tag_post in &self.groups[0].tag_posts {
             let mut progress_bar = ProgressBar::new(tag_post.posts.len() as u64);
-            progress_bar.message(tag_post.searching_tag.as_str());
+            progress_bar.message(format!("{} ", tag_post.searching_tag).as_str());
 
             for post in &tag_post.posts {
                 let name = self.get_name_for_image(post);
                 let mut image: Vec<u8> = Vec::new();
                 self.client.get(post.file_url.as_str())
                     .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                    .send()?.read_to_end(&mut image)?;
+                    .send()?
+                    .read_to_end(&mut image)?;
                 self.save_image(&name, &image, post.file_ext.as_ref().unwrap(), &tag_post.searching_tag.clone())?;
                 progress_bar.inc();
             }
