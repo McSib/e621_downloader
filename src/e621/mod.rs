@@ -1,320 +1,344 @@
 extern crate chrono;
-extern crate console;
-extern crate pbr;
 extern crate reqwest;
 extern crate serde;
 
+use std::collections::HashMap;
 use std::error::Error;
-use std::fs::{create_dir_all, File};
-use std::io::{Read, stdin, Write};
-use std::path::Path;
-use std::thread::sleep;
-use std::time::Duration;
+use std::io::stdin;
 
-use chrono::{Date, Local};
-use console::Term;
-use pbr::ProgressBar;
-use reqwest::Client;
-use reqwest::header::USER_AGENT;
-use serde::{Deserialize, Serialize};
+use chrono::Local;
+use reqwest::{header::USER_AGENT, Client, RequestBuilder};
+use serde::Serialize;
 
+use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
+use crate::e621::io::tag::Parsed;
 use crate::e621::io::Config;
-use crate::e621::io::tag::{Tag};
 
+mod data_sets;
 pub mod io;
 
-static USER_AGENT_PROJECT_NAME: &'static str = "e621_downloader/0.0.1 (by McSib on e621)";
+/// Default user agent value.
+static USER_AGENT_VALUE: &'static str = "e621_downloader/0.0.1 (by McSib on e621)";
+
+/// Default date for new tags.
 static DEFAULT_DATE: &'static str = "2006-01-01";
 
-/// Time the post was created.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatedAt {
-    pub json_class: String,
-    pub s: i64,
-    pub n: i64,
+/// A collection of posts with a name.
+#[derive(Debug, Clone)]
+struct NamedPost {
+    /// The name of the collection
+    pub name: String,
+    /// All of the post in collection
+    pub posts: Vec<PostEntry>,
 }
 
-/// Post from e621 or E926.
-/// 
-/// # Important
-/// If the post that is loaded happens to be deleted when loaded, these properties will not be usable:
-/// `source`, `sources`, `md5`, `file_size`, `file_ext`, `preview_width`, `preview_height`, `sample_url`, `sample_width`, `sample_height`, `has_children`, `children`.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Post {
-    /// The ID of the post
-    pub id: i64,
-    /// Tags from the post
-    pub tags: String,
-    /// Tags that are locked by the admins
-    pub locked_tags: Option<String>,
-    /// Description of the post
-    pub description: String,
-    /// When the post was uploaded
-    pub created_at: CreatedAt,
-    /// User ID of the user who uploaded the post
-    pub creator_id: Option<i64>,
-    /// Username of the user who uploaded the post
-    pub author: String,
-    /// The amount of changes that the post went through since uploaded
-    pub change: i64,
-    /// The main source of the work (use `sources` instead when using all source listed on post)
-    pub source: Option<String>,
-    /// How many upvoted or downvoted the post
-    pub score: i64,
-    /// How many favorites the post has
-    pub fav_count: i64,
-    /// The MD5 certification of the post
-    pub md5: Option<String>,
-    /// Size of the source file
-    pub file_size: Option<i64>,
-    /// URL of the source file
-    pub file_url: String,
-    /// Extension of the source file (png, jpg, webm, gif, etc)
-    pub file_ext: Option<String>,
-    /// URL for the preview file
-    pub preview_url: String,
-    /// Width of the preview file
-    pub preview_width: Option<i64>,
-    /// Height of the preview file
-    pub preview_height: Option<i64>,
-    /// URL for the sample file
-    pub sample_url: Option<String>,
-    /// Width of the sample file
-    pub sample_width: Option<i64>,
-    /// Height of the sample file
-    pub sample_height: Option<i64>,
-    /// Rating of the post (safe, questionable, explicit), this will be "s", "q", "e"
-    pub rating: String,
-    /// Post status, one of: active, flagged, pending, deleted
-    pub status: String,
-    /// Width of image
-    pub width: i64,
-    /// Height of image
-    pub height: i64,
-    /// If the post has comments
-    pub has_comments: bool,
-    /// If the post has notes
-    pub has_notes: bool,
-    /// If the post has children
-    pub has_children: Option<bool>,
-    /// All of the children attached to post
-    pub children: Option<String>,
-    /// If this post is a child, this will be the parent post's ID
-    pub parent_id: Option<i64>,
-    /// The artist or artists that drew this image
-    pub artist: Vec<String>,
-    /// All the sources for the work
-    pub sources: Option<Vec<String>>,
+impl From<&(&str, &[PostEntry])> for NamedPost {
+    /// Takes a tuple and creates a `NamedPost` to return.
+    fn from(entry: &(&str, &[PostEntry])) -> Self {
+        NamedPost {
+            name: entry.0.to_string(),
+            posts: entry.1.to_vec(),
+        }
+    }
 }
 
-#[derive(Debug)]
-/// Stores all posts from searched parsed tag.
-struct TagPosts {
-    pub searching_tag: String,
-    pub posts: Vec<Post>,
+/// Posts grab from search.
+#[derive(Default)]
+struct GrabbedPosts {
+    /// All posts from pools
+    pools: Vec<NamedPost>,
+    /// All posts from sets
+    sets: Vec<NamedPost>,
+    /// All individual posts
+    singles: Vec<PostEntry>,
+    /// All posts under a searching tag
+    posts: Vec<NamedPost>,
 }
 
-#[derive(Debug)]
-/// Contains posts tied to a specific group.
-struct GroupPosts {
-    /// Name of group
-    pub group_name: String,
-    /// All posts in group
-    pub tag_posts: Vec<TagPosts>,
+/// A collection of `Vec<NamedPost>` and `Vec<PostEntry>`.
+#[derive(Default, Debug)]
+struct Collection {
+    /// All named posts
+    named_posts: Vec<NamedPost>,
+    /// All individual posts
+    single_posts: Vec<PostEntry>,
 }
 
-/// Basic web connector for e621.
-pub struct EsixWebConnector<'a> {
-    /// Url used for connecting and downloading images
-    url: String,
-    /// Whether the site is the safe version or note. If true, it will force connection to E926 instead of E621
-    safe: bool,
-    /// Configuration data used for downloading images and tag searches
+impl Collection {
+    /// Processes all collected posts from a search and appends them to `self.named_posts` and `self.single_posts`.
+    fn set_posts(&mut self, collected_posts: &mut GrabbedPosts) {
+        self.named_posts.append(&mut collected_posts.pools);
+        self.named_posts.append(&mut collected_posts.sets);
+        self.single_posts.append(&mut collected_posts.singles);
+        self.named_posts.append(&mut collected_posts.posts);
+    }
+}
+
+/// Grabs all posts under a set of searching tags.
+struct Grabber<'a> {
+    /// All grabbed posts
+    pub grabbed_posts: GrabbedPosts,
+    /// Urls given as reference by `EsixWebConnector`
+    urls: &'a HashMap<String, String>,
+    /// Config given as reference by `EsixWebConnector`
     config: &'a mut Config,
-    /// Web client to connect and download images.
-    client: Client,
-    /// All posts grabbed from e621 search.
-    groups: Vec<GroupPosts>,
+}
+
+impl<'a> Grabber<'a> {
+    /// Creates new instance of `Self`.
+    pub fn new(urls: &'a HashMap<String, String>, config: &'a mut Config) -> Self {
+        Grabber {
+            grabbed_posts: GrabbedPosts::default(),
+            urls,
+            config,
+        }
+    }
+
+    /// Gets posts on creation using `tags` and searching with `urls`.
+    /// Also modifies the `config` when searching general tags.
+    pub fn from_tags(
+        tags: &[Parsed],
+        urls: &'a HashMap<String, String>,
+        config: &'a mut Config,
+    ) -> Result<Grabber<'a>, Box<dyn Error>> {
+        let mut grabber = Grabber::new(urls, config);
+        grabber.grab_tags(tags)?;
+        Ok(grabber)
+    }
+
+    /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
+    pub fn grab_tags(&mut self, tags: &[Parsed]) -> Result<(), Box<dyn Error>> {
+        let tag_client = Client::new();
+        for tag in tags {
+            match tag {
+                Parsed::Pool(id) => {
+                    let entry: PoolEntry = self
+                        .get_request_builder(&tag_client, "pool", &[("id", id)])
+                        .send()?
+                        .json()?;
+                    self.grabbed_posts.pools.push(NamedPost::from(&(
+                        entry.name.as_str(),
+                        entry.posts.as_slice(),
+                    )));
+
+                    println!("\"{}\" grabbed!", entry.name);
+                }
+                Parsed::Set(id) => {
+                    let entry: SetEntry = self
+                        .get_request_builder(&tag_client, "set", &[("id", id)])
+                        .send()?
+                        .json()?;
+                    self.grabbed_posts.sets.push(self.set_to_named(&entry)?);
+
+                    println!("\"{}\" grabbed!", entry.name);
+                }
+                Parsed::Post(id) => {
+                    let entry: PostEntry = self
+                        .get_request_builder(&tag_client, "single", &[("id", id)])
+                        .send()?
+                        .json()?;
+                    let id = entry.id;
+                    self.grabbed_posts.singles.push(entry);
+
+                    println!("\"{}\" post grabbed!", id);
+                }
+                Parsed::General(name) => {
+                    let mut tag = name.clone();
+                    self.update_tag_date(tag.as_str());
+                    self.add_date_to_tag(&mut tag);
+                    let posts = self.get_posts_from_tag(&tag_client, &tag)?;
+                    self.grabbed_posts
+                        .posts
+                        .push(NamedPost::from(&(tag.as_str(), posts.as_slice())));
+
+                    println!("\"{}\" grabbed!", name);
+                }
+            };
+        }
+
+        Ok(())
+    }
+
+    fn get_posts_from_tag(
+        &self,
+        client: &Client,
+        tag: &String,
+    ) -> Result<Vec<PostEntry>, Box<dyn Error>> {
+        // TODO: Use this code once we can tell the type of tag we're dealing with.
+
+        //        let limit: u8 = 10;
+        //        let mut posts: Vec<PostEntry> = vec![];
+        //        for page in 1..limit {
+        //            posts.push(
+        //                        self.get_request_builder(
+        //                            &client,
+        //                            "post",
+        //                            &[
+        //                                ("tags", tag),
+        //                                ("page", &format!("{}", page)),
+        //                                ("limit", &format!("{}", 320)),
+        //                            ],
+        //                        )
+        //                        .send()?
+        //                        .json()?,
+        //            );
+        //        }
+
+        let mut page: u16 = 1;
+        let mut posts = vec![];
+        loop {
+            let mut data_set: Vec<PostEntry> = self
+                .get_request_builder(
+                    &client,
+                    "post",
+                    &[
+                        ("tags", tag),
+                        ("page", &format!("{}", page)),
+                        ("limit", &format!("{}", 320)),
+                    ],
+                )
+                .send()?
+                .json()?;
+            if data_set.is_empty() {
+                break;
+            }
+
+            posts.append(&mut data_set);
+            page += 1;
+        }
+
+        Ok(posts)
+    }
+
+    fn add_date_to_tag(&self, tag: &mut String) {
+        *tag = format!("{} date:>={}", tag, self.config.last_run[tag.as_str()]);
+    }
+
+    /// Updates the tag date.
+    fn update_tag_date(&mut self, entry: &str) {
+        self.config
+            .last_run
+            .entry(entry.to_string())
+            .and_modify(|val| *val = Local::today().format("%Y-%m-%d").to_string())
+            .or_insert_with(|| DEFAULT_DATE.to_string());
+    }
+
+    /// Creates a request builder for tag searches.
+    fn get_request_builder<T: Serialize>(
+        &self,
+        client: &Client,
+        entry: &str,
+        query: &T,
+    ) -> RequestBuilder {
+        client
+            .get(self.urls[entry].as_str())
+            .header(USER_AGENT, USER_AGENT_VALUE)
+            .query(query)
+    }
+
+    /// Converts `SetEntry` to `NamedPost`.
+    fn set_to_named(&self, set: &SetEntry) -> Result<NamedPost, Box<dyn Error>> {
+        let client_builder = Client::builder();
+        let client = client_builder.cookie_store(false).tcp_nodelay().build()?;
+
+        let name = set.name.as_str();
+        let mut posts: Vec<PostEntry> = vec![];
+        for id in &set.posts {
+            posts.push(
+                self.get_request_builder(&client, "single", &[("id", id)])
+                    .send()?
+                    .json()?,
+            );
+        }
+
+        Ok(NamedPost::from(&(name, posts.as_slice())))
+    }
+}
+
+pub struct EsixWebConnector<'a> {
+    /// All urls that can be used.
+    /// These options are `"post"`, `"pool"`, `"set"`, and `"single"`
+    urls: HashMap<String, String>,
+    /// The config which is modified when grabbing posts
+    config: &'a mut Config,
+    //    client: Client,
+    /// Collection of all posts grabbed and posts to be downloaded
+    collection: Collection,
 }
 
 impl<'a> EsixWebConnector<'a> {
-    /// Creates new EWeb object for connecting and downloading images.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let connector = EWeb::new();
-    /// ```
-    pub fn new(config: &mut Config) -> EsixWebConnector {
-        let connector = EsixWebConnector {
-            url: "https://e621.net/post/index.json".to_string(),
-            safe: false,
+    /// Initializes urls for the `Hashmap<String, String>`.
+    fn initialize_urls(urls: &mut HashMap<String, String>) {
+        urls.insert(
+            String::from("post"),
+            String::from("https://e621.net/post/index.json"),
+        );
+        urls.insert(
+            String::from("pool"),
+            String::from("https://e621.net/pool/show.json"),
+        );
+        urls.insert(
+            String::from("set"),
+            String::from("https://e621.net/set/show.json"),
+        );
+        urls.insert(
+            String::from("single"),
+            String::from("https://e621.net/post/show.json"),
+        );
+    }
+
+    /// Creates instance of `Self` for grabbing and downloading posts.
+    pub fn new(config: &'a mut Config) -> Self {
+        let mut connector = EsixWebConnector {
+            urls: HashMap::new(),
             config,
-            client: Client::new(),
-            groups: Vec::new(),
+            //            client: Client::new(),
+            collection: Collection::default(),
         };
 
-        if connector.config.part_used_as_name != "md5" && connector.config.part_used_as_name != "id" {
-            println!("Config `part_used_as_name` is set incorrectly!");
-            println!("This will auto set to `md5` for this image, but you should fix the config when done with the program.");
-        }
+        EsixWebConnector::initialize_urls(&mut connector.urls);
 
         connector
     }
 
-    /// Sets the site into safe mode so no NSFW images popup in the course of downloading.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let connector = EWeb::new();
-    /// connector.set_safe();
-    /// ```
-    pub fn set_safe(&mut self) {
-        self.safe = true;
-        self.update_to_safe_url();
+    /// Gets input and checks if the user wants to enter safe mode.
+    /// If they do, this changes `self.urls` all to e926 and not e621.
+    pub fn should_enter_safe_mode(&mut self) {
+        if self.get_input("Should enter safe mode") {
+            self.update_urls_to_safe();
+        }
     }
 
-    /// Checks if the user wants to use safe mode.
-    pub fn check_for_safe_mode(&mut self) -> Result<(), Box<Error>> {
-        let mut response = String::new();
+    /// Gets a simply yes/no for whether or not to do something.
+    fn get_input(&self, msg: &str) -> bool {
+        println!("{} (Y/N)?", msg);
         loop {
-            println!("Do you want to use safe mode (e926)? (Y/N)");
-            response.clear();
-            stdin().read_line(&mut response)?;
-            match response.to_lowercase().trim() {
-                "y" => {
-                    self.set_safe();
-                    break;
-                },
-                "n" => break,
+            let mut input = String::new();
+            stdin().read_line(&mut input).unwrap();
+            match input.to_lowercase().trim() {
+                "y" | "yes" => return true,
+                "n" | "no" => return false,
                 _ => {
-                    let term = Term::stdout();
-                    println!("Input invalid!");
-                    sleep(Duration::from_millis(1000));
-                    term.clear_screen()?;
+                    println!("Incorrect input!");
+                    println!("Try again!");
                 }
             }
         }
+    }
+
+    /// Updates all urls from e621 to e926.
+    fn update_urls_to_safe(&mut self) {
+        for (_, val) in self.urls.iter_mut() {
+            let safe = val.replace("e621", "e926");
+            *val = safe;
+        }
+    }
+
+    /// Grabs all posts using `&[ParsedTag]` then converts grabbed posts and appends it to `self.collection`.
+    pub fn grab_posts(&mut self, tags: &[Parsed]) -> Result<(), Box<dyn Error>> {
+        let mut post_grabber = Grabber::from_tags(tags, &self.urls, self.config)?;
+        self.collection.set_posts(&mut post_grabber.grabbed_posts);
 
         Ok(())
-    }
-
-//    /// Gets posts with tags supplied and iterates through pages until no more posts available.
-//    pub fn get_posts(&mut self, groups: &Vec<Group>) -> Result<(), Box<Error>> {
-//        for group in groups {
-//            if group.tags.is_empty() {
-//                continue;
-//            }
-//
-//            let mut tag_posts: Vec<TagPosts> = vec![];
-//            for tag in &group.tags {
-//                println!("Grabbing posts tagged: {}", tag.value);
-//                self.update_tag_date(tag);
-//
-//                let mut page = 1;
-//                let mut json: Vec<Post>;
-//                let mut posts: Vec<Post> = vec![];
-//                loop {
-//                    json = self.client.get(&self.url)
-//                               .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-//                               .query(&[("tags", format!("{} date:>={}", tag.value, self.config.last_run[&tag.value])),
-//                                   ("page", format!("{}", page)),
-//                                   ("limit", String::from("320"))])
-//                               .send()
-//                               .expect("Unable to make connection to e621!")
-//                               .json::<Vec<Post>>()?;
-//                    if json.len() <= 0 {
-//                        break;
-//                    }
-//
-//                    posts.append(&mut json);
-//                    page += 1;
-//                }
-//
-//                tag_posts.push(TagPosts {
-//                    searching_tag: tag.value.clone(),
-//                    posts
-//                });
-//            }
-//
-//            self.groups.push(GroupPosts {
-//                group_name: group.group_name.clone(),
-//                tag_posts
-//            });
-//
-//            println!("{:#?}", self.groups);
-//        }
-//
-//        Ok(())
-//    }
-
-    /// Updates config `last_run` to hold new date.
-    fn update_tag_date(&mut self, tag: &Tag) {
-        let date: Date<Local> = Local::today();
-        self.config.last_run.entry(tag.value.clone())
-            .and_modify(|e| *e = date.format("%Y-%m-%d").to_string())
-            .or_insert(DEFAULT_DATE.to_string());
-    }
-
-    /// Downloads images from collected posts.
-    ///
-    /// # Warning
-    /// Since request are sent through a single thread, the progress bar may slow down progress.
-    /// This, along with other issues, is causing the program to take longer to download images (about 20+ minutes for 2000+ images).
-    pub fn download_posts(&self) -> Result<(), Box<Error>> {
-        // TODO: Program different treatment of groups.
-        for tag_post in &self.groups[0].tag_posts {
-            let mut progress_bar = ProgressBar::new(tag_post.posts.len() as u64);
-            progress_bar.message(format!("{} ", tag_post.searching_tag).as_str());
-
-            for post in &tag_post.posts {
-                let name = self.get_name_for_image(post);
-                let mut image: Vec<u8> = Vec::new();
-                self.client.get(post.file_url.as_str())
-                    .header(USER_AGENT, USER_AGENT_PROJECT_NAME)
-                    .send()?
-                    .read_to_end(&mut image)?;
-                self.save_image(&name, &image, post.file_ext.as_ref().unwrap(), &tag_post.searching_tag.clone())?;
-                progress_bar.inc();
-            }
-
-            progress_bar.finish_println("Posts downloaded!");
-        }
-
-        Ok(())
-    }
-
-    /// Saves image to directory described in config.
-    fn save_image(&self, name: &String, source: &Vec<u8>, image_type: &String, tag: &String) -> Result<(), Box<Error>> {
-        let download_dest = format!("{}{}", self.config.download_directory, tag);
-        if !Path::new(download_dest.as_str()).exists() {
-            create_dir_all(Path::new(download_dest.as_str()))?;
-        }
-
-        let mut file: File;
-        if self.config.create_directories {
-            file = File::create(Path::new(format!("{}{}/{}.{}", self.config.download_directory, tag, name, image_type).as_str()))?;
-            file.write(source)?;
-        } else {
-            file = File::create(Path::new(format!("{}{}.{}", self.config.download_directory, name, image_type).as_str()))?;
-            file.write(source)?;
-        }
-
-        Ok(())
-    }
-
-    /// Gets name that will be used for saving image.
-    fn get_name_for_image(&self, post: &Post) -> String {
-        match self.config.part_used_as_name.as_str() {
-            "md5" => post.md5.as_ref().unwrap().clone(),
-            "id" => format!("{}", post.id),
-            _ => post.md5.as_ref().unwrap().clone(),
-        }
-    }
-
-    /// Updates the url for safe mode.
-    fn update_to_safe_url(&mut self) {
-        self.url = self.url.replace("e621", "e926");
     }
 }
