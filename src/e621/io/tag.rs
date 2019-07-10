@@ -1,13 +1,29 @@
-use std::error::Error;
+extern crate failure;
+extern crate reqwest;
+
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::Path;
 
+use failure::Error;
+use reqwest::{header::USER_AGENT, Client};
+
+use super::serde_json::{from_value, Value};
+use crate::e621::data_sets::TagEntry;
 use crate::e621::io::emergency_exit;
+use crate::e621::USER_AGENT_VALUE;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &'static str = "tags.txt";
 static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
+
+/// A tag that can be either general or special.
+#[derive(Debug, Clone)]
+pub enum Tag {
+    General(String),
+    Special(String),
+    None,
+}
 
 /// Tag object used for searching e621.
 #[derive(Debug, Clone)]
@@ -15,11 +31,11 @@ pub enum Parsed {
     Pool(String),
     Set(String),
     Post(String),
-    General(String),
+    General(Tag),
 }
 
 /// Creates tag file if it doesn't exist.
-pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
+pub fn create_tag_file(p: &Path) -> Result<(), Error> {
     if !p.exists() {
         let mut file = File::create(p)?;
         file.write_all(TAG_FILE_EXAMPLE.as_bytes())?;
@@ -31,13 +47,71 @@ pub fn create_tag_file(p: &Path) -> Result<(), Box<Error>> {
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(p: &Path) -> Result<Vec<Parsed>, Box<Error>> {
+pub fn parse_tag_file(p: &Path) -> Result<Vec<Parsed>, Error> {
     let source = read_to_string(p)?;
     Ok(Parser {
         pos: 0,
         input: source,
     }
-    .parse_tags())
+    .parse_tags()?)
+}
+
+/// TODO: Implement this to remove the tag file type system.
+pub struct TagIdentifier {
+    identifier_client: Client,
+}
+
+impl TagIdentifier {
+    fn new() -> Self {
+        TagIdentifier {
+            identifier_client: Client::new(),
+        }
+    }
+
+    fn id_tag(tag: &String) -> Result<Tag, Error> {
+        let tag_url = "https://e621.net/tag/index.json";
+        let mut identifier = TagIdentifier::new();
+        let tag_type = identifier.search_for_tag(tag, &tag_url)?;
+        println!("{:?}", tag_type);
+        Ok(tag_type)
+    }
+
+    fn search_for_tag(&self, tags: &String, url: &str) -> Result<Tag, Error> {
+        let mut split: Vec<&str> = tags.split(' ').collect();
+        // TODO: This is, for some reason, not cutting elements like `order:score` out.
+        split.retain(|elem| !elem.contains(':') || !elem.contains("-"));
+
+        let mut tag_type = Tag::None;
+        for tag in &split {
+            let tag_entry: Value = self
+                .identifier_client
+                .get(url)
+                .header(USER_AGENT, USER_AGENT_VALUE)
+                .query(&[("name", tag)])
+                .send()?
+                .json()?;
+
+            println!("{}", tag_entry.to_string());
+
+            if tag_entry.to_string().contains("name") {
+                let tag = &from_value::<Vec<TagEntry>>(tag_entry)?[0];
+                tag_type = match tag.tag_type {
+                    0 | 3 | 5 => Tag::General(tags.clone()),
+                    1 | 4 => Tag::Special(tags.clone()),
+                    _ => Tag::None,
+                };
+
+                if let Tag::Special(_) = tag_type {
+                    break;
+                }
+            } else {
+                println!("Error: JSON Return for tag is empty!");
+                emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
+            }
+        }
+
+        Ok(tag_type)
+    }
 }
 
 /// Parser that reads a tag file and parses the tags.
@@ -50,7 +124,7 @@ struct Parser {
 
 impl Parser {
     /// Parses groups.
-    pub fn parse_tags(&mut self) -> Vec<Parsed> {
+    pub fn parse_tags(&mut self) -> Result<Vec<Parsed>, Error> {
         let mut tags: Vec<Parsed> = Vec::new();
         loop {
             self.consume_whitespace();
@@ -62,10 +136,10 @@ impl Parser {
                 continue;
             }
 
-            tags.push(self.parse_tag());
+            tags.push(self.parse_tag()?);
         }
 
-        tags
+        Ok(tags)
     }
 
     /// Checks if next character is comment identifier and parses it if it is.
@@ -79,23 +153,16 @@ impl Parser {
     }
 
     /// Parses tag from input.
-    fn parse_tag(&mut self) -> Parsed {
-        let tag_id = self.consume_while(valid_tag);
-        self.consume_whitespace();
+    fn parse_tag(&mut self) -> Result<Parsed, Error> {
+        let tag = self.consume_while(valid_tag);
 
-        let tag_type = if self.starts_with(":") {
-            self.consume_char();
-            self.consume_whitespace();
-            self.consume_while(valid_type)
-        } else {
-            String::new()
-        };
-
-        match tag_type.trim() {
-            "pool" => Parsed::Pool(tag_id),
-            "set" => Parsed::Set(tag_id),
-            "post" => Parsed::Post(tag_id),
-            _ => Parsed::General(tag_id.trim_end_matches(' ').to_string()),
+        match "replace" {
+            "pool" => Ok(Parsed::Pool(tag)),
+            "set" => Ok(Parsed::Set(tag)),
+            "post" => Ok(Parsed::Post(tag)),
+            _ => Ok(Parsed::General(TagIdentifier::id_tag(
+                &tag.trim().to_string(),
+            )?)),
         }
     }
 
@@ -154,14 +221,6 @@ impl Parser {
 
 /// Validates character for tag.
 fn valid_tag(c: char) -> bool {
-    match c {
-        ' '...'\"' | '$'...'9' | ';'...'~' => true,
-        _ => false,
-    }
-}
-
-/// Validates character for tag.
-fn valid_type(c: char) -> bool {
     match c {
         ' '...'\"' | '$'...'~' => true,
         _ => false,

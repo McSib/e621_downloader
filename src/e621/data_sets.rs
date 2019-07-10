@@ -2,6 +2,13 @@ extern crate serde;
 
 use serde::{Deserialize, Serialize};
 
+/// If an error occurs from server, it will respond with this.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ErrorEntry {
+    pub success: bool,
+    pub msg: String,
+}
+
 /// Time the post was created.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeSet {

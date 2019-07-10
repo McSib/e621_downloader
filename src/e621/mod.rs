@@ -1,17 +1,18 @@
 extern crate chrono;
+extern crate failure;
 extern crate reqwest;
 extern crate serde;
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::stdin;
 
 use chrono::Local;
+use failure::Error;
 use reqwest::{header::USER_AGENT, Client, RequestBuilder};
 use serde::Serialize;
 
 use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
-use crate::e621::io::tag::Parsed;
+use crate::e621::io::tag::{Parsed, Tag};
 use crate::e621::io::Config;
 
 mod data_sets;
@@ -100,14 +101,14 @@ impl<'a> Grabber<'a> {
         tags: &[Parsed],
         urls: &'a HashMap<String, String>,
         config: &'a mut Config,
-    ) -> Result<Grabber<'a>, Box<dyn Error>> {
+    ) -> Result<Grabber<'a>, Error> {
         let mut grabber = Grabber::new(urls, config);
         grabber.grab_tags(tags)?;
         Ok(grabber)
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
-    pub fn grab_tags(&mut self, tags: &[Parsed]) -> Result<(), Box<dyn Error>> {
+    pub fn grab_tags(&mut self, tags: &[Parsed]) -> Result<(), Error> {
         let tag_client = Client::new();
         for tag in tags {
             match tag {
@@ -142,15 +143,19 @@ impl<'a> Grabber<'a> {
 
                     println!("\"{}\" post grabbed!", id);
                 }
-                Parsed::General(name) => {
-                    let mut tag = name.clone();
-                    self.update_tag_date(tag.as_str());
-                    self.add_date_to_tag(&mut tag);
-                    let posts = self.get_posts_from_tag(&tag_client, &tag)?;
+                Parsed::General(tag) => {
+                    let mut name = match tag {
+                        Tag::General(name) => name.clone(),
+                        Tag::Special(name) => name.clone(),
+                        Tag::None => String::new(),
+                    };
+
+                    self.update_tag_date(name.as_str());
+                    self.add_date_to_tag(&mut name);
+                    let posts = self.get_posts_from_tag(&tag_client, tag)?;
                     self.grabbed_posts
                         .posts
-                        .push(NamedPost::from(&(tag.as_str(), posts.as_slice())));
-
+                        .push(NamedPost::from(&(name.as_str(), posts.as_slice())));
                     println!("\"{}\" grabbed!", name);
                 }
             };
@@ -159,55 +164,57 @@ impl<'a> Grabber<'a> {
         Ok(())
     }
 
-    fn get_posts_from_tag(
-        &self,
-        client: &Client,
-        tag: &String,
-    ) -> Result<Vec<PostEntry>, Box<dyn Error>> {
-        // TODO: Use this code once we can tell the type of tag we're dealing with.
+    fn get_posts_from_tag(&self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
+        match tag {
+            Tag::General(tag_search) => {
+                let limit: u8 = 10;
+                let mut posts: Vec<PostEntry> = vec![];
+                for page in 1..limit {
+                    posts.push(
+                        self.get_request_builder(
+                            &client,
+                            "post",
+                            &[
+                                ("tags", tag_search),
+                                ("page", &format!("{}", page)),
+                                ("limit", &format!("{}", 320)),
+                            ],
+                        )
+                        .send()?
+                        .json()?,
+                    );
+                }
 
-        //        let limit: u8 = 10;
-        //        let mut posts: Vec<PostEntry> = vec![];
-        //        for page in 1..limit {
-        //            posts.push(
-        //                        self.get_request_builder(
-        //                            &client,
-        //                            "post",
-        //                            &[
-        //                                ("tags", tag),
-        //                                ("page", &format!("{}", page)),
-        //                                ("limit", &format!("{}", 320)),
-        //                            ],
-        //                        )
-        //                        .send()?
-        //                        .json()?,
-        //            );
-        //        }
-
-        let mut page: u16 = 1;
-        let mut posts = vec![];
-        loop {
-            let mut data_set: Vec<PostEntry> = self
-                .get_request_builder(
-                    &client,
-                    "post",
-                    &[
-                        ("tags", tag),
-                        ("page", &format!("{}", page)),
-                        ("limit", &format!("{}", 320)),
-                    ],
-                )
-                .send()?
-                .json()?;
-            if data_set.is_empty() {
-                break;
+                Ok(posts)
             }
+            Tag::Special(tag_search) => {
+                let mut page: u16 = 1;
+                let mut posts = vec![];
+                loop {
+                    let mut data_set: Vec<PostEntry> = self
+                        .get_request_builder(
+                            &client,
+                            "post",
+                            &[
+                                ("tags", tag_search),
+                                ("page", &format!("{}", page)),
+                                ("limit", &format!("{}", 320)),
+                            ],
+                        )
+                        .send()?
+                        .json()?;
+                    if data_set.is_empty() {
+                        break;
+                    }
 
-            posts.append(&mut data_set);
-            page += 1;
+                    posts.append(&mut data_set);
+                    page += 1;
+                }
+
+                Ok(posts)
+            }
+            Tag::None => bail!(format_err!("The tag is none!")),
         }
-
-        Ok(posts)
     }
 
     fn add_date_to_tag(&self, tag: &mut String) {
@@ -237,7 +244,7 @@ impl<'a> Grabber<'a> {
     }
 
     /// Converts `SetEntry` to `NamedPost`.
-    fn set_to_named(&self, set: &SetEntry) -> Result<NamedPost, Box<dyn Error>> {
+    fn set_to_named(&self, set: &SetEntry) -> Result<NamedPost, Error> {
         let client_builder = Client::builder();
         let client = client_builder.cookie_store(false).tcp_nodelay().build()?;
 
@@ -335,7 +342,7 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Grabs all posts using `&[ParsedTag]` then converts grabbed posts and appends it to `self.collection`.
-    pub fn grab_posts(&mut self, tags: &[Parsed]) -> Result<(), Box<dyn Error>> {
+    pub fn grab_posts(&mut self, tags: &[Parsed]) -> Result<(), Error> {
         let mut post_grabber = Grabber::from_tags(tags, &self.urls, self.config)?;
         self.collection.set_posts(&mut post_grabber.grabbed_posts);
 

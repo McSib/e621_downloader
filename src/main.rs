@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate failure;
+
 use std::error::Error;
 use std::path::Path;
 
