@@ -70,7 +70,7 @@ impl TagIdentifier {
 
     fn id_tag(tag: &String) -> Result<Tag, Error> {
         let tag_url = "https://e621.net/tag/index.json";
-        let mut identifier = TagIdentifier::new();
+        let identifier = TagIdentifier::new();
         let tag_type = identifier.search_for_tag(tag, &tag_url)?;
         println!("{:?}", tag_type);
         Ok(tag_type)
@@ -78,8 +78,7 @@ impl TagIdentifier {
 
     fn search_for_tag(&self, tags: &String, url: &str) -> Result<Tag, Error> {
         let mut split: Vec<&str> = tags.split(' ').collect();
-        // TODO: This is, for some reason, not cutting elements like `order:score` out.
-        split.retain(|elem| !elem.contains(':') || !elem.contains("-"));
+        split.retain(|elem| !elem.contains(':') && !elem.starts_with('-'));
 
         let mut tag_type = Tag::None;
         for tag in &split {
@@ -95,9 +94,17 @@ impl TagIdentifier {
 
             if tag_entry.to_string().contains("name") {
                 let tag = &from_value::<Vec<TagEntry>>(tag_entry)?[0];
+                let tag_count = tag.count;
                 tag_type = match tag.tag_type {
                     0 | 3 | 5 => Tag::General(tags.clone()),
-                    1 | 4 => Tag::Special(tags.clone()),
+                    4 => {
+                        if tag_count > 1500 {
+                            Tag::General(tags.clone())
+                        } else {
+                            Tag::Special(tags.clone())
+                        }
+                    }
+                    1 => Tag::Special(tags.clone()),
                     _ => Tag::None,
                 };
 
