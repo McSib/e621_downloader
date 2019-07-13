@@ -14,6 +14,7 @@ use serde::Serialize;
 use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::io::tag::{Parsed, Tag};
 use crate::e621::io::Config;
+use serde_json::Value;
 
 mod data_sets;
 pub mod io;
@@ -167,21 +168,22 @@ impl<'a> Grabber<'a> {
     fn get_posts_from_tag(&self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
         match tag {
             Tag::General(tag_search) => {
-                let limit: u8 = 10;
+                let limit: u8 = 5;
                 let mut posts: Vec<PostEntry> = vec![];
                 for page in 1..limit {
-                    posts.push(
-                        self.get_request_builder(
-                            &client,
-                            "post",
-                            &[
-                                ("tags", tag_search),
-                                ("page", &format!("{}", page)),
-                                ("limit", &format!("{}", 320)),
-                            ],
-                        )
-                        .send()?
-                        .json()?,
+                    posts.append(
+                        &mut self
+                            .get_request_builder(
+                                &client,
+                                "post",
+                                &[
+                                    ("tags", tag_search),
+                                    ("page", &format!("{}", page)),
+                                    ("limit", &format!("{}", 320)),
+                                ],
+                            )
+                            .send()?
+                            .json::<Vec<PostEntry>>()?,
                     );
                 }
 

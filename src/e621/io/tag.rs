@@ -72,7 +72,6 @@ impl TagIdentifier {
         let tag_url = "https://e621.net/tag/index.json";
         let identifier = TagIdentifier::new();
         let tag_type = identifier.search_for_tag(tag, &tag_url)?;
-        println!("{:?}", tag_type);
         Ok(tag_type)
     }
 
@@ -89,8 +88,6 @@ impl TagIdentifier {
                 .query(&[("name", tag)])
                 .send()?
                 .json()?;
-
-            println!("{}", tag_entry.to_string());
 
             if tag_entry.to_string().contains("name") {
                 let tag = &from_value::<Vec<TagEntry>>(tag_entry)?[0];
