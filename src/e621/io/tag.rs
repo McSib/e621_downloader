@@ -93,7 +93,9 @@ impl TagIdentifier {
                 let tag = &from_value::<Vec<TagEntry>>(tag_entry)?[0];
                 let tag_count = tag.count;
                 tag_type = match tag.tag_type {
+                    // `0`: General; `3`: Copyright; `5`: Species;
                     0 | 3 | 5 => Tag::General(tags.clone()),
+                    // `4`: Character;
                     4 => {
                         if tag_count > 1500 {
                             Tag::General(tags.clone())
@@ -101,6 +103,7 @@ impl TagIdentifier {
                             Tag::Special(tags.clone())
                         }
                     }
+                    // `1`: Artist;
                     1 => Tag::Special(tags.clone()),
                     _ => Tag::None,
                 };
