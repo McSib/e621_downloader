@@ -26,10 +26,10 @@ fn main() -> Result<(), Box<Error>> {
     create_tag_file(&tag_path)?;
 
     // Parse tag file
-    let tags = parse_tag_file(&tag_path)?;
-    println!("{:?}", tags);
+    let groups = parse_tag_file(&tag_path)?;
+    println!("{:?}", groups);
 
-    connector.grab_posts(&tags)?;
+    connector.grab_posts(&groups)?;
 
     // TODO: Delete all the commented code before releasing 0.7.0.
 

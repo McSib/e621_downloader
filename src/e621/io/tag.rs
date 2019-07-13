@@ -8,8 +8,7 @@ use std::path::Path;
 use failure::Error;
 use reqwest::{header::USER_AGENT, Client};
 
-use super::serde_json::{from_value, Value};
-use crate::e621::data_sets::TagEntry;
+use crate::e621::data_sets::{AliasEntry, TagEntry};
 use crate::e621::io::emergency_exit;
 use crate::e621::USER_AGENT_VALUE;
 
@@ -34,6 +33,13 @@ pub enum Parsed {
     General(Tag),
 }
 
+/// Group object generated from parsed code.
+#[derive(Debug, Clone)]
+pub struct Group {
+    pub name: String,
+    pub tags: Vec<Parsed>,
+}
+
 /// Creates tag file if it doesn't exist.
 pub fn create_tag_file(p: &Path) -> Result<(), Error> {
     if !p.exists() {
@@ -47,13 +53,13 @@ pub fn create_tag_file(p: &Path) -> Result<(), Error> {
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(p: &Path) -> Result<Vec<Parsed>, Error> {
+pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Error> {
     let source = read_to_string(p)?;
     Ok(Parser {
         pos: 0,
         input: source,
     }
-    .parse_tags()?)
+    .parse_groups()?)
 }
 
 /// TODO: Implement this to remove the tag file type system.
@@ -68,43 +74,46 @@ impl TagIdentifier {
         }
     }
 
-    fn id_tag(tag: &String) -> Result<Tag, Error> {
-        let tag_url = "https://e621.net/tag/index.json";
+    fn id_tag(tags: &str) -> Result<Tag, Error> {
         let identifier = TagIdentifier::new();
-        let tag_type = identifier.search_for_tag(tag, &tag_url)?;
+        let tag_type = identifier.search_for_tag(tags)?;
         Ok(tag_type)
     }
 
-    fn search_for_tag(&self, tags: &String, url: &str) -> Result<Tag, Error> {
+    fn search_for_tag(&self, tags: &str) -> Result<Tag, Error> {
+        let tag_url = "https://e621.net/tag/index.json";
         let mut split: Vec<&str> = tags.split(' ').collect();
         split.retain(|elem| !elem.contains(':') && !elem.starts_with('-'));
 
         let mut tag_type = Tag::None;
         for tag in &split {
-            let tag_entry: Value = self
+            let tag_entry: Vec<TagEntry> = self
                 .identifier_client
-                .get(url)
+                .get(tag_url)
                 .header(USER_AGENT, USER_AGENT_VALUE)
                 .query(&[("name", tag)])
                 .send()?
                 .json()?;
 
-            if tag_entry.to_string().contains("name") {
-                let tag = &from_value::<Vec<TagEntry>>(tag_entry)?[0];
+            // To ensure that the tag set is not empty
+            if !tag_entry.is_empty() {
+                // Grab the closest matching tag
+                let tag = &tag_entry[0];
                 let tag_count = tag.count;
+                let tags_string = tags.to_string();
                 tag_type = match tag.tag_type {
                     // `0`: General; `3`: Copyright; `5`: Species;
-                    0 | 3 | 5 => Tag::General(tags.clone()),
+                    0 | 3 | 5 => Tag::General(tags_string),
                     // `4`: Character;
                     4 => {
                         if tag_count > 1500 {
-                            Tag::General(tags.clone())
+                            Tag::General(tags_string)
                         } else {
-                            Tag::Special(tags.clone())
+                            Tag::Special(tags_string)
                         }
                     }
                     // `1`: Artist;
-                    1 => Tag::Special(tags.clone()),
+                    1 => Tag::Special(tags_string),
                     _ => Tag::None,
                 };
 
@@ -113,6 +122,8 @@ impl TagIdentifier {
                 }
             } else {
                 println!("Error: JSON Return for tag is empty!");
+                println!("Info: The tag is either invalid or the tag is an alias.");
+                println!("Info: Please use the proper tag for the program to work correctly.");
                 emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
             }
         }
@@ -131,8 +142,8 @@ struct Parser {
 
 impl Parser {
     /// Parses groups.
-    pub fn parse_tags(&mut self) -> Result<Vec<Parsed>, Error> {
-        let mut tags: Vec<Parsed> = Vec::new();
+    pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
+        let mut groups: Vec<Group> = Vec::new();
         loop {
             self.consume_whitespace();
             if self.eof() {
@@ -143,7 +154,64 @@ impl Parser {
                 continue;
             }
 
-            tags.push(self.parse_tag()?);
+            if self.starts_with("[") {
+                groups.push(self.parse_group()?);
+            } else {
+                bail!(format_err!("Tags can't be outside of groups!"));
+            }
+        }
+
+        Ok(groups)
+    }
+
+    pub fn parse_group(&mut self) -> Result<Group, Error> {
+        assert_eq!(self.consume_char(), '[');
+        let group_name = self.consume_while(valid_group);
+        assert_eq!(self.consume_char(), ']');
+
+        let parsed_tags = match group_name.as_str() {
+            "artists" | "general" => self.parse_tags(|parser| {
+                let tag = parser.consume_while(valid_tag);
+                Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
+            })?,
+            "pools" => self.parse_tags(|parser| {
+                let tag = parser.consume_while(valid_id);
+                Ok(Parsed::Pool(tag))
+            })?,
+            "sets" => self.parse_tags(|parser| {
+                let tag = parser.consume_while(valid_id);
+                Ok(Parsed::Set(tag))
+            })?,
+            "single-post" => self.parse_tags(|parser| {
+                let tag = parser.consume_while(valid_id);
+                Ok(Parsed::Post(tag))
+            })?,
+            _ => bail!(format_err!("{} is an invalid group name!", group_name)),
+        };
+
+        Ok(Group {
+            name: group_name,
+            tags: parsed_tags,
+        })
+    }
+
+    /// Parses tags.
+    pub fn parse_tags<F>(&mut self, mut parse_method: F) -> Result<Vec<Parsed>, Error>
+    where
+        F: FnMut(&mut Self) -> Result<Parsed, Error>,
+    {
+        let mut tags: Vec<Parsed> = Vec::new();
+        while !self.eof() {
+            self.consume_whitespace();
+            if self.check_and_parse_comment() {
+                continue;
+            }
+
+            if self.starts_with("[") {
+                break;
+            }
+
+            tags.push(parse_method(self)?);
         }
 
         Ok(tags)
@@ -162,15 +230,7 @@ impl Parser {
     /// Parses tag from input.
     fn parse_tag(&mut self) -> Result<Parsed, Error> {
         let tag = self.consume_while(valid_tag);
-
-        match "replace" {
-            "pool" => Ok(Parsed::Pool(tag)),
-            "set" => Ok(Parsed::Set(tag)),
-            "post" => Ok(Parsed::Post(tag)),
-            _ => Ok(Parsed::General(TagIdentifier::id_tag(
-                &tag.trim().to_string(),
-            )?)),
-        }
+        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
     }
 
     /// Skips over comment.
@@ -230,6 +290,24 @@ impl Parser {
 fn valid_tag(c: char) -> bool {
     match c {
         ' '...'\"' | '$'...'~' => true,
+        _ => false,
+    }
+}
+
+/// Validates character for id.
+fn valid_id(c: char) -> bool {
+    match c {
+        '0'...'9' => true,
+        _ => false,
+    }
+}
+
+/// Validates character for group
+fn valid_group(c: char) -> bool {
+    match c {
+        'A'...'Z' => true,
+        'a'...'z' => true,
+        '-' => true,
         _ => false,
     }
 }

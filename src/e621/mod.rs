@@ -12,9 +12,8 @@ use reqwest::{header::USER_AGENT, Client, RequestBuilder};
 use serde::Serialize;
 
 use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
-use crate::e621::io::tag::{Parsed, Tag};
+use crate::e621::io::tag::{Group, Parsed, Tag};
 use crate::e621::io::Config;
-use serde_json::Value;
 
 mod data_sets;
 pub mod io;
@@ -99,67 +98,71 @@ impl<'a> Grabber<'a> {
     /// Gets posts on creation using `tags` and searching with `urls`.
     /// Also modifies the `config` when searching general tags.
     pub fn from_tags(
-        tags: &[Parsed],
+        groups: &[Group],
         urls: &'a HashMap<String, String>,
         config: &'a mut Config,
     ) -> Result<Grabber<'a>, Error> {
         let mut grabber = Grabber::new(urls, config);
-        grabber.grab_tags(tags)?;
+        grabber.grab_tags(groups)?;
         Ok(grabber)
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
-    pub fn grab_tags(&mut self, tags: &[Parsed]) -> Result<(), Error> {
+    pub fn grab_tags(&mut self, groups: &[Group]) -> Result<(), Error> {
         let tag_client = Client::new();
-        for tag in tags {
-            match tag {
-                Parsed::Pool(id) => {
-                    let entry: PoolEntry = self
-                        .get_request_builder(&tag_client, "pool", &[("id", id)])
-                        .send()?
-                        .json()?;
-                    self.grabbed_posts.pools.push(NamedPost::from(&(
-                        entry.name.as_str(),
-                        entry.posts.as_slice(),
-                    )));
+        for group in groups {
+            for tag in &group.tags {
+                match tag {
+                    Parsed::Pool(id) => {
+                        let entry: PoolEntry = self
+                            .get_request_builder(&tag_client, "pool", &[("id", id)])
+                            .send()?
+                            .json()?;
+                        self.grabbed_posts.pools.push(NamedPost::from(&(
+                            entry.name.as_str(),
+                            entry.posts.as_slice(),
+                        )));
 
-                    println!("\"{}\" grabbed!", entry.name);
-                }
-                Parsed::Set(id) => {
-                    let entry: SetEntry = self
-                        .get_request_builder(&tag_client, "set", &[("id", id)])
-                        .send()?
-                        .json()?;
-                    self.grabbed_posts.sets.push(self.set_to_named(&entry)?);
+                        println!("\"{}\" grabbed!", entry.name);
+                    }
+                    Parsed::Set(id) => {
+                        let entry: SetEntry = self
+                            .get_request_builder(&tag_client, "set", &[("id", id)])
+                            .send()?
+                            .json()?;
+                        self.grabbed_posts.sets.push(self.set_to_named(&entry)?);
 
-                    println!("\"{}\" grabbed!", entry.name);
-                }
-                Parsed::Post(id) => {
-                    let entry: PostEntry = self
-                        .get_request_builder(&tag_client, "single", &[("id", id)])
-                        .send()?
-                        .json()?;
-                    let id = entry.id;
-                    self.grabbed_posts.singles.push(entry);
+                        println!("\"{}\" grabbed!", entry.name);
+                    }
+                    Parsed::Post(id) => {
+                        let entry: PostEntry = self
+                            .get_request_builder(&tag_client, "single", &[("id", id)])
+                            .send()?
+                            .json()?;
+                        let id = entry.id;
+                        self.grabbed_posts.singles.push(entry);
 
-                    println!("\"{}\" post grabbed!", id);
-                }
-                Parsed::General(tag) => {
-                    let mut name = match tag {
-                        Tag::General(name) => name.clone(),
-                        Tag::Special(name) => name.clone(),
-                        Tag::None => String::new(),
-                    };
-
-                    self.update_tag_date(name.as_str());
-                    self.add_date_to_tag(&mut name);
-                    let posts = self.get_posts_from_tag(&tag_client, tag)?;
-                    self.grabbed_posts
-                        .posts
-                        .push(NamedPost::from(&(name.as_str(), posts.as_slice())));
-                    println!("\"{}\" grabbed!", name);
-                }
-            };
+                        println!("\"{}\" post grabbed!", id);
+                    }
+                    Parsed::General(tag) => {
+                        let name = match tag {
+                            Tag::General(tag) => tag.clone(),
+                            Tag::Special(tag) => {
+                                let mut name = tag.clone();
+                                self.update_tag_date(name.as_str());
+                                self.add_date_to_tag(&mut name);
+                                name
+                            }
+                            Tag::None => String::new(),
+                        };
+                        let posts = self.get_posts_from_tag(&tag_client, tag)?;
+                        self.grabbed_posts
+                            .posts
+                            .push(NamedPost::from(&(name.as_str(), posts.as_slice())));
+                        println!("\"{}\" grabbed!", name);
+                    }
+                };
+            }
         }
 
         Ok(())
@@ -343,9 +346,9 @@ impl<'a> EsixWebConnector<'a> {
         }
     }
 
-    /// Grabs all posts using `&[ParsedTag]` then converts grabbed posts and appends it to `self.collection`.
-    pub fn grab_posts(&mut self, tags: &[Parsed]) -> Result<(), Error> {
-        let mut post_grabber = Grabber::from_tags(tags, &self.urls, self.config)?;
+    /// Grabs all posts using `&[Group]` then converts grabbed posts and appends it to `self.collection`.
+    pub fn grab_posts(&mut self, groups: &[Group]) -> Result<(), Error> {
+        let mut post_grabber = Grabber::from_tags(groups, &self.urls, self.config)?;
         self.collection.set_posts(&mut post_grabber.grabbed_posts);
 
         Ok(())
