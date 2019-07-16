@@ -174,20 +174,23 @@ impl<'a> Grabber<'a> {
                 let limit: u8 = 5;
                 let mut posts: Vec<PostEntry> = vec![];
                 for page in 1..limit {
-                    posts.append(
-                        &mut self
-                            .get_request_builder(
-                                &client,
-                                "post",
-                                &[
-                                    ("tags", tag_search),
-                                    ("page", &format!("{}", page)),
-                                    ("limit", &format!("{}", 320)),
-                                ],
-                            )
-                            .send()?
-                            .json::<Vec<PostEntry>>()?,
-                    );
+                    let mut searched_posts: Vec<PostEntry> = self
+                        .get_request_builder(
+                            &client,
+                            "post",
+                            &[
+                                ("tags", tag_search),
+                                ("page", &format!("{}", page)),
+                                ("limit", &format!("{}", 320)),
+                            ],
+                        )
+                        .send()?
+                        .json::<Vec<PostEntry>>()?;
+                    if searched_posts.is_empty() {
+                        break;
+                    }
+
+                    posts.append(&mut searched_posts);
                 }
 
                 Ok(posts)
