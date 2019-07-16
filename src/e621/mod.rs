@@ -250,20 +250,31 @@ impl<'a> Grabber<'a> {
 
     /// Converts `SetEntry` to `NamedPost`.
     fn set_to_named(&self, set: &SetEntry) -> Result<NamedPost, Error> {
-        let client_builder = Client::builder();
-        let client = client_builder.cookie_store(false).tcp_nodelay().build()?;
+        let client = Client::new();
+        let mut posts: Vec<PostEntry> = Vec::with_capacity(set.posts.len());
+        let mut page = 1;
+        loop {
+            let mut set_posts: Vec<PostEntry> = self
+                .get_request_builder(
+                    &client,
+                    "post",
+                    &[
+                        ("tags", format!("set:{}", set.short_name).as_str()),
+                        ("page", format!("{}", page).as_str()),
+                        ("limit", "320"),
+                    ],
+                )
+                .send()?
+                .json()?;
+            if set_posts.is_empty() {
+                break;
+            }
 
-        let name = set.name.as_str();
-        let mut posts: Vec<PostEntry> = vec![];
-        for id in &set.posts {
-            posts.push(
-                self.get_request_builder(&client, "single", &[("id", id)])
-                    .send()?
-                    .json()?,
-            );
+            posts.append(&mut set_posts);
+            page += 1;
         }
 
-        Ok(NamedPost::from(&(name, posts.as_slice())))
+        Ok(NamedPost::from(&(set.name.as_str(), posts.as_slice())))
     }
 }
 
