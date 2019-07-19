@@ -79,6 +79,7 @@ impl Config {
 }
 
 impl Default for Config {
+    /// The default configuration for `Config`.
     fn default() -> Self {
         Config {
             create_directories: true,

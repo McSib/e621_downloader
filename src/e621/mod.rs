@@ -1,23 +1,23 @@
 extern crate chrono;
+extern crate pbr;
 extern crate failure;
 extern crate reqwest;
 extern crate serde;
 
 use std::collections::HashMap;
-use std::io::{stdin, Read, Write};
+use std::fs::{create_dir_all, File};
+use std::io::{Read, stdin, Write};
+use std::path::Path;
 
 use chrono::Local;
 use failure::Error;
-use reqwest::{header::USER_AGENT, Client, RequestBuilder};
+use pbr::ProgressBar;
+use reqwest::{Client, header::USER_AGENT, RequestBuilder, Url};
 use serde::Serialize;
 
-use self::reqwest::Url;
-use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
-use crate::e621::io::tag::{Group, Parsed, Tag};
-use crate::e621::io::Config;
-use pbr::ProgressBar;
-use std::fs::{create_dir_all, File};
-use std::path::Path;
+use data_sets::{PoolEntry, PostEntry, SetEntry};
+use io::Config;
+use io::tag::{Group, Parsed, Tag};
 
 mod data_sets;
 pub mod io;
@@ -38,6 +38,7 @@ struct NamedPost {
 }
 
 impl NamedPost {
+    /// Creates a new `NamedPost` with a name.
     pub fn new(name: String) -> Self {
         NamedPost {
             name,
@@ -47,6 +48,7 @@ impl NamedPost {
 }
 
 impl Default for NamedPost {
+    /// Default configuration for `NamedPost` with an empty name.
     fn default() -> Self {
         NamedPost::new(String::new())
     }
@@ -75,6 +77,7 @@ struct GrabbedPosts {
 }
 
 impl Default for GrabbedPosts {
+    /// Default configuration for `GrabbedPosts`
     fn default() -> Self {
         GrabbedPosts {
             pools: vec![],
@@ -95,6 +98,7 @@ pub struct Collection {
 }
 
 impl From<GrabbedPosts> for Collection {
+    /// Converts [`GrabbedPosts`] to `Collection`.
     fn from(mut grabbed: GrabbedPosts) -> Self {
         let mut collection = Collection::default();
         collection.named_posts.append(&mut grabbed.posts);
@@ -194,67 +198,82 @@ impl<'a> Grabber<'a> {
         Ok(())
     }
 
+    /// Grabs posts from general tag.
     fn get_posts_from_tag(&mut self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
         match tag {
-            Tag::General(tag_search) => {
-                let limit: u8 = 5;
-                let mut posts: Vec<PostEntry> = vec![];
-                for page in 1..limit {
-                    let mut searched_posts: Vec<PostEntry> = self
-                        .get_request_builder(
-                            &client,
-                            "post",
-                            &[
-                                ("tags", tag_search),
-                                ("page", &format!("{}", page)),
-                                ("limit", &format!("{}", 320)),
-                            ],
-                        )
-                        .send()?
-                        .json::<Vec<PostEntry>>()?;
-                    if searched_posts.is_empty() {
-                        break;
-                    }
-
-                    posts.append(&mut searched_posts);
-                }
-
-                Ok(posts)
-            }
-            Tag::Special(tag_search) => {
-                let mut tag_search = tag_search.clone();
-                self.update_tag_date(tag_search.as_str());
-                self.add_date_to_tag(&mut tag_search);
-
-                let mut page: u16 = 1;
-                let mut posts = vec![];
-                loop {
-                    let mut data_set: Vec<PostEntry> = self
-                        .get_request_builder(
-                            &client,
-                            "post",
-                            &[
-                                ("tags", &tag_search),
-                                ("page", &format!("{}", page)),
-                                ("limit", &format!("{}", 320)),
-                            ],
-                        )
-                        .send()?
-                        .json()?;
-                    if data_set.is_empty() {
-                        break;
-                    }
-
-                    posts.append(&mut data_set);
-                    page += 1;
-                }
-
-                Ok(posts)
-            }
+            Tag::General(tag_search) => Ok(self.general_search(client, tag_search)?),
+            Tag::Special(tag_search) => Ok(self.special_search(client, &mut tag_search.clone())?),
             Tag::None => bail!(format_err!("The tag is none!")),
         }
     }
 
+    /// Performs a general search where it grabs only five pages of posts.
+    fn general_search(
+        &mut self,
+        client: &Client,
+        searching_tag: &String,
+    ) -> Result<Vec<PostEntry>, Error> {
+        let limit: u8 = 5;
+        let mut posts: Vec<PostEntry> = vec![];
+        for page in 1..limit {
+            let mut searched_posts: Vec<PostEntry> = self
+                .get_request_builder(
+                    &client,
+                    "post",
+                    &[
+                        ("tags", searching_tag),
+                        ("page", &format!("{}", page)),
+                        ("limit", &format!("{}", 320)),
+                    ],
+                )
+                .send()?
+                .json::<Vec<PostEntry>>()?;
+            if searched_posts.is_empty() {
+                break;
+            }
+
+            posts.append(&mut searched_posts);
+        }
+
+        Ok(posts)
+    }
+
+    /// Performs a special search that grabs from a date up to the current day.
+    fn special_search(
+        &mut self,
+        client: &Client,
+        searching_tag: &mut String,
+    ) -> Result<Vec<PostEntry>, Error> {
+        self.update_tag_date(searching_tag.as_str());
+        self.add_date_to_tag(searching_tag);
+
+        let mut page: u16 = 1;
+        let mut posts = vec![];
+        loop {
+            let mut data_set: Vec<PostEntry> = self
+                .get_request_builder(
+                    &client,
+                    "post",
+                    &[
+                        ("tags", &*searching_tag),
+                        ("page", &format!("{}", page)),
+                        ("limit", &format!("{}", 320)),
+                    ],
+                )
+                .send()?
+                .json()?;
+            if data_set.is_empty() {
+                break;
+            }
+
+            posts.append(&mut data_set);
+            page += 1;
+        }
+
+        Ok(posts)
+    }
+
+    /// Adds date to tag.
     fn add_date_to_tag(&self, tag: &mut String) {
         *tag = format!("{} date:>={}", tag, self.config.last_run[tag.as_str()]);
     }
@@ -319,8 +338,6 @@ pub struct EsixWebConnector<'a> {
     config: &'a mut Config,
     /// Client used for downloading posts
     client: Client,
-    //    /// Collection of all posts grabbed and posts to be downloaded
-    //    collection: Collection,
 }
 
 impl<'a> EsixWebConnector<'a> {
@@ -348,7 +365,6 @@ impl<'a> EsixWebConnector<'a> {
             urls,
             config,
             client: Client::new(),
-            //            collection: Collection::default(),
         }
     }
 
@@ -393,6 +409,7 @@ impl<'a> EsixWebConnector<'a> {
         Ok(collection)
     }
 
+    /// Saves image to download directory.
     fn save_image(
         &mut self,
         dir_name: &mut String,
@@ -416,6 +433,7 @@ impl<'a> EsixWebConnector<'a> {
         Ok(())
     }
 
+    /// Sends request to download image.
     fn download_post(&self, url: &String) -> Result<(String, Vec<u8>), Error> {
         let mut image_response = self
             .client
@@ -437,6 +455,7 @@ impl<'a> EsixWebConnector<'a> {
         ))
     }
 
+    /// Processes vec and downloads all posts from it.
     fn download_posts_from_vec(
         &mut self,
         mut name: String,
@@ -465,6 +484,7 @@ impl<'a> EsixWebConnector<'a> {
         Ok(())
     }
 
+    /// Downloads all posts from collection.
     pub fn download_posts_from_collection(&mut self, collection: Collection) -> Result<(), Error> {
         let single_posts = &collection.single_posts;
         self.download_posts_from_vec(single_posts.name.clone(), &single_posts.posts)?;
@@ -472,12 +492,6 @@ impl<'a> EsixWebConnector<'a> {
         for named_post in &collection.named_posts {
             self.download_posts_from_vec(named_post.name.clone(), &named_post.posts)?;
         }
-
-        Ok(())
-    }
-
-    pub fn download_posts(&mut self, collection: Collection) -> Result<(), Error> {
-        self.download_posts_from_collection(collection)?;
 
         Ok(())
     }

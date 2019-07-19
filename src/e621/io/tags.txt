@@ -1,10 +1,19 @@
-# This is the tag that you will use so the program can know what tags to search.
-# Currently, it will search all tags from `config.json` last_run date to today.
-# If you wish to comment in this file, simply put `#` at the beginning of the line and the parser will ignore the current line.
+# This is the tag file that you will use so the program can know what tags to search.
+# If you wish to comment in this file, simply put `#` at the beginning or end of line.
 
-# Insert tags here (remove the example artist with an artist you wish to keep track of):
+# Insert tags here (remove all example tags and id with what you wish to download):
+
+[artists]
 fluff-kevlar
-braeburned
-reccand
-doxy
-l-a-v # Testing comment on the same line!
+
+[pools]
+14397 # Title: The Ghost in My Attic 2
+
+[sets]
+15932 # Title: Breeding Females
+
+[single-post]
+1929543 # fuzzamorous animation. Basic description: female/male sitting deepthroat animation.
+
+[general]
+artica_sparkle

@@ -19,24 +19,33 @@ static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
 /// A tag that can be either general or special.
 #[derive(Debug, Clone)]
 pub enum Tag {
+    /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
     General(String),
+    /// A special tag that is searched differently from general tags (artist and characters).
     Special(String),
+    /// This is used only if the type of tag is `2` or its greater than `5`.
     None,
 }
 
 /// Tag object used for searching e621.
 #[derive(Debug, Clone)]
 pub enum Parsed {
+    /// Pool containing its ID
     Pool(String),
+    /// Set containing its ID
     Set(String),
+    /// A single post containing its ID
     Post(String),
+    /// A general tag contain the [`Tag`] object.
     General(Tag),
 }
 
 /// Group object generated from parsed code.
 #[derive(Debug, Clone)]
 pub struct Group {
+    /// Name of group
     pub name: String,
+    /// [`Vec`] of [`Parsed`] tags
     pub tags: Vec<Parsed>,
 }
 
@@ -62,23 +71,31 @@ pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Error> {
     .parse_groups()?)
 }
 
+/// Identifier to help categorize tags.
 pub struct TagIdentifier {
+    /// Client used for identifying tags.
     identifier_client: Client,
 }
 
 impl TagIdentifier {
+    /// Creates new identifier.
     fn new() -> Self {
         TagIdentifier {
             identifier_client: Client::new(),
         }
     }
 
+    /// Identifies tag and returns [`Tag`].
     fn id_tag(tags: &str) -> Result<Tag, Error> {
         let identifier = TagIdentifier::new();
         let tag_type = identifier.search_for_tag(tags)?;
         Ok(tag_type)
     }
 
+    /// Search for tag on e621.
+    ///
+    /// # Important
+    /// This does not identify an alias right now, that may change in the future.
     fn search_for_tag(&self, tags: &str) -> Result<Tag, Error> {
         let tag_url = "https://e621.net/tag/index.json";
         let mut split: Vec<&str> = tags.split(' ').collect();
@@ -163,6 +180,7 @@ impl Parser {
         Ok(groups)
     }
 
+    // Parses single group and all tags for it.
     pub fn parse_group(&mut self) -> Result<Group, Error> {
         assert_eq!(self.consume_char(), '[');
         let group_name = self.consume_while(valid_group);
@@ -225,12 +243,6 @@ impl Parser {
 
         false
     }
-
-    /// Parses tag from input.
-    //    fn parse_tag(&mut self) -> Result<Parsed, Error> {
-    //        let tag = self.consume_while(valid_tag);
-    //        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
-    //    }
 
     /// Skips over comment.
     fn parse_comment(&mut self) {
