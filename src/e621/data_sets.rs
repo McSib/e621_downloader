@@ -66,19 +66,6 @@ pub struct TagEntry {
     pub type_locked: Option<bool>,
 }
 
-/// GET return for alias entry on e621/e926.
-#[derive(Deserialize, Clone, Debug)]
-pub struct AliasEntry {
-    /// Id of alias
-    pub id: u32,
-    /// Name of alias
-    pub name: String,
-    /// Alias id
-    pub alias_id: u32,
-    /// If the alias is pending
-    pub pending: bool,
-}
-
 /// GET return for post entry on e621/e926.
 ///
 /// # Important

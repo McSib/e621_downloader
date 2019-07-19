@@ -4,16 +4,20 @@ extern crate reqwest;
 extern crate serde;
 
 use std::collections::HashMap;
-use std::io::stdin;
+use std::io::{stdin, Read, Write};
 
 use chrono::Local;
 use failure::Error;
 use reqwest::{header::USER_AGENT, Client, RequestBuilder};
 use serde::Serialize;
 
+use self::reqwest::Url;
 use crate::e621::data_sets::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::io::tag::{Group, Parsed, Tag};
 use crate::e621::io::Config;
+use pbr::ProgressBar;
+use std::fs::{create_dir_all, File};
+use std::path::Path;
 
 mod data_sets;
 pub mod io;
@@ -33,6 +37,21 @@ struct NamedPost {
     pub posts: Vec<PostEntry>,
 }
 
+impl NamedPost {
+    pub fn new(name: String) -> Self {
+        NamedPost {
+            name,
+            posts: vec![],
+        }
+    }
+}
+
+impl Default for NamedPost {
+    fn default() -> Self {
+        NamedPost::new(String::new())
+    }
+}
+
 impl From<&(&str, &[PostEntry])> for NamedPost {
     /// Takes a tuple and creates a `NamedPost` to return.
     fn from(entry: &(&str, &[PostEntry])) -> Self {
@@ -44,34 +63,46 @@ impl From<&(&str, &[PostEntry])> for NamedPost {
 }
 
 /// Posts grab from search.
-#[derive(Default)]
 struct GrabbedPosts {
     /// All posts from pools
     pools: Vec<NamedPost>,
     /// All posts from sets
     sets: Vec<NamedPost>,
     /// All individual posts
-    singles: Vec<PostEntry>,
+    singles: NamedPost,
     /// All posts under a searching tag
     posts: Vec<NamedPost>,
 }
 
+impl Default for GrabbedPosts {
+    fn default() -> Self {
+        GrabbedPosts {
+            pools: vec![],
+            sets: vec![],
+            singles: NamedPost::new(String::from("single_posts")),
+            posts: vec![],
+        }
+    }
+}
+
 /// A collection of `Vec<NamedPost>` and `Vec<PostEntry>`.
 #[derive(Default, Debug)]
-struct Collection {
+pub struct Collection {
     /// All named posts
     named_posts: Vec<NamedPost>,
     /// All individual posts
-    single_posts: Vec<PostEntry>,
+    single_posts: NamedPost,
 }
 
-impl Collection {
-    /// Processes all collected posts from a search and appends them to `self.named_posts` and `self.single_posts`.
-    fn set_posts(&mut self, collected_posts: &mut GrabbedPosts) {
-        self.named_posts.append(&mut collected_posts.pools);
-        self.named_posts.append(&mut collected_posts.sets);
-        self.single_posts.append(&mut collected_posts.singles);
-        self.named_posts.append(&mut collected_posts.posts);
+impl From<GrabbedPosts> for Collection {
+    fn from(mut grabbed: GrabbedPosts) -> Self {
+        let mut collection = Collection::default();
+        collection.named_posts.append(&mut grabbed.posts);
+        collection.named_posts.append(&mut grabbed.pools);
+        collection.named_posts.append(&mut grabbed.sets);
+        collection.single_posts = grabbed.singles;
+
+        collection
     }
 }
 
@@ -140,26 +171,21 @@ impl<'a> Grabber<'a> {
                             .send()?
                             .json()?;
                         let id = entry.id;
-                        self.grabbed_posts.singles.push(entry);
+                        self.grabbed_posts.singles.posts.push(entry);
 
                         println!("\"{}\" post grabbed!", id);
                     }
                     Parsed::General(tag) => {
-                        let name = match tag {
-                            Tag::General(tag) => tag.clone(),
-                            Tag::Special(tag) => {
-                                let mut name = tag.clone();
-                                self.update_tag_date(name.as_str());
-                                self.add_date_to_tag(&mut name);
-                                name
-                            }
+                        let tag_str = match tag {
+                            Tag::General(tag_str) => tag_str.clone(),
+                            Tag::Special(tag_str) => tag_str.clone(),
                             Tag::None => String::new(),
                         };
                         let posts = self.get_posts_from_tag(&tag_client, tag)?;
                         self.grabbed_posts
                             .posts
-                            .push(NamedPost::from(&(name.as_str(), posts.as_slice())));
-                        println!("\"{}\" grabbed!", name);
+                            .push(NamedPost::from(&(tag_str.as_str(), posts.as_slice())));
+                        println!("\"{}\" grabbed!", tag_str);
                     }
                 };
             }
@@ -168,7 +194,7 @@ impl<'a> Grabber<'a> {
         Ok(())
     }
 
-    fn get_posts_from_tag(&self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
+    fn get_posts_from_tag(&mut self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
         match tag {
             Tag::General(tag_search) => {
                 let limit: u8 = 5;
@@ -196,6 +222,10 @@ impl<'a> Grabber<'a> {
                 Ok(posts)
             }
             Tag::Special(tag_search) => {
+                let mut tag_search = tag_search.clone();
+                self.update_tag_date(tag_search.as_str());
+                self.add_date_to_tag(&mut tag_search);
+
                 let mut page: u16 = 1;
                 let mut posts = vec![];
                 loop {
@@ -204,7 +234,7 @@ impl<'a> Grabber<'a> {
                             &client,
                             "post",
                             &[
-                                ("tags", tag_search),
+                                ("tags", &tag_search),
                                 ("page", &format!("{}", page)),
                                 ("limit", &format!("{}", 320)),
                             ],
@@ -287,14 +317,16 @@ pub struct EsixWebConnector<'a> {
     urls: HashMap<String, String>,
     /// The config which is modified when grabbing posts
     config: &'a mut Config,
-    //    client: Client,
-    /// Collection of all posts grabbed and posts to be downloaded
-    collection: Collection,
+    /// Client used for downloading posts
+    client: Client,
+    //    /// Collection of all posts grabbed and posts to be downloaded
+    //    collection: Collection,
 }
 
 impl<'a> EsixWebConnector<'a> {
-    /// Initializes urls for the `Hashmap<String, String>`.
-    fn initialize_urls(urls: &mut HashMap<String, String>) {
+    /// Creates instance of `Self` for grabbing and downloading posts.
+    pub fn new(config: &'a mut Config) -> Self {
+        let mut urls: HashMap<String, String> = HashMap::new();
         urls.insert(
             String::from("post"),
             String::from("https://e621.net/post/index.json"),
@@ -311,20 +343,13 @@ impl<'a> EsixWebConnector<'a> {
             String::from("single"),
             String::from("https://e621.net/post/show.json"),
         );
-    }
 
-    /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(config: &'a mut Config) -> Self {
-        let mut connector = EsixWebConnector {
-            urls: HashMap::new(),
+        EsixWebConnector {
+            urls,
             config,
-            //            client: Client::new(),
-            collection: Collection::default(),
-        };
-
-        EsixWebConnector::initialize_urls(&mut connector.urls);
-
-        connector
+            client: Client::new(),
+            //            collection: Collection::default(),
+        }
     }
 
     /// Gets input and checks if the user wants to enter safe mode.
@@ -361,9 +386,98 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Grabs all posts using `&[Group]` then converts grabbed posts and appends it to `self.collection`.
-    pub fn grab_posts(&mut self, groups: &[Group]) -> Result<(), Error> {
-        let mut post_grabber = Grabber::from_tags(groups, &self.urls, self.config)?;
-        self.collection.set_posts(&mut post_grabber.grabbed_posts);
+    pub fn grab_posts(&mut self, groups: &[Group]) -> Result<Collection, Error> {
+        let post_grabber = Grabber::from_tags(groups, &self.urls, self.config)?;
+        let collection = Collection::from(post_grabber.grabbed_posts);
+
+        Ok(collection)
+    }
+
+    fn save_image(
+        &mut self,
+        dir_name: &mut String,
+        file_name: &str,
+        bytes: &Vec<u8>,
+    ) -> Result<(), Error> {
+        // Remove invalid characters from directory name.
+        for character in &["\\", "/", "?", ":", "*", "<", ">", "\"", "|"] {
+            *dir_name = dir_name.replace(character, "_");
+        }
+
+        let file_dir = format!("{}{}", self.config.download_directory, dir_name);
+        let dir = Path::new(file_dir.as_str());
+        if !dir.exists() {
+            create_dir_all(dir)?;
+        }
+
+        let mut image_file: File = File::create(dir.join(file_name))?;
+        image_file.write_all(bytes.as_slice())?;
+
+        Ok(())
+    }
+
+    fn download_post(&self, url: &String) -> Result<(String, Vec<u8>), Error> {
+        let mut image_response = self
+            .client
+            .get(url)
+            .header(USER_AGENT, USER_AGENT_VALUE)
+            .send()?;
+        let mut image_bytes: Vec<u8> = vec![];
+        image_response.read_to_end(&mut image_bytes)?;
+
+        Ok((
+            image_response
+                .url()
+                .path_segments()
+                .unwrap()
+                .last()
+                .unwrap()
+                .to_string(),
+            image_bytes,
+        ))
+    }
+
+    fn download_posts_from_vec(
+        &mut self,
+        mut name: String,
+        posts: &Vec<PostEntry>,
+    ) -> Result<(), Error> {
+        let mut progress_bar = ProgressBar::new(posts.len() as u64);
+        for post in posts {
+            progress_bar.message(format!("Downloading: {} ", name).as_str());
+            let file_name = Url::parse(post.file_url.as_str())?
+                .path_segments()
+                .unwrap()
+                .last()
+                .unwrap()
+                .to_string();
+            let file_dir = format!("{}{}/{}", self.config.download_directory, name, file_name);
+            if Path::new(file_dir.as_str()).exists() {
+                progress_bar.message("Duplicate found: skipping... ");
+                continue;
+            }
+            let (file_name, bytes) = self.download_post(&post.file_url)?;
+            self.save_image(&mut name, &file_name, &bytes)?;
+            progress_bar.inc();
+        }
+
+        progress_bar.finish_println("");
+        Ok(())
+    }
+
+    pub fn download_posts_from_collection(&mut self, collection: Collection) -> Result<(), Error> {
+        let single_posts = &collection.single_posts;
+        self.download_posts_from_vec(single_posts.name.clone(), &single_posts.posts)?;
+
+        for named_post in &collection.named_posts {
+            self.download_posts_from_vec(named_post.name.clone(), &named_post.posts)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn download_posts(&mut self, collection: Collection) -> Result<(), Error> {
+        self.download_posts_from_collection(collection)?;
 
         Ok(())
     }

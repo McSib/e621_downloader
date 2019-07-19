@@ -1,8 +1,7 @@
 #[macro_use]
 extern crate failure;
-extern crate serde_json;
 
-use std::error::Error;
+use failure::Error;
 use std::path::Path;
 
 use crate::e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
@@ -12,7 +11,7 @@ use crate::e621::EsixWebConnector;
 mod e621;
 
 /// Main entry point of the application.
-fn main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Error> {
     // Check the config and load it.
     Config::check_config()?;
     let mut config = Config::get_config()?;
@@ -29,28 +28,9 @@ fn main() -> Result<(), Box<Error>> {
     let groups = parse_tag_file(&tag_path)?;
     println!("{:?}", groups);
 
-    connector.grab_posts(&groups)?;
-
-    // TODO: Delete all the commented code before releasing 0.7.0.
-
-    //    connector.download_posts();
-    //    connector.get_posts(&tags);
-    //    println!("{:#?}", connector.post_collection);
-
-    // Validate tags and group names
-    //    let mut validator = TagValidator::new();
-    //    validator.validate_and_identify_tags(&mut tags);
-    //    println!("{:?}", tags);
-    //    if validator.validate_groups() {
-    //        // Connect to e621, grab the posts, then download all of them.
-    //        let mut connector = EsixWebConnector::new(&mut config);
-    //        connector.check_for_safe_mode()?;
-    //        connector.get_posts(&groups)?;
-    //        connector.download_posts()?;
-    //
-    //        // Update the date for future runs.
-    //        save_config(&config)?;
-    //    }
+    let collection = connector.grab_posts(&groups)?;
+    connector.download_posts(collection)?;
+    Config::save_config(&config)?;
 
     Ok(())
 }

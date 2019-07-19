@@ -8,7 +8,7 @@ use std::path::Path;
 use failure::Error;
 use reqwest::{header::USER_AGENT, Client};
 
-use crate::e621::data_sets::{AliasEntry, TagEntry};
+use crate::e621::data_sets::TagEntry;
 use crate::e621::io::emergency_exit;
 use crate::e621::USER_AGENT_VALUE;
 
@@ -62,7 +62,6 @@ pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Error> {
     .parse_groups()?)
 }
 
-/// TODO: Implement this to remove the tag file type system.
 pub struct TagIdentifier {
     identifier_client: Client,
 }
@@ -228,10 +227,10 @@ impl Parser {
     }
 
     /// Parses tag from input.
-    fn parse_tag(&mut self) -> Result<Parsed, Error> {
-        let tag = self.consume_while(valid_tag);
-        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
-    }
+    //    fn parse_tag(&mut self) -> Result<Parsed, Error> {
+    //        let tag = self.consume_while(valid_tag);
+    //        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
+    //    }
 
     /// Skips over comment.
     fn parse_comment(&mut self) {

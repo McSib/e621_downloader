@@ -1,13 +1,14 @@
+extern crate failure;
 extern crate serde;
 extern crate serde_json;
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::fs::{read_to_string, write};
 use std::io;
 use std::path::Path;
 use std::process::exit;
 
+use failure::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string_pretty};
 
@@ -45,7 +46,7 @@ impl Config {
     }
 
     /// Creates config file.
-    fn create_config() -> Result<(), Box<Error>> {
+    fn create_config() -> Result<(), Error> {
         let json = to_string_pretty(&Config::default())?;
         write(Path::new(CONFIG_NAME), json)?;
 
@@ -53,7 +54,7 @@ impl Config {
     }
 
     /// Checks if config exist and, if not, creates config template.
-    pub fn check_config() -> Result<(), Box<Error>> {
+    pub fn check_config() -> Result<(), Error> {
         if !Config::config_exists() {
             println!("Creating config...");
             return Config::create_config();
@@ -63,13 +64,13 @@ impl Config {
     }
 
     /// Loads and returns `config` for quick management and settings.
-    pub fn get_config() -> Result<Config, Box<Error>> {
+    pub fn get_config() -> Result<Config, Error> {
         let config = from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?;
         Ok(config)
     }
 
     /// Saves new configuration for future run.
-    pub fn save_config(config: &Config) -> Result<(), Box<Error>> {
+    pub fn save_config(config: &Config) -> Result<(), Error> {
         let json = serde_json::to_string_pretty(config)?;
         write(Path::new(CONFIG_NAME), json)?;
 
