@@ -1,29 +1,30 @@
 extern crate chrono;
-extern crate pbr;
 extern crate failure;
+extern crate pbr;
 extern crate reqwest;
 extern crate serde;
 
 use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
-use std::io::{Read, stdin, Write};
+use std::io::{stdin, Read, Write};
 use std::path::Path;
 
 use chrono::Local;
 use failure::Error;
 use pbr::ProgressBar;
-use reqwest::{Client, header::USER_AGENT, RequestBuilder, Url};
+use reqwest::{header::USER_AGENT, Client, RequestBuilder, Url};
 use serde::Serialize;
 
+use crate::e621::io::emergency_exit;
 use data_sets::{PoolEntry, PostEntry, SetEntry};
-use io::Config;
 use io::tag::{Group, Parsed, Tag};
+use io::Config;
 
 mod data_sets;
 pub mod io;
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &'static str = "e621_downloader/0.0.1 (by McSib on e621)";
+static USER_AGENT_VALUE: &'static str = "e621_downloader/1.0.3 (by McSib on e621)";
 
 /// Default date for new tags.
 static DEFAULT_DATE: &'static str = "2006-01-01";
@@ -435,11 +436,29 @@ impl<'a> EsixWebConnector<'a> {
 
     /// Sends request to download image.
     fn download_post(&self, url: &String) -> Result<(String, Vec<u8>), Error> {
-        let mut image_response = self
+        let image_result = self
             .client
             .get(url)
             .header(USER_AGENT, USER_AGENT_VALUE)
-            .send()?;
+            .send();
+        let mut image_response = match image_result {
+            Ok(response) => response,
+            Err(error) => {
+                println!(
+                    "The server returned a {} error code!",
+                    error.status().unwrap()
+                );
+                if error.is_server_error() {
+                    emergency_exit("If this code is 503, please contact the developer (McSib) and report this to him.");
+                } else {
+                    println!("If error code is 4xx, this is a client side error.");
+                    emergency_exit("Please contact the developer (McSib) about this problem if it is 403, 404, 421");
+                }
+
+                // This should never be called.
+                bail!(format_err!("Failed to download image!"))
+            }
+        };
         let mut image_bytes: Vec<u8> = vec![];
         image_response.read_to_end(&mut image_bytes)?;
 
