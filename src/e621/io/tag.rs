@@ -113,30 +113,12 @@ impl TagIdentifier {
 
             // To ensure that the tag set is not empty
             if !tag_entry.is_empty() {
-                // Grab the closest matching tag
-                let tag = &tag_entry[0];
-                let tag_count = tag.count;
-                let tags_string = tags.to_string();
-                tag_type = match tag.tag_type {
-                    // `0`: General; `3`: Copyright; `5`: Species;
-                    0 | 3 | 5 => Tag::General(tags_string),
-                    // `4`: Character;
-                    4 => {
-                        if tag_count > 1500 {
-                            Tag::General(tags_string)
-                        } else {
-                            Tag::Special(tags_string)
-                        }
-                    }
-                    // `1`: Artist;
-                    1 => Tag::Special(tags_string),
-                    _ => Tag::None,
-                };
-
+                tag_type = self.process_tag_data(tags, &tag_entry[0]);
                 if let Tag::Special(_) = tag_type {
                     break;
                 }
             } else {
+                // TODO: Implement a check on whether or not the tag is an alias.
                 println!("Error: JSON Return for tag is empty!");
                 println!("Info: The tag is either invalid or the tag is an alias.");
                 println!("Info: Please use the proper tag for the program to work correctly.");
@@ -145,6 +127,27 @@ impl TagIdentifier {
         }
 
         Ok(tag_type)
+    }
+
+    fn process_tag_data(&self, tags: &str, tag_entry: &TagEntry) -> Tag {
+        // Grab the closest matching tag
+        let tag_count = tag_entry.count;
+        let tags_string = tags.to_string();
+        match tag_entry.tag_type {
+            // `0`: General; `3`: Copyright; `5`: Species;
+            0 | 3 | 5 => Tag::General(tags_string),
+            // `4`: Character;
+            4 => {
+                if tag_count > 1500 {
+                    Tag::General(tags_string)
+                } else {
+                    Tag::Special(tags_string)
+                }
+            }
+            // `1`: Artist;
+            1 => Tag::Special(tags_string),
+            _ => Tag::None,
+        }
     }
 }
 
@@ -218,13 +221,17 @@ impl Parser {
         F: FnMut(&mut Self) -> Result<Parsed, Error>,
     {
         let mut tags: Vec<Parsed> = Vec::new();
-        while !self.eof() {
+        loop {
             self.consume_whitespace();
             if self.check_and_parse_comment() {
                 continue;
             }
 
             if self.starts_with("[") {
+                break;
+            }
+
+            if self.eof() {
                 break;
             }
 
@@ -300,15 +307,22 @@ impl Parser {
 /// Validates character for tag.
 fn valid_tag(c: char) -> bool {
     match c {
-        ' '...'\"' | '$'...'~' => true,
-        _ => false,
+        ' '..='\"' | '$'..='~' => true,
+        // This will check for any special characters in the validator.
+        _ => {
+            if c != '#' {
+                return c.is_alphanumeric();
+            }
+
+            false
+        }
     }
 }
 
 /// Validates character for id.
 fn valid_id(c: char) -> bool {
     match c {
-        '0'...'9' => true,
+        '0'..='9' => true,
         _ => false,
     }
 }
@@ -316,8 +330,8 @@ fn valid_id(c: char) -> bool {
 /// Validates character for group
 fn valid_group(c: char) -> bool {
     match c {
-        'A'...'Z' => true,
-        'a'...'z' => true,
+        'A'..='Z' => true,
+        'a'..='z' => true,
         '-' => true,
         _ => false,
     }
@@ -326,7 +340,7 @@ fn valid_group(c: char) -> bool {
 /// Validates character for comment.
 fn valid_comment(c: char) -> bool {
     match c {
-        ' '...'~' => true,
-        _ => false,
+        ' '..='~' => true,
+        _ => c.is_alphanumeric(),
     }
 }

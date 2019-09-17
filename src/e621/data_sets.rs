@@ -21,6 +21,15 @@ pub struct TimeSet {
     pub n: i64,
 }
 
+/// Alias tag with id linking to the tag it was aliased to.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AliasEntry {
+    pub id: i64,
+    pub name: String,
+    pub alias_id: i64,
+    pub pending: bool,
+}
+
 /// GET return for set entry on e621/e926.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SetEntry {
