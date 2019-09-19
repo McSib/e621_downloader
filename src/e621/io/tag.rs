@@ -8,7 +8,7 @@ use std::path::Path;
 use failure::Error;
 use reqwest::{header::USER_AGENT, Client};
 
-use crate::e621::data_sets::TagEntry;
+use crate::e621::data_sets::{AliasEntry, TagEntry};
 use crate::e621::io::emergency_exit;
 use crate::e621::USER_AGENT_VALUE;
 
@@ -103,7 +103,7 @@ impl TagIdentifier {
 
         let mut tag_type = Tag::None;
         for tag in &split {
-            let tag_entry: Vec<TagEntry> = self
+            let tag_entries: Vec<TagEntry> = self
                 .identifier_client
                 .get(tag_url)
                 .header(USER_AGENT, USER_AGENT_VALUE)
@@ -112,21 +112,59 @@ impl TagIdentifier {
                 .json()?;
 
             // To ensure that the tag set is not empty
-            if !tag_entry.is_empty() {
-                tag_type = self.process_tag_data(tags, &tag_entry[0]);
-                if let Tag::Special(_) = tag_type {
-                    break;
-                }
+            if !tag_entries.is_empty() {
+                tag_type = self.process_tag_data(tags, &tag_entries[0]);
             } else {
-                // TODO: Implement a check on whether or not the tag is an alias.
-                println!("Error: JSON Return for tag is empty!");
-                println!("Info: The tag is either invalid or the tag is an alias.");
-                println!("Info: Please use the proper tag for the program to work correctly.");
-                emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
+                let alias_entry = self.is_alias(&tag)?;
+                tag_type = self.process_tag_data(tags, &alias_entry);
+            }
+
+            if let Tag::Special(_) = tag_type {
+                break;
             }
         }
 
         Ok(tag_type)
+    }
+
+    fn is_alias(&self, tag: &str) -> Result<TagEntry, Error> {
+        let alias_url = "https://e621.net/tag_alias/index.json";
+        let tag_url = "https://e621.net/tag/show.json";
+
+        let alias_entries: Vec<AliasEntry> = self
+            .identifier_client
+            .get(alias_url)
+            .header(USER_AGENT, USER_AGENT_VALUE)
+            .query(&[("query", tag)])
+            .send()?
+            .json()?;
+        if !alias_entries.is_empty() {
+            let entry = &alias_entries[0];
+            if !entry.pending {
+                let alias_id = entry.alias_id;
+                let tag_entry: TagEntry = self
+                    .identifier_client
+                    .get(tag_url)
+                    .header(USER_AGENT, USER_AGENT_VALUE)
+                    .query(&[("id", alias_id)])
+                    .send()?
+                    .json()?;
+                return Ok(tag_entry);
+            } else {
+                self.exit_tag_failure(&tag);
+            }
+        } else {
+            self.exit_tag_failure(&tag);
+        }
+
+        bail!(format_err!("Tag entry was not found!"))
+    }
+
+    fn exit_tag_failure(&self, tag: &str) {
+        println!("Error: JSON Return for tag is empty!");
+        println!("Info: The tag is either invalid or the tag is an alias.");
+        println!("Info: Please use the proper tag for the program to work correctly.");
+        emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
     }
 
     fn process_tag_data(&self, tags: &str, tag_entry: &TagEntry) -> Tag {

@@ -29,9 +29,6 @@ pub struct Config {
     /// Holds all dates for every tag used.
     #[serde(rename = "lastRun")]
     pub last_run: HashMap<String, String>,
-    /// Which part should be used as the name, that of which are: "id", or "md5"
-    #[serde(rename = "partUsedAsName")]
-    pub part_used_as_name: String,
 }
 
 impl Config {
@@ -85,7 +82,6 @@ impl Default for Config {
             create_directories: true,
             download_directory: String::from("downloads/"),
             last_run: HashMap::new(),
-            part_used_as_name: String::from("md5"),
         }
     }
 }

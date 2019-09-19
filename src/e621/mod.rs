@@ -422,7 +422,11 @@ impl<'a> EsixWebConnector<'a> {
             *dir_name = dir_name.replace(character, "_");
         }
 
-        let file_dir = format!("{}{}", self.config.download_directory, dir_name);
+        let file_dir = if self.config.create_directories {
+            format!("{}{}", self.config.download_directory, dir_name)
+        } else {
+            format!("{}", self.config.download_directory)
+        };
         let dir = Path::new(file_dir.as_str());
         if !dir.exists() {
             create_dir_all(dir)?;
