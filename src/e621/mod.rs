@@ -24,7 +24,7 @@ mod data_sets;
 pub mod io;
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &'static str = "e621_downloader/1.1.3 (by McSib on e621)";
+static USER_AGENT_VALUE: &'static str = "e621_downloader/1.2.3 (by McSib on e621)";
 
 /// Default date for new tags.
 static DEFAULT_DATE: &'static str = "2006-01-01";
