@@ -277,13 +277,6 @@ struct BlacklistFlagger {
 }
 
 impl BlacklistFlagger {
-    fn run(post: &PostEntry, blacklist_line: &BlacklistLineToken) -> bool {
-        let mut flagger = BlacklistFlagger::new();
-        flagger.set_red_flag_margin(&blacklist_line.tags);
-        flagger.check_post(post, blacklist_line);
-        !flagger.is_flagged()
-    }
-
     fn new() -> Self {
         BlacklistFlagger {
             margin: 0,

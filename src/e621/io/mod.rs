@@ -3,7 +3,7 @@ extern crate serde;
 extern crate serde_json;
 
 use std::collections::HashMap;
-use std::fs::{read_to_string, write, File};
+use std::fs::{read_to_string, write};
 use std::io;
 use std::path::Path;
 use std::process::exit;
