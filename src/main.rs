@@ -5,6 +5,7 @@ use std::path::Path;
 
 use failure::Error;
 
+use crate::e621::io::Login;
 use e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
 use e621::io::Config;
 use e621::EsixWebConnector;
@@ -17,13 +18,17 @@ fn main() -> Result<(), Error> {
     Config::check_config()?;
     let mut config = Config::get_config()?;
 
+    // Loads login information for requests
+    let login = Login::load()?;
+
     // Create tag if it doesn't exist, then parse it.
     let tag_path = Path::new(TAG_NAME);
     create_tag_file(&tag_path)?;
 
     // Creates connector to prepare for downloading posts.
-    let mut connector = EsixWebConnector::new(&mut config);
+    let mut connector = EsixWebConnector::new(&mut config, &login);
     connector.should_enter_safe_mode();
+    connector.grab_blacklist()?;
 
     // Parse tag file
     let groups = parse_tag_file(&tag_path)?;

@@ -17,7 +17,8 @@ E621 has over 1,680,900+ images and videos hosted on its platform, with this ove
 This list is constantly updated and checked for new features and addons that need to be implemented in the future. My hope with all this work is to have a downloader that will last a long time for the next forseable future, as there are many downloaders like this that have either ceased developement, or found to be too hard or confusing to operate for the average person.
 
  - [x] Add the ability to not create directories for images.
- - [ ] Let the user sign in and use their blacklist as well as downloading their favorites.
+ - [x] Let the user sign in and use their blacklist.
+ - [ ] Let the user be able to download their favorites.
  - [ ] Bring more general improvement and optimization to the code for faster runtime.
  - [x] Allow the program to work with aliases (the validator searches for tags in the most literal way, so aliases won't slide right now).
 

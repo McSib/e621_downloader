@@ -15,19 +15,22 @@ use pbr::ProgressBar;
 use reqwest::{header::USER_AGENT, Client, RequestBuilder, Url};
 use serde::Serialize;
 
-use crate::e621::io::emergency_exit;
+use crate::e621::blacklist::Blacklist;
+use crate::e621::io::{emergency_exit, Login};
 use data_sets::{PoolEntry, PostEntry, SetEntry};
 use io::tag::{Group, Parsed, Tag};
 use io::Config;
+use serde_json::Value;
 
+pub mod blacklist;
 mod data_sets;
 pub mod io;
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &'static str = "e621_downloader/1.2.3 (by McSib on e621)";
+static USER_AGENT_VALUE: &str = "e621_downloader/1.3.3 (by McSib on e621)";
 
 /// Default date for new tags.
-static DEFAULT_DATE: &'static str = "2006-01-01";
+static DEFAULT_DATE: &str = "2006-01-01";
 
 /// A collection of posts with a name.
 #[derive(Debug, Clone)]
@@ -119,15 +122,22 @@ struct Grabber<'a> {
     urls: &'a HashMap<String, String>,
     /// Config given as reference by `EsixWebConnector`
     config: &'a mut Config,
+    /// Blacklist used to throwaway posts that contain tags the user may not want
+    blacklist: &'a [&'a str],
 }
 
 impl<'a> Grabber<'a> {
     /// Creates new instance of `Self`.
-    pub fn new(urls: &'a HashMap<String, String>, config: &'a mut Config) -> Self {
+    pub fn new(
+        urls: &'a HashMap<String, String>,
+        config: &'a mut Config,
+        blacklist: &'a [&'a str],
+    ) -> Self {
         Grabber {
             grabbed_posts: GrabbedPosts::default(),
             urls,
             config,
+            blacklist,
         }
     }
 
@@ -137,8 +147,9 @@ impl<'a> Grabber<'a> {
         groups: &[Group],
         urls: &'a HashMap<String, String>,
         config: &'a mut Config,
+        blacklist: &'a [&'a str],
     ) -> Result<Grabber<'a>, Error> {
-        let mut grabber = Grabber::new(urls, config);
+        let mut grabber = Grabber::new(urls, config, blacklist);
         grabber.grab_tags(groups)?;
         Ok(grabber)
     }
@@ -212,7 +223,7 @@ impl<'a> Grabber<'a> {
     fn general_search(
         &mut self,
         client: &Client,
-        searching_tag: &String,
+        searching_tag: &str,
     ) -> Result<Vec<PostEntry>, Error> {
         let limit: u8 = 5;
         let mut posts: Vec<PostEntry> = vec![];
@@ -233,6 +244,9 @@ impl<'a> Grabber<'a> {
                 break;
             }
 
+            let blacklist = Blacklist::new(self.blacklist);
+            blacklist.filter_posts(&mut searched_posts);
+
             posts.append(&mut searched_posts);
         }
 
@@ -251,7 +265,7 @@ impl<'a> Grabber<'a> {
         let mut page: u16 = 1;
         let mut posts = vec![];
         loop {
-            let mut data_set: Vec<PostEntry> = self
+            let mut searched_posts: Vec<PostEntry> = self
                 .get_request_builder(
                     &client,
                     "post",
@@ -263,11 +277,14 @@ impl<'a> Grabber<'a> {
                 )
                 .send()?
                 .json()?;
-            if data_set.is_empty() {
+            if searched_posts.is_empty() {
                 break;
             }
 
-            posts.append(&mut data_set);
+            let blacklist = Blacklist::new(self.blacklist);
+            blacklist.filter_posts(&mut searched_posts);
+
+            posts.append(&mut searched_posts);
             page += 1;
         }
 
@@ -339,11 +356,15 @@ pub struct EsixWebConnector<'a> {
     config: &'a mut Config,
     /// Client used for downloading posts
     client: Client,
+    /// Login information for grabbing the Blacklist
+    login: &'a Login,
+    /// Blacklist grabbed from logged in user
+    blacklist: String,
 }
 
 impl<'a> EsixWebConnector<'a> {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(config: &'a mut Config) -> Self {
+    pub fn new(config: &'a mut Config, login: &'a Login) -> Self {
         let mut urls: HashMap<String, String> = HashMap::new();
         urls.insert(
             String::from("post"),
@@ -366,6 +387,8 @@ impl<'a> EsixWebConnector<'a> {
             urls,
             config,
             client: Client::new(),
+            login,
+            blacklist: String::new(),
         }
     }
 
@@ -377,7 +400,28 @@ impl<'a> EsixWebConnector<'a> {
         }
     }
 
-    /// Gets a simply yes/no for whether or not to do something.
+    pub fn grab_blacklist(&mut self) -> Result<(), Error> {
+        if !self.login.is_empty() {
+            let url = "https://e621.net/user/blacklist.json";
+            let json: Value = self
+                .client
+                .get(url)
+                .query(&[
+                    ("login", self.login.username.as_str()),
+                    ("password_hash", self.login.password_hash.as_str()),
+                ])
+                .send()?
+                .json()?;
+            self.blacklist = json["blacklist"]
+                .to_string()
+                .trim_matches('\"')
+                .replace("\\n", "\n");
+        }
+
+        Ok(())
+    }
+
+    /// Gets simply a yes/no for whether or not to do something.
     fn get_input(&self, msg: &str) -> bool {
         println!("{} (Y/N)?", msg);
         loop {
@@ -404,7 +448,9 @@ impl<'a> EsixWebConnector<'a> {
 
     /// Grabs all posts using `&[Group]` then converts grabbed posts and appends it to `self.collection`.
     pub fn grab_posts(&mut self, groups: &[Group]) -> Result<Collection, Error> {
-        let post_grabber = Grabber::from_tags(groups, &self.urls, self.config)?;
+        let blacklist: Vec<&str> = self.blacklist.lines().collect();
+        let post_grabber =
+            Grabber::from_tags(groups, &self.urls, self.config, &blacklist.as_slice())?;
         let collection = Collection::from(post_grabber.grabbed_posts);
 
         Ok(collection)
@@ -415,7 +461,7 @@ impl<'a> EsixWebConnector<'a> {
         &mut self,
         dir_name: &mut String,
         file_name: &str,
-        bytes: &Vec<u8>,
+        bytes: &[u8],
     ) -> Result<(), Error> {
         // Remove invalid characters from directory name.
         for character in &["\\", "/", "?", ":", "*", "<", ">", "\"", "|"] {
@@ -425,7 +471,7 @@ impl<'a> EsixWebConnector<'a> {
         let file_dir = if self.config.create_directories {
             format!("{}{}", self.config.download_directory, dir_name)
         } else {
-            format!("{}", self.config.download_directory)
+            self.config.download_directory.to_string()
         };
         let dir = Path::new(file_dir.as_str());
         if !dir.exists() {
@@ -433,13 +479,13 @@ impl<'a> EsixWebConnector<'a> {
         }
 
         let mut image_file: File = File::create(dir.join(file_name))?;
-        image_file.write_all(bytes.as_slice())?;
+        image_file.write_all(bytes)?;
 
         Ok(())
     }
 
     /// Sends request to download image.
-    fn download_post(&self, url: &String) -> Result<(String, Vec<u8>), Error> {
+    fn download_post(&self, url: &str) -> Result<(String, Vec<u8>), Error> {
         let image_result = self
             .client
             .get(url)
@@ -482,7 +528,7 @@ impl<'a> EsixWebConnector<'a> {
     fn download_posts_from_vec(
         &mut self,
         mut name: String,
-        posts: &Vec<PostEntry>,
+        posts: &[PostEntry],
     ) -> Result<(), Error> {
         let mut progress_bar = ProgressBar::new(posts.len() as u64);
         for post in posts {
