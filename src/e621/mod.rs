@@ -150,8 +150,25 @@ impl<'a> Grabber<'a> {
         blacklist: &'a [&'a str],
     ) -> Result<Grabber<'a>, Error> {
         let mut grabber = Grabber::new(urls, config, blacklist);
+        grabber.grab_favorites()?;
         grabber.grab_tags(groups)?;
         Ok(grabber)
+    }
+
+    pub fn grab_favorites(&mut self) -> Result<(), Error> {
+        let login = Login::load()?;
+        if !login.username.is_empty() && login.download_favorites {
+            let tag_str = format!("fav:{}", login.username);
+            let favorites_tag = Tag::Special(tag_str.clone());
+            let tag_client = Client::new();
+            let posts = self.get_posts_from_tag(&tag_client, &favorites_tag)?;
+            self.grabbed_posts
+                .posts
+                .push(NamedPost::from(&(tag_str.as_str(), posts.as_slice())));
+            println!("\"{}\" grabbed!", tag_str);
+        }
+
+        Ok(())
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
@@ -244,8 +261,10 @@ impl<'a> Grabber<'a> {
                 break;
             }
 
-            let blacklist = Blacklist::new(self.blacklist);
-            blacklist.filter_posts(&mut searched_posts);
+            if !self.blacklist.is_empty() {
+                let blacklist = Blacklist::new(self.blacklist);
+                blacklist.filter_posts(&mut searched_posts);
+            }
 
             posts.append(&mut searched_posts);
         }
@@ -281,8 +300,10 @@ impl<'a> Grabber<'a> {
                 break;
             }
 
-            let blacklist = Blacklist::new(self.blacklist);
-            blacklist.filter_posts(&mut searched_posts);
+            if !self.blacklist.is_empty() {
+                let blacklist = Blacklist::new(self.blacklist);
+                blacklist.filter_posts(&mut searched_posts);
+            }
 
             posts.append(&mut searched_posts);
             page += 1;
