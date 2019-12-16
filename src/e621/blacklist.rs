@@ -112,7 +112,9 @@ impl Parser {
         if self.starts_with("rating:") || self.starts_with("id:") || self.starts_with("user:") {
             let mut token = BlacklistTagToken::default();
             let identifier = self.consume_while(valid_tag);
+
             assert_eq!(self.consume_char(), ':');
+
             let value = self.process_value(&identifier)?;
             self.update_token(&mut token, &identifier, &value)?;
             return Ok(token);
@@ -120,6 +122,7 @@ impl Parser {
 
         if self.starts_with("-") {
             assert_eq!(self.consume_char(), '-');
+
             let name = self.consume_while(valid_tag);
             let mut token = BlacklistTagToken::new(&name);
             token.negated = true;
@@ -270,15 +273,15 @@ fn valid_id(c: char) -> bool {
     }
 }
 
-struct BlacklistFlagger {
+struct BlacklistFlagWorker {
     margin: i16,
     negated_margin: i16,
     flagged: bool,
 }
 
-impl BlacklistFlagger {
+impl BlacklistFlagWorker {
     fn new() -> Self {
-        BlacklistFlagger {
+        BlacklistFlagWorker {
             margin: 0,
             negated_margin: 0,
             flagged: false,
@@ -382,32 +385,34 @@ impl BlacklistFlagger {
     }
 }
 
-pub struct Blacklist<'a> {
-    blacklist_entries: &'a [&'a str],
+pub struct Blacklist {
+    blacklist_entries: Vec<String>,
 }
 
-impl<'a> Blacklist<'a> {
-    pub fn new(blacklist_entries: &'a [&'a str]) -> Self {
-        Blacklist { blacklist_entries }
+impl Blacklist {
+    pub fn new(blacklist_entries: &[String]) -> Self {
+        Blacklist {
+            blacklist_entries: blacklist_entries.to_vec(),
+        }
     }
 
     pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
         let mut filtered = 0;
-        for blacklist_entry in self.blacklist_entries {
+        for blacklist_entry in &self.blacklist_entries {
             let mut parser = Parser {
                 pos: 0,
                 input: blacklist_entry.to_string(),
             };
             let blacklist_line = parser.parse_tags().unwrap();
             posts.retain(|e| {
-                let mut flagger = BlacklistFlagger::new();
-                flagger.set_red_flag_margin(&blacklist_line.tags);
-                flagger.check_post(e, &blacklist_line);
-                if flagger.is_flagged() {
+                let mut flag_worker = BlacklistFlagWorker::new();
+                flag_worker.set_red_flag_margin(&blacklist_line.tags);
+                flag_worker.check_post(e, &blacklist_line);
+                if flag_worker.is_flagged() {
                     filtered += 1;
                 }
 
-                !flagger.is_flagged()
+                !flag_worker.is_flagged()
             });
         }
 

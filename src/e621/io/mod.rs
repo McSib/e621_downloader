@@ -2,7 +2,6 @@ extern crate failure;
 extern crate serde;
 extern crate serde_json;
 
-use std::collections::HashMap;
 use std::fs::{read_to_string, write};
 use std::io;
 use std::path::Path;
@@ -28,9 +27,6 @@ pub struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
     pub download_directory: String,
-    /// Holds all dates for every tag used.
-    #[serde(rename = "lastRun")]
-    pub last_run: HashMap<String, String>,
 }
 
 impl Config {
@@ -56,7 +52,7 @@ impl Config {
     pub fn check_config() -> Result<(), Error> {
         if !Config::config_exists() {
             println!("Creating config...");
-            return Config::create_config();
+            Config::create_config()?;
         }
 
         Ok(())
@@ -83,7 +79,6 @@ impl Default for Config {
         Config {
             create_directories: true,
             download_directory: String::from("downloads/"),
-            last_run: HashMap::new(),
         }
     }
 }

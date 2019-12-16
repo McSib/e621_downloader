@@ -13,8 +13,8 @@ use crate::e621::io::emergency_exit;
 use crate::e621::USER_AGENT_VALUE;
 
 /// Constant of the tag file's name.
-pub static TAG_NAME: &'static str = "tags.txt";
-static TAG_FILE_EXAMPLE: &'static str = include_str!("tags.txt");
+pub static TAG_NAME: &str = "tags.txt";
+static TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
 #[derive(Debug, Clone)]
@@ -55,7 +55,10 @@ pub fn create_tag_file(p: &Path) -> Result<(), Error> {
         let mut file = File::create(p)?;
         file.write_all(TAG_FILE_EXAMPLE.as_bytes())?;
 
-        emergency_exit("The tag file is created, I recommend closing the application to include the artist you wish to download.");
+        emergency_exit(
+            "The tag file is created, the application will close so you can include \
+             the artists, sets, pools, and individual posts you wish to download.",
+        );
     }
 
     Ok(())
@@ -228,22 +231,10 @@ impl Parser {
         assert_eq!(self.consume_char(), ']');
 
         let parsed_tags = match group_name.as_str() {
-            "artists" | "general" => self.parse_tags(|parser| {
-                let tag = parser.consume_while(valid_tag);
-                Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
-            })?,
-            "pools" => self.parse_tags(|parser| {
-                let tag = parser.consume_while(valid_id);
-                Ok(Parsed::Pool(tag))
-            })?,
-            "sets" => self.parse_tags(|parser| {
-                let tag = parser.consume_while(valid_id);
-                Ok(Parsed::Set(tag))
-            })?,
-            "single-post" => self.parse_tags(|parser| {
-                let tag = parser.consume_while(valid_id);
-                Ok(Parsed::Post(tag))
-            })?,
+            "artists" | "general" => self.parse_tags(|parser| parser.parse_general())?,
+            "pools" => self.parse_tags(|parser| parser.parse_pool())?,
+            "sets" => self.parse_tags(|parser| parser.parse_set())?,
+            "single-post" => self.parse_tags(|parser| parser.parse_post())?,
             _ => bail!(format_err!("{} is an invalid group name!", group_name)),
         };
 
@@ -251,6 +242,26 @@ impl Parser {
             name: group_name,
             tags: parsed_tags,
         })
+    }
+
+    fn parse_pool(&mut self) -> Result<Parsed, Error> {
+        let tag = self.consume_while(valid_id);
+        Ok(Parsed::Pool(tag))
+    }
+
+    fn parse_set(&mut self) -> Result<Parsed, Error> {
+        let tag = self.consume_while(valid_id);
+        Ok(Parsed::Set(tag))
+    }
+
+    fn parse_post(&mut self) -> Result<Parsed, Error> {
+        let tag = self.consume_while(valid_id);
+        Ok(Parsed::Post(tag))
+    }
+
+    fn parse_general(&mut self) -> Result<Parsed, Error> {
+        let tag = self.consume_while(valid_tag);
+        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
     }
 
     /// Parses tags.

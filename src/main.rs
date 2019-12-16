@@ -36,7 +36,7 @@ fn main() -> Result<(), Error> {
 
     // Collects all grabbed posts and moves it to connector to start downloading.
     let collection = connector.grab_posts(&groups)?;
-    connector.download_posts_from_collection(collection)?;
+    connector.download_posts_from_collection(&collection)?;
 
     // When posts are downloaded, save config with modified date.
     Config::save_config(&config)?;
