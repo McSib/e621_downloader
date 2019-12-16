@@ -28,22 +28,24 @@ mod data_sets;
 pub mod io;
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &str = "e621_downloader/1.3.3 (by McSib on e621)";
+static USER_AGENT_VALUE: &str = "e621_downloader/1.4.3 (by McSib on e621)";
 
 /// A collection of posts with a name.
 #[derive(Debug, Clone)]
 struct NamedPost {
     /// The name of the collection
     pub name: String,
+    pub post_type: String,
     /// All of the post in collection
     pub posts: Vec<PostEntry>,
 }
 
 impl NamedPost {
     /// Creates a new `NamedPost` with a name.
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, post_type: String) -> Self {
         NamedPost {
             name,
+            post_type,
             posts: vec![],
         }
     }
@@ -53,6 +55,7 @@ impl From<&str> for NamedPost {
     fn from(name: &str) -> Self {
         NamedPost {
             name: name.to_string(),
+            post_type: String::new(),
             posts: vec![],
         }
     }
@@ -61,16 +64,18 @@ impl From<&str> for NamedPost {
 impl Default for NamedPost {
     /// Default configuration for `NamedPost` with an empty name.
     fn default() -> Self {
-        NamedPost::new(String::new())
+        NamedPost::new(String::new(), String::new())
     }
 }
 
-impl From<&(&str, &[PostEntry])> for NamedPost {
+impl From<&(&str, &str, &[PostEntry])> for NamedPost {
     /// Takes a tuple and creates a `NamedPost` to return.
-    fn from(entry: &(&str, &[PostEntry])) -> Self {
+    fn from(entry: &(&str, &str, &[PostEntry])) -> Self {
+        let (name, post_type, posts) = entry;
         NamedPost {
-            name: entry.0.to_string(),
-            posts: entry.1.to_vec(),
+            name: name.to_string(),
+            post_type: post_type.to_string(),
+            posts: posts.to_vec(),
         }
     }
 }
@@ -132,9 +137,11 @@ impl Grabber {
             let tag_str = format!("fav:{}", login.username);
             let tag_client = Client::new();
             let posts = self.custom_search(&tag_client, tag_str.as_str())?;
-            self.grabbed_posts
-                .named_posts
-                .push(NamedPost::from(&(tag_str.as_str(), posts.as_slice())));
+            self.grabbed_posts.named_posts.push(NamedPost::from(&(
+                tag_str.as_str(),
+                "Favorites",
+                posts.as_slice(),
+            )));
             println!("\"{}\" grabbed!", tag_str);
         }
 
@@ -154,6 +161,7 @@ impl Grabber {
                             .json()?;
                         self.grabbed_posts.named_posts.push(NamedPost::from(&(
                             entry.name.as_str(),
+                            "Pools",
                             entry.posts.as_slice(),
                         )));
 
@@ -187,9 +195,11 @@ impl Grabber {
                             Tag::None => String::new(),
                         };
                         let posts = self.get_posts_from_tag(&tag_client, tag)?;
-                        self.grabbed_posts
-                            .named_posts
-                            .push(NamedPost::from(&(tag_str.as_str(), posts.as_slice())));
+                        self.grabbed_posts.named_posts.push(NamedPost::from(&(
+                            tag_str.as_str(),
+                            "General Searches",
+                            posts.as_slice(),
+                        )));
                         println!("\"{}\" grabbed!", tag_str);
                     }
                 };
@@ -300,8 +310,12 @@ impl Grabber {
     fn set_to_named_entry(&self, set: &SetEntry) -> Result<NamedPost, Error> {
         let client = Client::new();
         let posts: Vec<PostEntry> =
-            self.custom_search(&client, format!("set:{}", set.name).as_str())?;
-        Ok(NamedPost::from(&(set.name.as_str(), posts.as_slice())))
+            self.custom_search(&client, format!("set:{}", set.short_name).as_str())?;
+        Ok(NamedPost::from(&(
+            set.name.as_str(),
+            "Sets",
+            posts.as_slice(),
+        )))
     }
 
     fn custom_search(&self, client: &Client, tag: &str) -> Result<Vec<PostEntry>, Error> {
@@ -445,24 +459,8 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Saves image to download directory.
-    fn save_image(
-        &mut self,
-        dir_name: &mut String,
-        file_name: &str,
-        bytes: &[u8],
-    ) -> Result<(), Error> {
-        self.remove_invalid_chars(dir_name);
-        let file_dir = if self.config.create_directories {
-            format!("{}{}", self.config.download_directory, dir_name)
-        } else {
-            self.config.download_directory.clone()
-        };
-        let dir = Path::new(file_dir.as_str());
-        if !dir.exists() {
-            create_dir_all(dir)?;
-        }
-
-        let mut image_file: File = File::create(dir.join(file_name))?;
+    fn save_image(&mut self, file_path: &Path, bytes: &[u8]) -> Result<(), Error> {
+        let mut image_file: File = File::create(file_path)?;
         image_file.write_all(bytes)?;
 
         Ok(())
@@ -470,13 +468,13 @@ impl<'a> EsixWebConnector<'a> {
 
     /// Removes invalid characters from directory name.
     fn remove_invalid_chars(&self, dir_name: &mut String) {
-        for character in &["\\", "/", "?", ":", "*", "<", ">", "\"", "|"] {
+        for character in &["?", ":", "*", "<", ">", "\"", "|"] {
             *dir_name = dir_name.replace(character, "_");
         }
     }
 
     /// Sends request to download image.
-    fn download_post(&self, url: &str, file_size: i64) -> Result<(String, Vec<u8>), Error> {
+    fn download_post(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
         let image_result = self
             .client
             .get(url)
@@ -493,16 +491,7 @@ impl<'a> EsixWebConnector<'a> {
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response.read_to_end(&mut image_bytes)?;
 
-        Ok((
-            image_response
-                .url()
-                .path_segments()
-                .unwrap()
-                .last()
-                .unwrap()
-                .to_string(),
-            image_bytes,
-        ))
+        Ok(image_bytes)
     }
 
     fn close_on_server_error(&self, error: &reqwest::Error) {
@@ -523,24 +512,43 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Processes vec and downloads all posts from it.
-    fn download_posts(&mut self, mut name: String, posts: &[PostEntry]) -> Result<(), Error> {
+    fn download_posts(
+        &mut self,
+        name: &mut String,
+        post_type: &str,
+        posts: &[PostEntry],
+    ) -> Result<(), Error> {
         let mut progress_bar = ProgressBar::new(posts.len() as u64);
         for post in posts {
+            self.remove_invalid_chars(name);
             progress_bar.message(format!("Downloading: {} ", name).as_str());
+
             let file_name = Url::parse(post.file_url.as_str())?
                 .path_segments()
                 .unwrap()
                 .last()
                 .unwrap()
                 .to_string();
-            let file_dir = format!("{}{}/{}", self.config.download_directory, name, file_name);
-            if Path::new(file_dir.as_str()).exists() {
+            let file_dir = if post_type.is_empty() {
+                format!("{}{}/", self.config.download_directory, name)
+            } else {
+                format!("{}{}/{}/", self.config.download_directory, post_type, name)
+            };
+
+            let file_path_string = format!("{}{}", file_dir, file_name);
+            let file_path = Path::new(file_path_string.as_str());
+            if file_path.exists() {
                 progress_bar.message("Duplicate found: skipping... ");
                 continue;
             }
-            let (file_name, bytes) =
-                self.download_post(&post.file_url, post.file_size.unwrap_or(0))?;
-            self.save_image(&mut name, &file_name, &bytes)?;
+
+            if !Path::new(file_dir.as_str()).exists() {
+                create_dir_all(file_dir)?;
+            }
+
+            let bytes = self.download_post(&post.file_url, post.file_size.unwrap_or(0))?;
+            self.save_image(file_path, &bytes)?;
+
             progress_bar.inc();
         }
 
@@ -549,23 +557,33 @@ impl<'a> EsixWebConnector<'a> {
     }
 
     /// Downloads all posts from collection.
-    pub fn download_posts_from_collection(&mut self, collection: &Collection) -> Result<(), Error> {
-        self.download_singles(collection)?;
-        self.download_named(collection)?;
+    pub fn download_posts_from_collection(
+        &mut self,
+        collection: &mut Collection,
+    ) -> Result<(), Error> {
+        self.download_singles(&mut collection.single_posts)?;
+        self.download_named(&mut collection.named_posts)?;
 
         Ok(())
     }
 
-    fn download_singles(&mut self, collection: &Collection) -> Result<(), Error> {
-        let single_posts = &collection.single_posts;
-        self.download_posts(single_posts.name.clone(), &single_posts.posts)?;
+    fn download_singles(&mut self, single_posts: &mut NamedPost) -> Result<(), Error> {
+        self.download_posts(
+            &mut single_posts.name,
+            &single_posts.post_type,
+            &single_posts.posts,
+        )?;
 
         Ok(())
     }
 
-    fn download_named(&mut self, collection: &Collection) -> Result<(), Error> {
-        for named_post in &collection.named_posts {
-            self.download_posts(named_post.name.clone(), &named_post.posts)?;
+    fn download_named(&mut self, named_posts: &mut Vec<NamedPost>) -> Result<(), Error> {
+        for named_post in named_posts {
+            self.download_posts(
+                &mut named_post.name,
+                &named_post.post_type,
+                &named_post.posts,
+            )?;
         }
 
         Ok(())

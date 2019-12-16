@@ -35,8 +35,8 @@ fn main() -> Result<(), Error> {
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.
-    let collection = connector.grab_posts(&groups)?;
-    connector.download_posts_from_collection(&collection)?;
+    let mut collection = connector.grab_posts(&groups)?;
+    connector.download_posts_from_collection(&mut collection)?;
 
     // When posts are downloaded, save config with modified date.
     Config::save_config(&config)?;
