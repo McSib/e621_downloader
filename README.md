@@ -19,7 +19,7 @@ This list is constantly updated and checked for new features and addons that nee
  - [x] Add the ability to not create directories for images.
  - [x] Let the user sign in and use their blacklist.
  - [x] Let the user be able to download their favorites.
- - [ ] Bring more general improvement and optimization to the code for faster runtime.
+ - [x] Bring more general improvement and optimization to the code for faster runtime.
  - [x] Allow the program to work with aliases (the validator searches for tags in the most literal way, so aliases won't slide right now).
 
 # FAQ
