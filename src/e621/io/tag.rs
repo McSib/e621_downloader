@@ -1,16 +1,13 @@
 extern crate failure;
-extern crate reqwest;
 
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::Path;
 
 use failure::Error;
-use reqwest::{header::USER_AGENT, Client};
 
-use crate::e621::data_sets::{AliasEntry, TagEntry};
+use crate::e621::caller::{AliasEntry, RequestSender, TagEntry};
 use crate::e621::io::emergency_exit;
-use crate::e621::USER_AGENT_VALUE;
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &str = "tags.txt";
@@ -65,32 +62,30 @@ pub fn create_tag_file(p: &Path) -> Result<(), Error> {
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(p: &Path) -> Result<Vec<Group>, Error> {
+pub fn parse_tag_file(p: &Path, request_sender: RequestSender) -> Result<Vec<Group>, Error> {
     let source = read_to_string(p)?;
     Ok(Parser {
         pos: 0,
         input: source,
+        request_sender,
     }
     .parse_groups()?)
 }
 
 /// Identifier to help categorize tags.
 pub struct TagIdentifier {
-    /// Client used for identifying tags.
-    identifier_client: Client,
+    request_sender: RequestSender,
 }
 
 impl TagIdentifier {
     /// Creates new identifier.
-    fn new() -> Self {
-        TagIdentifier {
-            identifier_client: Client::new(),
-        }
+    fn new(request_sender: RequestSender) -> Self {
+        TagIdentifier { request_sender }
     }
 
     /// Identifies tag and returns [`Tag`].
-    fn id_tag(tags: &str) -> Result<Tag, Error> {
-        let identifier = TagIdentifier::new();
+    fn id_tag(tags: &str, request_sender: RequestSender) -> Result<Tag, Error> {
+        let identifier = TagIdentifier::new(request_sender);
         let tag_type = identifier.search_for_tag(tags)?;
         Ok(tag_type)
     }
@@ -100,19 +95,12 @@ impl TagIdentifier {
     /// # Important
     /// This does not identify an alias right now, that may change in the future.
     fn search_for_tag(&self, tags: &str) -> Result<Tag, Error> {
-        let tag_url = "https://e621.net/tag/index.json";
         let mut split: Vec<&str> = tags.split(' ').collect();
         split.retain(|elem| !elem.contains(':') && !elem.starts_with('-'));
 
         let mut tag_type = Tag::None;
-        for tag in &split {
-            let tag_entries: Vec<TagEntry> = self
-                .identifier_client
-                .get(tag_url)
-                .header(USER_AGENT, USER_AGENT_VALUE)
-                .query(&[("name", tag)])
-                .send()?
-                .json()?;
+        for tag in split {
+            let tag_entries: Vec<TagEntry> = self.request_sender.tag_from_name(tag)?;
 
             // To ensure that the tag set is not empty
             if !tag_entries.is_empty() {
@@ -131,27 +119,14 @@ impl TagIdentifier {
     }
 
     fn is_alias(&self, tag: &str) -> Result<TagEntry, Error> {
-        let alias_url = "https://e621.net/tag_alias/index.json";
-        let tag_url = "https://e621.net/tag/show.json";
-
-        let alias_entries: Vec<AliasEntry> = self
-            .identifier_client
-            .get(alias_url)
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .query(&[("query", tag)])
-            .send()?
-            .json()?;
+        let alias_entries: Vec<AliasEntry> = self.request_sender.query_alias(tag)?;
         if !alias_entries.is_empty() {
             let entry = &alias_entries[0];
             if !entry.pending {
                 let alias_id = entry.alias_id;
                 let tag_entry: TagEntry = self
-                    .identifier_client
-                    .get(tag_url)
-                    .header(USER_AGENT, USER_AGENT_VALUE)
-                    .query(&[("id", alias_id)])
-                    .send()?
-                    .json()?;
+                    .request_sender
+                    .get_entry_from_id(&format!("{}", alias_id), "tag")?;
                 return Ok(tag_entry);
             } else {
                 self.exit_tag_failure(&tag);
@@ -198,6 +173,7 @@ struct Parser {
     pos: usize,
     /// Input used for parsing.
     input: String,
+    request_sender: RequestSender,
 }
 
 impl Parser {
@@ -261,7 +237,10 @@ impl Parser {
 
     fn parse_general(&mut self) -> Result<Parsed, Error> {
         let tag = self.consume_while(valid_tag);
-        Ok(Parsed::General(TagIdentifier::id_tag(&tag.trim())?))
+        Ok(Parsed::General(TagIdentifier::id_tag(
+            &tag.trim(),
+            self.request_sender.clone(),
+        )?))
     }
 
     /// Parses tags.

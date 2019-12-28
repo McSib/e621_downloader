@@ -1,4 +1,4 @@
-use crate::e621::data_sets::PostEntry;
+use crate::e621::caller::PostEntry;
 use failure::Error;
 
 #[derive(Debug)]

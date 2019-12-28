@@ -1,34 +1,27 @@
 extern crate chrono;
 extern crate failure;
 extern crate pbr;
-extern crate reqwest;
 extern crate serde;
 
-use std::collections::HashMap;
 use std::fs::{create_dir_all, File};
-use std::io::{stdin, Read, Write};
+use std::io::{stdin, Write};
 use std::path::Path;
 
 use failure::Error;
 use pbr::ProgressBar;
-use reqwest::{header::USER_AGENT, Client, RequestBuilder, Url};
-use serde::Serialize;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::{emergency_exit, Login};
-use data_sets::{PoolEntry, PostEntry, SetEntry};
+use crate::e621::caller::RequestSender;
+use crate::e621::io::Login;
+use caller::{PoolEntry, PostEntry, SetEntry};
 use io::tag::{Group, Parsed, Tag};
 use io::Config;
+use reqwest::Url;
 use serde_json::Value;
-use std::cell::RefCell;
-use std::rc::Rc;
 
 pub mod blacklist;
-mod data_sets;
+pub mod caller;
 pub mod io;
-
-/// Default user agent value.
-static USER_AGENT_VALUE: &str = "e621_downloader/1.4.3 (by McSib on e621)";
 
 /// A collection of posts with a name.
 #[derive(Debug, Clone)]
@@ -102,18 +95,17 @@ impl Default for Collection {
 struct Grabber {
     /// All grabbed posts
     pub grabbed_posts: Collection,
-    /// Urls given as reference by `EsixWebConnector`
-    urls: Rc<RefCell<HashMap<String, String>>>,
+    request_sender: RequestSender,
     /// Blacklist used to throwaway posts that contain tags the user may not want
     blacklist: Vec<String>,
 }
 
 impl Grabber {
     /// Creates new instance of `Self`.
-    pub fn new(urls: Rc<RefCell<HashMap<String, String>>>, blacklist: Vec<String>) -> Self {
+    pub fn new(request_sender: RequestSender, blacklist: Vec<String>) -> Self {
         Grabber {
             grabbed_posts: Collection::default(),
-            urls,
+            request_sender,
             blacklist,
         }
     }
@@ -122,10 +114,13 @@ impl Grabber {
     /// Also modifies the `config` when searching general tags.
     pub fn from_tags(
         groups: &[Group],
-        urls: Rc<RefCell<HashMap<String, String>>>,
+        request_sender: RequestSender,
         blacklist: Vec<&str>,
     ) -> Result<Grabber, Error> {
-        let mut grabber = Grabber::new(urls, blacklist.iter().map(|e| e.to_string()).collect());
+        let mut grabber = Grabber::new(
+            request_sender,
+            blacklist.iter().map(|e| e.to_string()).collect(),
+        );
         grabber.grab_favorites()?;
         grabber.grab_tags(groups)?;
         Ok(grabber)
@@ -135,8 +130,7 @@ impl Grabber {
         let login = Login::load()?;
         if !login.username.is_empty() && login.download_favorites {
             let tag_str = format!("fav:{}", login.username);
-            let tag_client = Client::new();
-            let posts = self.custom_search(&tag_client, tag_str.as_str())?;
+            let posts = self.custom_search(tag_str.as_str())?;
             self.grabbed_posts.named_posts.push(NamedPost::from(&(
                 tag_str.as_str(),
                 "Favorites",
@@ -150,15 +144,11 @@ impl Grabber {
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
     pub fn grab_tags(&mut self, groups: &[Group]) -> Result<(), Error> {
-        let tag_client = Client::new();
         for group in groups {
             for tag in &group.tags {
                 match tag {
                     Parsed::Pool(id) => {
-                        let entry: PoolEntry = self
-                            .get_request_builder(&tag_client, "pool", &[("id", id)])
-                            .send()?
-                            .json()?;
+                        let entry: PoolEntry = self.request_sender.get_entry_from_id(id, "pool")?;
                         self.grabbed_posts.named_posts.push(NamedPost::from(&(
                             entry.name.as_str(),
                             "Pools",
@@ -168,10 +158,7 @@ impl Grabber {
                         println!("\"{}\" grabbed!", entry.name);
                     }
                     Parsed::Set(id) => {
-                        let entry: SetEntry = self
-                            .get_request_builder(&tag_client, "set", &[("id", id)])
-                            .send()?
-                            .json()?;
+                        let entry: SetEntry = self.request_sender.get_entry_from_id(id, "set")?;
                         self.grabbed_posts
                             .named_posts
                             .push(self.set_to_named_entry(&entry)?);
@@ -179,10 +166,8 @@ impl Grabber {
                         println!("\"{}\" grabbed!", entry.name);
                     }
                     Parsed::Post(id) => {
-                        let entry: PostEntry = self
-                            .get_request_builder(&tag_client, "single", &[("id", id)])
-                            .send()?
-                            .json()?;
+                        let entry: PostEntry =
+                            self.request_sender.get_entry_from_id(id, "single")?;
                         let id = entry.id;
                         self.grabbed_posts.single_posts.posts.push(entry);
 
@@ -194,7 +179,7 @@ impl Grabber {
                             Tag::Special(tag_str) => tag_str.clone(),
                             Tag::None => String::new(),
                         };
-                        let posts = self.get_posts_from_tag(&tag_client, tag)?;
+                        let posts = self.get_posts_from_tag(tag)?;
                         self.grabbed_posts.named_posts.push(NamedPost::from(&(
                             tag_str.as_str(),
                             "General Searches",
@@ -210,37 +195,21 @@ impl Grabber {
     }
 
     /// Grabs posts from general tag.
-    fn get_posts_from_tag(&mut self, client: &Client, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
+    fn get_posts_from_tag(&mut self, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
         match tag {
-            Tag::General(ref tag_search) => Ok(self.general_search(client, tag_search)?),
-            Tag::Special(ref tag_search) => {
-                Ok(self.special_search(client, &mut tag_search.clone())?)
-            }
+            Tag::General(ref tag_search) => Ok(self.general_search(tag_search)?),
+            Tag::Special(ref tag_search) => Ok(self.special_search(&mut tag_search.clone())?),
             Tag::None => bail!(format_err!("The tag is none!")),
         }
     }
 
     /// Performs a general search where it grabs only five pages of posts.
-    fn general_search(
-        &mut self,
-        client: &Client,
-        searching_tag: &str,
-    ) -> Result<Vec<PostEntry>, Error> {
-        let limit: u8 = 5;
+    fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
+        let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
         for page in 1..limit {
-            let mut searched_posts: Vec<PostEntry> = self
-                .get_request_builder(
-                    &client,
-                    "post",
-                    &[
-                        ("tags", searching_tag),
-                        ("page", &format!("{}", page)),
-                        ("limit", &format!("{}", 320)),
-                    ],
-                )
-                .send()?
-                .json::<Vec<PostEntry>>()?;
+            let mut searched_posts: Vec<PostEntry> =
+                self.request_sender.bulk_search(searching_tag, page)?;
             if searched_posts.is_empty() {
                 break;
             }
@@ -257,26 +226,12 @@ impl Grabber {
     }
 
     /// Performs a special search that grabs from a date up to the current day.
-    fn special_search(
-        &mut self,
-        client: &Client,
-        searching_tag: &mut String,
-    ) -> Result<Vec<PostEntry>, Error> {
+    fn special_search(&mut self, searching_tag: &mut String) -> Result<Vec<PostEntry>, Error> {
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
         loop {
-            let mut searched_posts: Vec<PostEntry> = self
-                .get_request_builder(
-                    &client,
-                    "post",
-                    &[
-                        ("tags", &*searching_tag),
-                        ("page", &format!("{}", page)),
-                        ("limit", &format!("{}", 320)),
-                    ],
-                )
-                .send()?
-                .json()?;
+            let mut searched_posts: Vec<PostEntry> =
+                self.request_sender.bulk_search(searching_tag, page)?;
             if searched_posts.is_empty() {
                 break;
             }
@@ -293,24 +248,9 @@ impl Grabber {
         Ok(posts)
     }
 
-    /// Creates a request builder for tag searches.
-    fn get_request_builder<T: Serialize>(
-        &self,
-        client: &Client,
-        entry: &str,
-        query: &T,
-    ) -> RequestBuilder {
-        client
-            .get(self.urls.borrow()[entry].as_str())
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .query(query)
-    }
-
     /// Converts `SetEntry` to `NamedPost`.
     fn set_to_named_entry(&self, set: &SetEntry) -> Result<NamedPost, Error> {
-        let client = Client::new();
-        let posts: Vec<PostEntry> =
-            self.custom_search(&client, format!("set:{}", set.short_name).as_str())?;
+        let posts: Vec<PostEntry> = self.custom_search(&format!("set:{}", set.short_name))?;
         Ok(NamedPost::from(&(
             set.name.as_str(),
             "Sets",
@@ -318,22 +258,11 @@ impl Grabber {
         )))
     }
 
-    fn custom_search(&self, client: &Client, tag: &str) -> Result<Vec<PostEntry>, Error> {
+    fn custom_search(&self, tag: &str) -> Result<Vec<PostEntry>, Error> {
         let mut posts = vec![];
         let mut page = 1;
         loop {
-            let mut set_posts: Vec<PostEntry> = self
-                .get_request_builder(
-                    &client,
-                    "post",
-                    &[
-                        ("tags", tag),
-                        ("page", format!("{}", page).as_str()),
-                        ("limit", "320"),
-                    ],
-                )
-                .send()?
-                .json()?;
+            let mut set_posts: Vec<PostEntry> = self.request_sender.bulk_search(tag, page)?;
             if set_posts.is_empty() {
                 break;
             }
@@ -347,13 +276,9 @@ impl Grabber {
 }
 
 pub struct EsixWebConnector<'a> {
-    /// All urls that can be used.
-    /// These options are `"post"`, `"pool"`, `"set"`, and `"single"`
-    urls: Rc<RefCell<HashMap<String, String>>>,
+    request_sender: RequestSender,
     /// The config which is modified when grabbing posts
     config: &'a mut Config,
-    /// Client used for downloading posts
-    client: Client,
     /// Login information for grabbing the Blacklist
     login: &'a Login,
     /// Blacklist grabbed from logged in user
@@ -362,58 +287,26 @@ pub struct EsixWebConnector<'a> {
 
 impl<'a> EsixWebConnector<'a> {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(config: &'a mut Config, login: &'a Login) -> Self {
-        let mut urls: HashMap<String, String> = HashMap::new();
-        EsixWebConnector::insert_urls(&mut urls);
-
+    pub fn new(config: &'a mut Config, login: &'a Login, request_sender: RequestSender) -> Self {
         EsixWebConnector {
-            urls: Rc::new(RefCell::new(urls)),
+            request_sender,
             config,
-            client: Client::new(),
             login,
             blacklist: String::new(),
         }
-    }
-
-    fn insert_urls(urls: &mut HashMap<String, String>) {
-        urls.insert(
-            String::from("post"),
-            String::from("https://e621.net/post/index.json"),
-        );
-        urls.insert(
-            String::from("pool"),
-            String::from("https://e621.net/pool/show.json"),
-        );
-        urls.insert(
-            String::from("set"),
-            String::from("https://e621.net/set/show.json"),
-        );
-        urls.insert(
-            String::from("single"),
-            String::from("https://e621.net/post/show.json"),
-        );
     }
 
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, this changes `self.urls` all to e926 and not e621.
     pub fn should_enter_safe_mode(&mut self) {
         if self.get_input("Should enter safe mode") {
-            self.update_urls_to_safe();
+            self.request_sender.update_to_safe();
         }
     }
 
     pub fn grab_blacklist(&mut self) -> Result<(), Error> {
         if !self.login.is_empty() {
-            let url = "https://e621.net/user/blacklist.json";
-            let json: Value = self
-                .client
-                .get(url)
-                .query(&[
-                    ("login", self.login.username.as_str()),
-                    ("password_hash", self.login.password_hash.as_str()),
-                ])
-                .send()?
-                .json()?;
+            let json: Value = self.request_sender.grab_blacklist(self.login)?;
             self.blacklist = json["blacklist"]
                 .to_string()
                 .trim_matches('\"')
@@ -440,19 +333,11 @@ impl<'a> EsixWebConnector<'a> {
         }
     }
 
-    /// Updates all urls from e621 to e926.
-    fn update_urls_to_safe(&mut self) {
-        self.urls
-            .borrow_mut()
-            .iter_mut()
-            .for_each(|(_, val)| *val = val.replace("e621", "e926"));
-    }
-
     /// Grabs all posts using `&[Group]` then converts grabbed posts and appends it to `self.collection`.
     pub fn grab_posts(&mut self, groups: &[Group]) -> Result<Collection, Error> {
         Ok(Grabber::from_tags(
             groups,
-            self.urls.clone(),
+            self.request_sender.clone(),
             self.blacklist.lines().collect::<Vec<&str>>(),
         )?
         .grabbed_posts)
@@ -470,44 +355,6 @@ impl<'a> EsixWebConnector<'a> {
     fn remove_invalid_chars(&self, dir_name: &mut String) {
         for character in &["?", ":", "*", "<", ">", "\"", "|"] {
             *dir_name = dir_name.replace(character, "_");
-        }
-    }
-
-    /// Sends request to download image.
-    fn download_post(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
-        let image_result = self
-            .client
-            .get(url)
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .send();
-        let mut image_response = match image_result {
-            Ok(response) => response,
-            Err(ref error) => {
-                self.close_on_server_error(error);
-                unreachable!()
-            }
-        };
-
-        let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
-        image_response.read_to_end(&mut image_bytes)?;
-
-        Ok(image_bytes)
-    }
-
-    fn close_on_server_error(&self, error: &reqwest::Error) {
-        println!(
-            "The server returned a {} error code!",
-            error.status().unwrap()
-        );
-        if error.is_server_error() {
-            emergency_exit(
-                "If this code is 503, please contact the developer (McSib) and report this to him.",
-            );
-        } else {
-            println!("If error code is 4xx, this is a client side error.");
-            emergency_exit(
-                "Please contact the developer (McSib) about this problem if it is 403, 404, 421",
-            );
         }
     }
 
@@ -546,7 +393,10 @@ impl<'a> EsixWebConnector<'a> {
                 create_dir_all(file_dir)?;
             }
 
-            let bytes = self.download_post(&post.file_url, post.file_size.unwrap_or(0))?;
+            //            let bytes = self.download_post(&post.file_url, post.file_size.unwrap_or(0))?;
+            let bytes = self
+                .request_sender
+                .download_image(&post.file_url, post.file_size.unwrap_or(0))?;
             self.save_image(file_path, &bytes)?;
 
             progress_bar.inc();
