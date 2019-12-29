@@ -1,6 +1,7 @@
 extern crate failure;
 extern crate reqwest;
 extern crate serde;
+extern crate serde_json;
 
 use crate::e621::io::{emergency_exit, Login};
 use failure::Error;
@@ -14,6 +15,21 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::rc::Rc;
 use std::time::Duration;
+
+#[macro_export]
+macro_rules! hashmap {
+    ( $( $x:expr ),* ) => {
+        {
+            let mut hash_map: HashMap<String, String> = HashMap::new();
+            $(
+                let (calling_name, url) = $x;
+                hash_map.insert(String::from(calling_name), String::from(url));
+            )*
+
+            hash_map
+        }
+    };
+}
 
 /// If an error occurs from server, it will respond with this.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -228,48 +244,23 @@ pub struct RequestSender {
 
 impl RequestSender {
     pub fn new() -> Self {
-        let mut urls: HashMap<String, String> = HashMap::with_capacity(4);
-        RequestSender::initialize_url_map(&mut urls);
-
         RequestSender {
             client: Rc::new(EsixClient::new()),
-            urls: Rc::new(RefCell::new(urls)),
+            urls: Rc::new(RefCell::new(RequestSender::initialize_url_map())),
         }
     }
 
-    fn initialize_url_map(urls: &mut HashMap<String, String>) {
-        urls.insert(
-            String::from("posts"),
-            String::from("https://e621.net/post/index.json"),
-        );
-        urls.insert(
-            String::from("pool"),
-            String::from("https://e621.net/pool/show.json"),
-        );
-        urls.insert(
-            String::from("set"),
-            String::from("https://e621.net/set/show.json"),
-        );
-        urls.insert(
-            String::from("single"),
-            String::from("https://e621.net/post/show.json"),
-        );
-        urls.insert(
-            String::from("blacklist"),
-            String::from("https://e621.net/user/blacklist.json"),
-        );
-        urls.insert(
-            String::from("tag"),
-            String::from("https://e621.net/tag/show.json"),
-        );
-        urls.insert(
-            String::from("tag_bulk"),
-            String::from("https://e621.net/tag/index.json"),
-        );
-        urls.insert(
-            String::from("alias"),
-            String::from("https://e621.net/tag_alias/index.json"),
-        );
+    fn initialize_url_map() -> HashMap<String, String> {
+        hashmap![
+            ("posts", "https://e621.net/post/index.json"),
+            ("pool", "https://e621.net/pool/show.json"),
+            ("set", "https://e621.net/set/show.json"),
+            ("single", "https://e621.net/post/show.json"),
+            ("blacklist", "https://e621.net/user/blacklist.json"),
+            ("tag", "https://e621.net/tag/show.json"),
+            ("tag_bulk", "https://e621.net/tag/index.json"),
+            ("alias", "https://e621.net/tag_alias/index.json")
+        ]
     }
 
     pub fn update_to_safe(&mut self) {
@@ -283,50 +274,57 @@ impl RequestSender {
         match result {
             Ok(response) => response,
             Err(ref error) => {
-                eprintln!(
-                    "Error occurred from sent request. \
-                     Error: {}",
-                    error
-                );
-                eprintln!("Url where error occurred: {:#?}", error.url());
-
-                if let Some(status) = error.status() {
-                    eprintln!("The response code from the server was: {}", status);
-
-                    if error.is_server_error() {
-                        if status == 500 {
-                            eprintln!(
-                                "There was an error that happened internally in the servers, \
-                                 please try using the downloader later until the issue is solved."
-                            );
-                        } else if status == 503 {
-                            eprintln!("Server could not handle the request, or the downloader has \
-                            exceeded the rate-limit. Contact the developer immediately about this \
-                            issue.");
-                        }
-                    } else if error.is_client_error() {
-                        if status == 403 {
-                            eprintln!(
-                                "The client was forbidden from accessing the api, contact the \
-                                 developer immediately if this error occurs."
-                            );
-                        } else if status == 421 {
-                            eprintln!(
-                                "The user is throttled, thus the request is unsuccessful. \
-                                 Contact the developer immediately if this error occurs."
-                            );
-                        }
-                    }
-                } else {
-                    eprintln!("Response code couldn't be posted...")
-                }
-
-                emergency_exit(
-                    "To prevent the program from crashing, it will do an emergency exit.",
-                );
+                self.output_error(error);
                 unreachable!()
             }
         }
+    }
+
+    fn output_error(&self, error: &reqwest::Error) {
+        eprintln!(
+            "Error occurred from sent request. \
+             Error: {}",
+            error
+        );
+        eprintln!("Url where error occurred: {:#?}", error.url());
+
+        if let Some(status) = error.status() {
+            let code = status.as_u16();
+            eprintln!("The response code from the server was: {}", code);
+
+            match code {
+                500 => {
+                    eprintln!(
+                        "There was an error that happened internally in the servers, \
+                         please try using the downloader later until the issue is solved."
+                    );
+                }
+                503 => {
+                    eprintln!(
+                        "Server could not handle the request, or the downloader has \
+                         exceeded the rate-limit. Contact the developer immediately about this \
+                         issue."
+                    );
+                }
+                403 => {
+                    eprintln!(
+                        "The client was forbidden from accessing the api, contact the \
+                         developer immediately if this error occurs."
+                    );
+                }
+                421 => {
+                    eprintln!(
+                        "The user is throttled, thus the request is unsuccessful. \
+                         Contact the developer immediately if this error occurs."
+                    );
+                }
+                _ => {
+                    eprintln!("Response code couldn't be posted...");
+                }
+            }
+        }
+
+        emergency_exit("To prevent the program from crashing, it will do an emergency exit.");
     }
 
     pub fn grab_blacklist(&self, login: &Login) -> Result<Value, Error> {
