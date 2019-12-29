@@ -61,14 +61,6 @@ impl Config {
         let config = from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?;
         Ok(config)
     }
-
-    /// Saves new configuration for future run.
-    pub fn save_config(config: &Config) -> Result<(), Error> {
-        let json = serde_json::to_string_pretty(config)?;
-        write(Path::new(CONFIG_NAME), json)?;
-
-        Ok(())
-    }
 }
 
 impl Default for Config {
