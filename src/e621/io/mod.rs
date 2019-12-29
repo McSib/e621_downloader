@@ -22,9 +22,6 @@ pub static LOGIN_NAME: &str = "login.json";
 /// Config that is used to do general setup.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Config {
-    /// Whether or not to create a directory for every tag used to search for images
-    #[serde(rename = "createDirectories")]
-    pub create_directories: bool,
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
     pub download_directory: String,
@@ -78,7 +75,6 @@ impl Default for Config {
     /// The default configuration for `Config`.
     fn default() -> Self {
         Config {
-            create_directories: true,
             download_directory: String::from("downloads/"),
         }
     }

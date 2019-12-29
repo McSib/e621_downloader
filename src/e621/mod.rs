@@ -275,23 +275,20 @@ impl Grabber {
     }
 }
 
-pub struct WebConnector<'a> {
+pub struct WebConnector {
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts
-    config: &'a mut Config,
-    /// Login information for grabbing the Blacklist
-    login: &'a Login,
+    download_directory: String,
     /// Blacklist grabbed from logged in user
     blacklist: String,
 }
 
-impl<'a> WebConnector<'a> {
+impl WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(config: &'a mut Config, login: &'a Login, request_sender: RequestSender) -> Self {
+    pub fn new(request_sender: RequestSender) -> Self {
         WebConnector {
             request_sender,
-            config,
-            login,
+            download_directory: Config::get_config().unwrap_or_default().download_directory,
             blacklist: String::new(),
         }
     }
@@ -305,8 +302,9 @@ impl<'a> WebConnector<'a> {
     }
 
     pub fn grab_blacklist(&mut self) -> Result<(), Error> {
-        if !self.login.is_empty() {
-            let json: Value = self.request_sender.grab_blacklist(self.login)?;
+        let login = Login::load()?;
+        if !login.is_empty() {
+            let json: Value = self.request_sender.grab_blacklist(&login)?;
             self.blacklist = json["blacklist"]
                 .to_string()
                 .trim_matches('\"')
@@ -377,9 +375,9 @@ impl<'a> WebConnector<'a> {
                 .unwrap()
                 .to_string();
             let file_dir = if post_type.is_empty() {
-                format!("{}{}/", self.config.download_directory, name)
+                format!("{}{}/", self.download_directory, name)
             } else {
-                format!("{}{}/{}/", self.config.download_directory, post_type, name)
+                format!("{}{}/{}/", self.download_directory, post_type, name)
             };
 
             let file_path_string = format!("{}{}", file_dir, file_name);
@@ -393,7 +391,6 @@ impl<'a> WebConnector<'a> {
                 create_dir_all(file_dir)?;
             }
 
-            //            let bytes = self.download_post(&post.file_url, post.file_size.unwrap_or(0))?;
             let bytes = self
                 .request_sender
                 .download_image(&post.file_url, post.file_size.unwrap_or(0))?;

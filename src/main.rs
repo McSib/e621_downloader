@@ -17,10 +17,6 @@ mod e621;
 fn main() -> Result<(), Error> {
     // Check the config and load it.
     Config::check_config()?;
-    let mut config = Config::get_config()?;
-
-    // Loads login information for requests
-    let login = Login::load()?;
 
     // Create tag if it doesn't exist, then parse it.
     let tag_path = Path::new(TAG_NAME);
@@ -29,7 +25,7 @@ fn main() -> Result<(), Error> {
     let request_sender = RequestSender::new();
 
     // Creates connector to prepare for downloading posts.
-    let mut connector = WebConnector::new(&mut config, &login, request_sender.clone());
+    let mut connector = WebConnector::new(request_sender.clone());
     connector.should_enter_safe_mode();
     connector.grab_blacklist()?;
 
@@ -40,9 +36,6 @@ fn main() -> Result<(), Error> {
     // Collects all grabbed posts and moves it to connector to start downloading.
     let mut collection = connector.grab_posts(&groups)?;
     connector.download_posts_from_collection(&mut collection)?;
-
-    // When posts are downloaded, save config with modified date.
-    Config::save_config(&config)?;
 
     Ok(())
 }
