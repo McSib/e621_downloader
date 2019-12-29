@@ -6,9 +6,9 @@ use std::path::Path;
 
 use failure::Error;
 
-use crate::e621::caller::{AliasEntry, RequestSender, TagEntry};
 use crate::e621::io::emergency_exit;
 use crate::e621::io::parser::{Parser, ParserFnc};
+use crate::e621::sender::{AliasEntry, RequestSender, TagEntry};
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &str = "tags.txt";

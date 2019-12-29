@@ -5,11 +5,11 @@ use std::path::Path;
 
 use failure::Error;
 
-use crate::e621::caller::RequestSender;
 use crate::e621::io::Login;
+use crate::e621::sender::RequestSender;
 use e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
 use e621::io::Config;
-use e621::EsixWebConnector;
+use e621::WebConnector;
 
 mod e621;
 
@@ -29,7 +29,7 @@ fn main() -> Result<(), Error> {
     let request_sender = RequestSender::new();
 
     // Creates connector to prepare for downloading posts.
-    let mut connector = EsixWebConnector::new(&mut config, &login, request_sender.clone());
+    let mut connector = WebConnector::new(&mut config, &login, request_sender.clone());
     connector.should_enter_safe_mode();
     connector.grab_blacklist()?;
 

@@ -11,17 +11,17 @@ use failure::Error;
 use pbr::ProgressBar;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::caller::RequestSender;
 use crate::e621::io::Login;
-use caller::{PoolEntry, PostEntry, SetEntry};
+use crate::e621::sender::RequestSender;
 use io::tag::{Group, Parsed, Tag};
 use io::Config;
 use reqwest::Url;
+use sender::{PoolEntry, PostEntry, SetEntry};
 use serde_json::Value;
 
 pub mod blacklist;
-pub mod caller;
 pub mod io;
+pub mod sender;
 
 /// A collection of posts with a name.
 #[derive(Debug, Clone)]
@@ -275,7 +275,7 @@ impl Grabber {
     }
 }
 
-pub struct EsixWebConnector<'a> {
+pub struct WebConnector<'a> {
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts
     config: &'a mut Config,
@@ -285,10 +285,10 @@ pub struct EsixWebConnector<'a> {
     blacklist: String,
 }
 
-impl<'a> EsixWebConnector<'a> {
+impl<'a> WebConnector<'a> {
     /// Creates instance of `Self` for grabbing and downloading posts.
     pub fn new(config: &'a mut Config, login: &'a Login, request_sender: RequestSender) -> Self {
-        EsixWebConnector {
+        WebConnector {
             request_sender,
             config,
             login,
