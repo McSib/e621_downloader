@@ -11,6 +11,7 @@ use failure::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string_pretty};
 
+pub mod parser;
 pub mod tag;
 
 /// Name of the configuration file.

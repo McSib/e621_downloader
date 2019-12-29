@@ -1,27 +1,28 @@
 use crate::e621::caller::PostEntry;
+use crate::e621::io::parser::{Parser, ParserFnc};
 use failure::Error;
 
 #[derive(Debug)]
-struct BlacklistLineToken {
-    tags: Vec<BlacklistTagToken>,
+struct LineToken {
+    tags: Vec<TagToken>,
 }
 
-impl BlacklistLineToken {
-    fn new(tags: Vec<BlacklistTagToken>) -> Self {
-        let mut line_token = BlacklistLineToken::default();
+impl LineToken {
+    fn new(tags: Vec<TagToken>) -> Self {
+        let mut line_token = LineToken::default();
         line_token.tags = tags;
         line_token
     }
 }
 
-impl Default for BlacklistLineToken {
+impl Default for LineToken {
     fn default() -> Self {
-        BlacklistLineToken { tags: Vec::new() }
+        LineToken { tags: Vec::new() }
     }
 }
 
 #[derive(Debug, PartialEq)]
-enum BlacklistRating {
+enum Rating {
     None,
     Safe,
     Questionable,
@@ -29,115 +30,115 @@ enum BlacklistRating {
 }
 
 #[derive(Debug, PartialEq)]
-enum BlacklistID {
+enum ID {
     None,
     ID(i64),
 }
 
 #[derive(Debug, PartialEq)]
-enum BlacklistUser {
+enum User {
     None,
     User(String),
 }
 
 #[derive(Debug)]
-struct BlacklistTagToken {
+struct TagToken {
     negated: bool,
-    rating: BlacklistRating,
-    id: BlacklistID,
-    user: BlacklistUser,
+    rating: Rating,
+    id: ID,
+    user: User,
     name: String,
 }
 
-impl BlacklistTagToken {
+impl TagToken {
     fn new(name: &str) -> Self {
-        BlacklistTagToken {
+        TagToken {
             negated: false,
-            rating: BlacklistRating::None,
-            id: BlacklistID::None,
-            user: BlacklistUser::None,
+            rating: Rating::None,
+            id: ID::None,
+            user: User::None,
             name: name.to_string(),
         }
     }
 
     fn is_user(&self) -> bool {
-        self.user != BlacklistUser::None
+        self.user != User::None
     }
 
     fn is_id(&self) -> bool {
-        self.id != BlacklistID::None
+        self.id != ID::None
     }
 
     fn is_rating(&self) -> bool {
-        self.rating != BlacklistRating::None
+        self.rating != Rating::None
     }
 }
 
-impl Default for BlacklistTagToken {
+impl Default for TagToken {
     fn default() -> Self {
-        BlacklistTagToken {
+        TagToken {
             negated: false,
-            rating: BlacklistRating::None,
-            id: BlacklistID::None,
-            user: BlacklistUser::None,
+            rating: Rating::None,
+            id: ID::None,
+            user: User::None,
             name: String::new(),
         }
     }
 }
 
 /// Parser that reads a tag file and parses the tags.
-struct Parser {
-    /// Current cursor position in the array of characters.
-    pos: usize,
-    /// Input used for parsing.
-    input: String,
+struct BlacklistParser {
+    parser: Parser,
 }
 
-impl Parser {
-    fn parse_tags(&mut self) -> Result<BlacklistLineToken, Error> {
-        let mut tags: Vec<BlacklistTagToken> = Vec::new();
+impl BlacklistParser {
+    fn parse_tags(&mut self) -> Result<LineToken, Error> {
+        let mut tags: Vec<TagToken> = Vec::new();
         loop {
-            self.consume_whitespace();
-            if self.eof() {
+            self.parser.consume_whitespace();
+            if self.parser.eof() {
                 break;
             }
 
             tags.push(self.parse_tag()?);
         }
 
-        Ok(BlacklistLineToken::new(tags))
+        Ok(LineToken::new(tags))
     }
 
-    fn parse_tag(&mut self) -> Result<BlacklistTagToken, Error> {
-        if self.starts_with("rating:") || self.starts_with("id:") || self.starts_with("user:") {
-            let mut token = BlacklistTagToken::default();
-            let identifier = self.consume_while(valid_tag);
+    fn parse_tag(&mut self) -> Result<TagToken, Error> {
+        if self.parser.starts_with("rating:")
+            || self.parser.starts_with("id:")
+            || self.parser.starts_with("user:")
+        {
+            let mut token = TagToken::default();
+            let identifier = self.parser.consume_while(valid_tag);
 
-            assert_eq!(self.consume_char(), ':');
+            assert_eq!(self.parser.consume_char(), ':');
 
             let value = self.process_value(&identifier)?;
             self.update_token(&mut token, &identifier, &value)?;
             return Ok(token);
         }
 
-        if self.starts_with("-") {
-            assert_eq!(self.consume_char(), '-');
+        if self.parser.starts_with("-") {
+            assert_eq!(self.parser.consume_char(), '-');
 
-            let name = self.consume_while(valid_tag);
-            let mut token = BlacklistTagToken::new(&name);
+            let name = self.parser.consume_while(valid_tag);
+            let mut token = TagToken::new(&name);
             token.negated = true;
             return Ok(token);
         }
 
-        let name = self.consume_while(valid_tag);
-        Ok(BlacklistTagToken::new(&name))
+        let name = self.parser.consume_while(valid_tag);
+        Ok(TagToken::new(&name))
     }
 
     fn process_value(&mut self, identifier: &str) -> Result<String, Error> {
         match identifier {
-            "rating" => Ok(self.consume_while(valid_rating)),
-            "id" => Ok(self.consume_while(valid_id)),
-            "user" => Ok(self.consume_while(valid_user)),
+            "rating" => Ok(self.parser.consume_while(valid_rating)),
+            "id" => Ok(self.parser.consume_while(valid_id)),
+            "user" => Ok(self.parser.consume_while(valid_user)),
             _ => bail!(format_err!(
                 "Identifier doesn't match with any match parameters!"
             )),
@@ -146,7 +147,7 @@ impl Parser {
 
     fn update_token(
         &self,
-        token: &mut BlacklistTagToken,
+        token: &mut TagToken,
         identifier: &str,
         value: &str,
     ) -> Result<(), Error> {
@@ -156,10 +157,10 @@ impl Parser {
                 token.rating = self.get_rating(&value);
             }
             "id" => {
-                token.id = BlacklistID::ID(value.parse::<i64>()?);
+                token.id = ID::ID(value.parse::<i64>()?);
             }
             "user" => {
-                token.user = BlacklistUser::User(value.to_string());
+                token.user = User::User(value.to_string());
             }
             _ => bail!(format_err!(
                 "Identifier doesn't match with any match parameters!"
@@ -169,60 +170,13 @@ impl Parser {
         Ok(())
     }
 
-    fn get_rating(&self, value: &str) -> BlacklistRating {
+    fn get_rating(&self, value: &str) -> Rating {
         match value.to_lowercase().as_str() {
-            "safe" | "s" => BlacklistRating::Safe,
-            "questionable" | "q" => BlacklistRating::Questionable,
-            "explicit" | "e" => BlacklistRating::Explicit,
-            _ => BlacklistRating::None,
+            "safe" | "s" => Rating::Safe,
+            "questionable" | "q" => Rating::Questionable,
+            "explicit" | "e" => Rating::Explicit,
+            _ => Rating::None,
         }
-    }
-
-    /// Consume and discard zero or more whitespace characters.
-    fn consume_whitespace(&mut self) {
-        self.consume_while(char::is_whitespace);
-    }
-
-    /// Consumes characters until `test` returns false.
-    fn consume_while<F>(&mut self, test: F) -> String
-    where
-        F: Fn(char) -> bool,
-    {
-        let mut result = String::new();
-        while !self.eof() && test(self.next_char()) {
-            result.push(self.consume_char());
-        }
-
-        result
-    }
-
-    /// Returns current char and pushes `self.pos` to the next char.
-    fn consume_char(&mut self) -> char {
-        let mut iter = self.get_current_input().char_indices();
-        let (_, cur_char) = iter.next().unwrap();
-        let (next_pos, _) = iter.next().unwrap_or((1, ' '));
-        self.pos += next_pos;
-        cur_char
-    }
-
-    /// Read the current char without consuming it.
-    fn next_char(&mut self) -> char {
-        self.get_current_input().chars().next().unwrap()
-    }
-
-    /// Checks if the current input starts with the given string.
-    fn starts_with(&self, s: &str) -> bool {
-        self.get_current_input().starts_with(s)
-    }
-
-    /// Gets current input from current `pos` onward.
-    fn get_current_input(&self) -> &str {
-        &self.input[self.pos..]
-    }
-
-    /// Checks whether or not `pos` is at end of file.
-    fn eof(&self) -> bool {
-        self.pos >= self.input.len()
     }
 }
 
@@ -288,7 +242,7 @@ impl BlacklistFlagWorker {
         }
     }
 
-    fn set_red_flag_margin(&mut self, tags: &[BlacklistTagToken]) {
+    fn set_red_flag_margin(&mut self, tags: &[TagToken]) {
         let (length, negated_length) = {
             let mut negated_length: i16 = 0;
             let mut length: i16 = tags.len() as i16;
@@ -306,14 +260,14 @@ impl BlacklistFlagWorker {
         self.negated_margin = negated_length;
     }
 
-    fn check_post(&mut self, post: &PostEntry, blacklist_line: &BlacklistLineToken) {
+    fn check_post(&mut self, post: &PostEntry, blacklist_line: &LineToken) {
         let mut flags: i16 = 0;
         let mut negated_flags: i16 = 0;
         let post_tags: Vec<&str> = post.tags.split(' ').collect();
         for tag in &blacklist_line.tags {
             if tag.is_user() || tag.is_rating() || tag.is_id() {
                 if tag.is_id() {
-                    if let BlacklistID::ID(id) = tag.id {
+                    if let ID::ID(id) = tag.id {
                         if post.id == id {
                             self.flagged = true;
                             break;
@@ -322,7 +276,7 @@ impl BlacklistFlagWorker {
                 }
 
                 if tag.is_user() {
-                    if let BlacklistUser::User(username) = &tag.user {
+                    if let User::User(username) = &tag.user {
                         if post.author == *username {
                             self.flagged = true;
                             break;
@@ -332,20 +286,20 @@ impl BlacklistFlagWorker {
 
                 if tag.is_rating() {
                     match tag.rating {
-                        BlacklistRating::None => {}
-                        BlacklistRating::Safe => {
+                        Rating::None => {}
+                        Rating::Safe => {
                             if post.rating.as_str() == "s" {
                                 flags += 1;
                                 continue;
                             }
                         }
-                        BlacklistRating::Questionable => {
+                        Rating::Questionable => {
                             if post.rating.as_str() == "q" {
                                 flags += 1;
                                 continue;
                             }
                         }
-                        BlacklistRating::Explicit => {
+                        Rating::Explicit => {
                             if post.rating.as_str() == "e" {
                                 flags += 1;
                                 continue;
@@ -399,9 +353,11 @@ impl Blacklist {
     pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
         let mut filtered = 0;
         for blacklist_entry in &self.blacklist_entries {
-            let mut parser = Parser {
-                pos: 0,
-                input: blacklist_entry.to_string(),
+            let mut parser = BlacklistParser {
+                parser: Parser {
+                    pos: 0,
+                    input: blacklist_entry.to_string(),
+                },
             };
             let blacklist_line = parser.parse_tags().unwrap();
             posts.retain(|e| {

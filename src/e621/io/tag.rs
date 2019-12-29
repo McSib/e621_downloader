@@ -8,6 +8,7 @@ use failure::Error;
 
 use crate::e621::caller::{AliasEntry, RequestSender, TagEntry};
 use crate::e621::io::emergency_exit;
+use crate::e621::io::parser::{Parser, ParserFnc};
 
 /// Constant of the tag file's name.
 pub static TAG_NAME: &str = "tags.txt";
@@ -64,9 +65,11 @@ pub fn create_tag_file(p: &Path) -> Result<(), Error> {
 /// Creates instance of the parser and parses groups and tags.
 pub fn parse_tag_file(p: &Path, request_sender: RequestSender) -> Result<Vec<Group>, Error> {
     let source = read_to_string(p)?;
-    Ok(Parser {
-        pos: 0,
-        input: source,
+    Ok(TagParser {
+        parser: Parser {
+            pos: 0,
+            input: source,
+        },
         request_sender,
     }
     .parse_groups()?)
@@ -168,21 +171,18 @@ impl TagIdentifier {
 }
 
 /// Parser that reads a tag file and parses the tags.
-struct Parser {
-    /// Current cursor position in the array of characters.
-    pos: usize,
-    /// Input used for parsing.
-    input: String,
+struct TagParser {
+    parser: Parser,
     request_sender: RequestSender,
 }
 
-impl Parser {
+impl TagParser {
     /// Parses groups.
     pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
         let mut groups: Vec<Group> = Vec::new();
         loop {
-            self.consume_whitespace();
-            if self.eof() {
+            self.parser.consume_whitespace();
+            if self.parser.eof() {
                 break;
             }
 
@@ -190,7 +190,7 @@ impl Parser {
                 continue;
             }
 
-            if self.starts_with("[") {
+            if self.parser.starts_with("[") {
                 groups.push(self.parse_group()?);
             } else {
                 bail!(format_err!("Tags can't be outside of groups!"));
@@ -202,9 +202,9 @@ impl Parser {
 
     // Parses single group and all tags for it.
     pub fn parse_group(&mut self) -> Result<Group, Error> {
-        assert_eq!(self.consume_char(), '[');
-        let group_name = self.consume_while(valid_group);
-        assert_eq!(self.consume_char(), ']');
+        assert_eq!(self.parser.consume_char(), '[');
+        let group_name = self.parser.consume_while(valid_group);
+        assert_eq!(self.parser.consume_char(), ']');
 
         let parsed_tags = match group_name.as_str() {
             "artists" | "general" => self.parse_tags(|parser| parser.parse_general())?,
@@ -221,22 +221,22 @@ impl Parser {
     }
 
     fn parse_pool(&mut self) -> Result<Parsed, Error> {
-        let tag = self.consume_while(valid_id);
+        let tag = self.parser.consume_while(valid_id);
         Ok(Parsed::Pool(tag))
     }
 
     fn parse_set(&mut self) -> Result<Parsed, Error> {
-        let tag = self.consume_while(valid_id);
+        let tag = self.parser.consume_while(valid_id);
         Ok(Parsed::Set(tag))
     }
 
     fn parse_post(&mut self) -> Result<Parsed, Error> {
-        let tag = self.consume_while(valid_id);
+        let tag = self.parser.consume_while(valid_id);
         Ok(Parsed::Post(tag))
     }
 
     fn parse_general(&mut self) -> Result<Parsed, Error> {
-        let tag = self.consume_while(valid_tag);
+        let tag = self.parser.consume_while(valid_tag);
         Ok(Parsed::General(TagIdentifier::id_tag(
             &tag.trim(),
             self.request_sender.clone(),
@@ -250,16 +250,16 @@ impl Parser {
     {
         let mut tags: Vec<Parsed> = Vec::new();
         loop {
-            self.consume_whitespace();
+            self.parser.consume_whitespace();
             if self.check_and_parse_comment() {
                 continue;
             }
 
-            if self.starts_with("[") {
+            if self.parser.starts_with("[") {
                 break;
             }
 
-            if self.eof() {
+            if self.parser.eof() {
                 break;
             }
 
@@ -271,7 +271,7 @@ impl Parser {
 
     /// Checks if next character is comment identifier and parses it if it is.
     fn check_and_parse_comment(&mut self) -> bool {
-        if self.starts_with("#") {
+        if self.parser.starts_with("#") {
             self.parse_comment();
             return true;
         }
@@ -281,54 +281,7 @@ impl Parser {
 
     /// Skips over comment.
     fn parse_comment(&mut self) {
-        self.consume_while(valid_comment);
-    }
-
-    /// Consume and discard zero or more whitespace characters.
-    fn consume_whitespace(&mut self) {
-        self.consume_while(char::is_whitespace);
-    }
-
-    /// Consumes characters until `test` returns false.
-    fn consume_while<F>(&mut self, test: F) -> String
-    where
-        F: Fn(char) -> bool,
-    {
-        let mut result = String::new();
-        while !self.eof() && test(self.next_char()) {
-            result.push(self.consume_char());
-        }
-
-        result
-    }
-
-    /// Returns current char and pushes `self.pos` to the next char.
-    fn consume_char(&mut self) -> char {
-        let mut iter = self.get_current_input().char_indices();
-        let (_, cur_char) = iter.next().unwrap();
-        let (next_pos, _) = iter.next().unwrap_or((1, ' '));
-        self.pos += next_pos;
-        cur_char
-    }
-
-    /// Read the current char without consuming it.
-    fn next_char(&mut self) -> char {
-        self.get_current_input().chars().next().unwrap()
-    }
-
-    /// Checks if the current input starts with the given string.
-    fn starts_with(&self, s: &str) -> bool {
-        self.get_current_input().starts_with(s)
-    }
-
-    /// Gets current input from current `pos` onward.
-    fn get_current_input(&self) -> &str {
-        &self.input[self.pos..]
-    }
-
-    /// Checks whether or not `pos` is at end of file.
-    fn eof(&self) -> bool {
-        self.pos >= self.input.len()
+        self.parser.consume_while(valid_comment);
     }
 }
 
