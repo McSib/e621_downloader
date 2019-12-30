@@ -108,9 +108,10 @@ impl WebConnector {
         &mut self,
         set_name: &mut String,
         category: &str,
-        posts: &[GrabbedPost],
+        posts: &mut [GrabbedPost],
     ) -> Result<(), Error> {
         let mut progress_bar = ProgressBar::new(posts.len() as u64);
+        posts.reverse();
         for post in posts {
             self.remove_invalid_chars(set_name);
             progress_bar.message(format!("Downloading: {} ", set_name).as_str());
@@ -147,19 +148,19 @@ impl WebConnector {
         &mut self,
         grabbed_posts: (Vec<PostSet>, PostSet),
     ) -> Result<(), Error> {
-        let (posts, single_posts) = grabbed_posts;
-        for post in posts {
+        let (mut posts, mut single_posts) = grabbed_posts;
+        for post in posts.iter_mut() {
             self.download_posts(
                 &mut post.set_name.clone(),
                 &post.category.to_string(),
-                &post.posts,
+                &mut post.posts,
             )?;
         }
 
         self.download_posts(
             &mut single_posts.set_name.clone(),
             &single_posts.category.to_string(),
-            &single_posts.posts,
+            &mut single_posts.posts,
         )?;
         Ok(())
     }

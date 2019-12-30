@@ -1,4 +1,4 @@
-use crate::e621::io::parser::{Parser, ParserFnc};
+use crate::e621::io::parser::Parser;
 use crate::e621::sender::PostEntry;
 use failure::Error;
 

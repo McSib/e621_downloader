@@ -7,7 +7,7 @@ use std::path::Path;
 use failure::Error;
 
 use crate::e621::io::emergency_exit;
-use crate::e621::io::parser::{Parser, ParserFnc};
+use crate::e621::io::parser::Parser;
 use crate::e621::sender::{AliasEntry, RequestSender, TagEntry};
 
 /// Constant of the tag file's name.
