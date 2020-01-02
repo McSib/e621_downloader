@@ -51,7 +51,7 @@ impl WebConnector {
     pub fn grab_blacklist(&mut self) -> Result<(), Error> {
         let login = Login::load()?;
         if !login.is_empty() {
-            let json: Value = self.request_sender.grab_blacklist(&login)?;
+            let json: Value = self.request_sender.get_blacklist(&login)?;
             self.blacklist = json["blacklist"]
                 .to_string()
                 .trim_matches('\"')

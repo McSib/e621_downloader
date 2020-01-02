@@ -21,9 +21,8 @@ fn main() -> Result<(), Error> {
     let tag_path = Path::new(TAG_NAME);
     create_tag_file(&tag_path)?;
 
+    // Creates connector and requester to prepare for downloading posts.
     let request_sender = RequestSender::new();
-
-    // Creates connector to prepare for downloading posts.
     let mut connector = WebConnector::new(request_sender.clone());
     connector.should_enter_safe_mode();
     connector.grab_blacklist()?;

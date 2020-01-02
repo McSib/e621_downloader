@@ -206,22 +206,24 @@ pub struct PoolEntry {
 /// Default user agent value.
 static USER_AGENT_VALUE: &str = "e621_downloader/1.4.3 (by McSib on e621)";
 
-struct EsixClient {
+struct SenderClient {
     client: Rc<Client>,
 }
 
-impl EsixClient {
+impl SenderClient {
     fn new() -> Self {
-        let client = Client::builder()
+        SenderClient {
+            client: Rc::new(SenderClient::build_client()),
+        }
+    }
+
+    fn build_client() -> Client {
+        Client::builder()
             .cookie_store(false)
             .tcp_nodelay()
             .timeout(Duration::from_secs(60))
             .build()
-            .unwrap_or_else(|_| Client::new());
-
-        EsixClient {
-            client: Rc::new(client),
-        }
+            .unwrap_or_else(|_| Client::new())
     }
 
     pub fn get(&self, url: &str) -> RequestBuilder {
@@ -229,23 +231,23 @@ impl EsixClient {
     }
 }
 
-impl Clone for EsixClient {
+impl Clone for SenderClient {
     fn clone(&self) -> Self {
-        EsixClient {
+        SenderClient {
             client: self.client.clone(),
         }
     }
 }
 
 pub struct RequestSender {
-    client: Rc<EsixClient>,
+    client: Rc<SenderClient>,
     urls: Rc<RefCell<HashMap<String, String>>>,
 }
 
 impl RequestSender {
     pub fn new() -> Self {
         RequestSender {
-            client: Rc::new(EsixClient::new()),
+            client: Rc::new(SenderClient::new()),
             urls: Rc::new(RefCell::new(RequestSender::initialize_url_map())),
         }
     }
@@ -268,16 +270,6 @@ impl RequestSender {
             .borrow_mut()
             .iter_mut()
             .for_each(|(_, value)| *value = value.replace("e621", "e926"));
-    }
-
-    pub fn check_result(&self, result: Result<Response, reqwest::Error>) -> Response {
-        match result {
-            Ok(response) => response,
-            Err(ref error) => {
-                self.output_error(error);
-                unreachable!()
-            }
-        }
     }
 
     fn output_error(&self, error: &reqwest::Error) {
@@ -327,28 +319,14 @@ impl RequestSender {
         emergency_exit("To prevent the program from crashing, it will do an emergency exit.");
     }
 
-    pub fn grab_blacklist(&self, login: &Login) -> Result<Value, Error> {
-        Ok(self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["blacklist"])
-                    .query(&[
-                        ("login", login.username.as_str()),
-                        ("password_hash", login.password_hash.as_str()),
-                    ])
-                    .send(),
-            )
-            .json()?)
-    }
-
-    /// Sends request to download image.
-    pub fn download_image(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
-        let image_result = self.client.get(url).send();
-        let mut image_response = self.check_result(image_result);
-        let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
-        image_response.read_to_end(&mut image_bytes)?;
-
-        Ok(image_bytes)
+    pub fn check_result(&self, result: Result<Response, reqwest::Error>) -> Response {
+        match result {
+            Ok(response) => response,
+            Err(ref error) => {
+                self.output_error(error);
+                unreachable!()
+            }
+        }
     }
 
     pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> Result<T, Error>
@@ -367,6 +345,15 @@ impl RequestSender {
         Ok(entry)
     }
 
+    /// Sends request to download image.
+    pub fn download_image(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
+        let mut image_response = self.check_result(self.client.get(url).send());
+        let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
+        image_response.read_to_end(&mut image_bytes)?;
+
+        Ok(image_bytes)
+    }
+
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> Result<Vec<PostEntry>, Error> {
         let searched_posts: Vec<PostEntry> = self
             .check_result(
@@ -383,7 +370,7 @@ impl RequestSender {
         Ok(searched_posts)
     }
 
-    pub fn tag_from_name(&self, tag: &str) -> Result<Vec<TagEntry>, Error> {
+    pub fn get_tags_by_name(&self, tag: &str) -> Result<Vec<TagEntry>, Error> {
         let tags: Vec<TagEntry> = self
             .check_result(
                 self.client
@@ -395,15 +382,43 @@ impl RequestSender {
         Ok(tags)
     }
 
-    pub fn query_alias(&self, tag: &str) -> Result<Vec<AliasEntry>, Error> {
-        Ok(self
+    pub fn get_tag_by_id(&self, id: &str) -> Result<TagEntry, Error> {
+        let tag: TagEntry = self
+            .check_result(
+                self.client
+                    .get(&self.urls.borrow()["tag"])
+                    .query(&[("id", id)])
+                    .send(),
+            )
+            .json()?;
+        Ok(tag)
+    }
+
+    pub fn query_aliases(&self, tag: &str) -> Result<Vec<AliasEntry>, Error> {
+        let alias = self
             .check_result(
                 self.client
                     .get(&self.urls.borrow()["alias"])
                     .query(&[("query", tag)])
                     .send(),
             )
-            .json()?)
+            .json()?;
+        Ok(alias)
+    }
+
+    pub fn get_blacklist(&self, login: &Login) -> Result<Value, Error> {
+        let blacklist = self
+            .check_result(
+                self.client
+                    .get(&self.urls.borrow()["blacklist"])
+                    .query(&[
+                        ("login", login.username.as_str()),
+                        ("password_hash", login.password_hash.as_str()),
+                    ])
+                    .send(),
+            )
+            .json()?;
+        Ok(blacklist)
     }
 }
 

@@ -14,6 +14,27 @@ use crate::e621::sender::{AliasEntry, RequestSender, TagEntry};
 pub static TAG_NAME: &str = "tags.txt";
 static TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
+trait UnwrapOrFail<T> {
+    fn unwrap_or_fail<F>(self, closure: F) -> T
+    where
+        F: FnOnce();
+}
+
+impl<T> UnwrapOrFail<T> for Option<T> {
+    fn unwrap_or_fail<F>(self, closure: F) -> T
+    where
+        F: FnOnce(),
+    {
+        match self {
+            Some(e) => e,
+            None => {
+                closure();
+                unreachable!()
+            }
+        }
+    }
+}
+
 /// A tag that can be either general or special.
 #[derive(Debug, Clone)]
 pub enum Tag {
@@ -103,7 +124,7 @@ impl TagIdentifier {
 
         let mut tag_type = Tag::None;
         for tag in split {
-            let tag_entries: Vec<TagEntry> = self.request_sender.tag_from_name(tag)?;
+            let tag_entries: Vec<TagEntry> = self.request_sender.get_tags_by_name(tag)?;
 
             // To ensure that the tag set is not empty
             if !tag_entries.is_empty() {
@@ -122,18 +143,15 @@ impl TagIdentifier {
     }
 
     fn is_alias(&self, tag: &str) -> Result<TagEntry, Error> {
-        let alias_entries: Vec<AliasEntry> = self.request_sender.query_alias(tag)?;
-        if !alias_entries.is_empty() {
-            let entry = &alias_entries[0];
-            if !entry.pending {
-                let alias_id = entry.alias_id;
-                let tag_entry: TagEntry = self
-                    .request_sender
-                    .get_entry_from_id(&format!("{}", alias_id), "tag")?;
-                return Ok(tag_entry);
-            } else {
-                self.exit_tag_failure(&tag);
-            }
+        let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag)?;
+        let entry = alias_entries
+            .first()
+            .unwrap_or_fail(|| self.exit_tag_failure(&tag));
+        if !entry.pending {
+            let tag_entry: TagEntry = self
+                .request_sender
+                .get_tag_by_id(&format!("{}", entry.alias_id))?;
+            return Ok(tag_entry);
         } else {
             self.exit_tag_failure(&tag);
         }
@@ -206,13 +224,7 @@ impl TagParser {
         let group_name = self.parser.consume_while(valid_group);
         assert_eq!(self.parser.consume_char(), ']');
 
-        let parsed_tags = match group_name.as_str() {
-            "artists" | "general" => self.parse_tags(|parser| parser.parse_general())?,
-            "pools" => self.parse_tags(|parser| parser.parse_pool())?,
-            "sets" => self.parse_tags(|parser| parser.parse_set())?,
-            "single-post" => self.parse_tags(|parser| parser.parse_post())?,
-            _ => bail!(format_err!("{} is an invalid group name!", group_name)),
-        };
+        //        self.parse_tags(&group_name)?;
 
         Ok(Group {
             name: group_name,
@@ -244,29 +256,28 @@ impl TagParser {
     }
 
     /// Parses tags.
-    pub fn parse_tags<F>(&mut self, mut parse_method: F) -> Result<Vec<Parsed>, Error>
-    where
-        F: FnMut(&mut Self) -> Result<Parsed, Error>,
-    {
-        let mut tags: Vec<Parsed> = Vec::new();
-        loop {
-            self.parser.consume_whitespace();
-            if self.check_and_parse_comment() {
-                continue;
-            }
-
-            if self.parser.starts_with("[") {
-                break;
-            }
-
-            if self.parser.eof() {
-                break;
-            }
-
-            tags.push(parse_method(self)?);
-        }
-
-        Ok(tags)
+    pub fn parse_tags(&mut self) -> Result<Vec<Parsed>, Error> {
+        //        let mut tags: Vec<Parsed> = Vec::new();
+        //        loop {
+        //            self.parser.consume_whitespace();
+        //            if self.check_and_parse_comment() {
+        //                continue;
+        //            }
+        //
+        //            if self.parser.starts_with("[") {
+        //                break;
+        //            }
+        //
+        //            if self.parser.eof() {
+        //                break;
+        //            }
+        //
+        //            tags.push();
+        //        }
+        //
+        //        Ok(tags)
+        // TODO: Implement a way for the tags to parse to the correct category without the use of closures.
+        unimplemented!()
     }
 
     /// Checks if next character is comment identifier and parses it if it is.
