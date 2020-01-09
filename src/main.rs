@@ -23,12 +23,12 @@ fn main() -> Result<(), Error> {
 
     // Creates connector and requester to prepare for downloading posts.
     let request_sender = RequestSender::new();
-    let mut connector = WebConnector::new(request_sender.clone());
+    let mut connector = WebConnector::new(&request_sender);
     connector.should_enter_safe_mode();
     connector.grab_blacklist()?;
 
     // Parse tag file
-    let groups = parse_tag_file(&tag_path, request_sender.clone())?;
+    let groups = parse_tag_file(&tag_path, &request_sender)?;
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.

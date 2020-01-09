@@ -2,7 +2,7 @@ extern crate failure;
 extern crate reqwest;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{Group, Parsed, Tag};
+use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
 use crate::e621::io::Login;
 use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 use failure::Error;
@@ -94,7 +94,7 @@ impl Grabber {
     ) -> Result<Grabber, Error> {
         let mut grabber = Grabber::new(
             request_sender,
-            blacklist.iter().map(|e| e.to_string()).collect(),
+            blacklist.iter().map(|e| (*e).to_string()).collect(),
         );
         grabber.grab_favorites()?;
         grabber.grab_tags(groups)?;
@@ -121,9 +121,10 @@ impl Grabber {
     pub fn grab_tags(&mut self, groups: &[Group]) -> Result<(), Error> {
         for group in groups {
             for tag in &group.tags {
-                match tag {
-                    Parsed::Pool(id) => {
-                        let entry: PoolEntry = self.request_sender.get_entry_from_id(id, "pool")?;
+                match tag.tag_type {
+                    TagType::Pool => {
+                        let entry: PoolEntry =
+                            self.request_sender.get_entry_from_id(&tag.raw, "pool")?;
                         self.grabbed_posts.push(PostSet::new(
                             &entry.name,
                             "Pools",
@@ -132,15 +133,16 @@ impl Grabber {
 
                         println!("\"{}\" grabbed!", entry.name);
                     }
-                    Parsed::Set(id) => {
-                        let entry: SetEntry = self.request_sender.get_entry_from_id(id, "set")?;
+                    TagType::Set => {
+                        let entry: SetEntry =
+                            self.request_sender.get_entry_from_id(&tag.raw, "set")?;
                         self.grabbed_posts.push(self.set_to_named_entry(&entry)?);
 
                         println!("\"{}\" grabbed!", entry.name);
                     }
-                    Parsed::Post(id) => {
+                    TagType::Post => {
                         let entry: PostEntry =
-                            self.request_sender.get_entry_from_id(id, "single")?;
+                            self.request_sender.get_entry_from_id(&tag.raw, "single")?;
                         let id = entry.id;
                         self.grabbed_single_posts
                             .posts
@@ -148,19 +150,16 @@ impl Grabber {
 
                         println!("Post with ID \"{}\" grabbed!", id);
                     }
-                    Parsed::General(tag) => {
-                        let tag_str = match tag {
-                            Tag::General(tag_str) | Tag::Special(tag_str) => tag_str.clone(),
-                            Tag::None => String::new(),
-                        };
+                    TagType::General | TagType::Artist => {
                         let posts = self.get_posts_from_tag(tag)?;
                         self.grabbed_posts.push(PostSet::new(
-                            &tag_str,
+                            &tag.raw,
                             "General Searches",
                             GrabbedPost::entry_to_vec(posts),
                         ));
-                        println!("\"{}\" grabbed!", tag_str);
+                        println!("\"{}\" grabbed!", tag.raw);
                     }
+                    TagType::None => unreachable!(),
                 };
             }
         }
@@ -170,10 +169,10 @@ impl Grabber {
 
     /// Grabs posts from general tag.
     fn get_posts_from_tag(&mut self, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
-        match tag {
-            Tag::General(ref tag_search) => Ok(self.general_search(tag_search)?),
-            Tag::Special(ref tag_search) => Ok(self.special_search(&tag_search)?),
-            Tag::None => bail!(format_err!("The tag is none!")),
+        match tag.search_type {
+            TagCategory::General => Ok(self.general_search(&tag.raw)?),
+            TagCategory::Special => Ok(self.special_search(&tag.raw)?),
+            TagCategory::None => unreachable!(),
         }
     }
 

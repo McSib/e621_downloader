@@ -32,9 +32,9 @@ pub struct WebConnector {
 
 impl WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(request_sender: RequestSender) -> Self {
+    pub fn new(request_sender: &RequestSender) -> Self {
         WebConnector {
-            request_sender,
+            request_sender: request_sender.clone(),
             download_directory: Config::get_config().unwrap_or_default().download_directory,
             blacklist: String::new(),
         }
