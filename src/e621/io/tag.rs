@@ -14,6 +14,7 @@ use crate::e621::sender::{AliasEntry, RequestSender, TagEntry};
 pub static TAG_NAME: &str = "tags.txt";
 static TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
+/// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
 trait UnwrapOrFail<T> {
     fn unwrap_or_fail<F>(self, closure: F) -> T
     where
@@ -21,6 +22,10 @@ trait UnwrapOrFail<T> {
 }
 
 impl<T> UnwrapOrFail<T> for Option<T> {
+    /// Attempts to unwrap and return `T`. If `None`, it will run a closure that is expected to panic.
+    ///
+    /// # Error
+    /// Will panic with `unreachable!()` if the closure does not panic itself.
     fn unwrap_or_fail<F>(self, closure: F) -> T
     where
         F: FnOnce(),
@@ -46,6 +51,7 @@ pub enum TagCategory {
     None,
 }
 
+/// The type a tag can be.
 #[derive(Debug, Clone)]
 pub enum TagType {
     Pool,
@@ -56,10 +62,14 @@ pub enum TagType {
     None,
 }
 
+/// A tag that contains its raw name, search type, and tag type.
 #[derive(Debug, Clone)]
 pub struct Tag {
+    /// The raw string of the tag.
     pub raw: String,
+    /// The search type of the tag.
     pub search_type: TagCategory,
+    /// The tag type of the tag.
     pub tag_type: TagType,
 }
 
@@ -86,9 +96,9 @@ impl Default for Tag {
 /// Group object generated from parsed code.
 #[derive(Debug, Clone)]
 pub struct Group {
-    /// Name of group
+    /// The name of group.
     pub name: String,
-    /// [`Vec`] of [`Parsed`] tags
+    /// A `Vec` containing all the tags parsed.
     pub tags: Vec<Tag>,
 }
 
@@ -122,6 +132,7 @@ pub fn parse_tag_file(p: &Path, request_sender: &RequestSender) -> Result<Vec<Gr
 
 /// Identifier to help categorize tags.
 pub struct TagIdentifier {
+    /// Request sender for making any needed API calls.
     request_sender: RequestSender,
 }
 
@@ -131,7 +142,7 @@ impl TagIdentifier {
         TagIdentifier { request_sender }
     }
 
-    /// Identifies tag and returns [`Tag`].
+    /// Identifies tag and returns `Tag`.
     fn id_tag(tags: &str, request_sender: RequestSender) -> Result<Tag, Error> {
         let identifier = TagIdentifier::new(request_sender);
         let tag_type = identifier.search_for_tag(tags)?;
@@ -161,6 +172,7 @@ impl TagIdentifier {
         Ok(tag)
     }
 
+    /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
     fn is_alias(&self, tag: &str) -> Result<TagEntry, Error> {
         let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag)?;
         let entry = alias_entries
@@ -178,6 +190,7 @@ impl TagIdentifier {
         unreachable!()
     }
 
+    /// Emergency exits if a tag isn't identified.
     fn exit_tag_failure(&self, tag: &str) {
         println!("Error: JSON Return for tag is empty!");
         println!("Info: The tag is either invalid or the tag is an alias.");
@@ -185,6 +198,7 @@ impl TagIdentifier {
         emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
     }
 
+    /// Processes the tag type and creates the appropriate tag for it.
     fn process_tag_data(&self, tags: &str, tag_entry: &TagEntry) -> Tag {
         // Grab the closest matching tag
         match tag_entry.tag_type {
@@ -207,12 +221,14 @@ impl TagIdentifier {
 
 /// Parser that reads a tag file and parses the tags.
 struct TagParser {
+    /// Low-level parser for parsing raw data.
     parser: Parser,
+    /// Request sender for any needed API calls.
     request_sender: RequestSender,
 }
 
 impl TagParser {
-    /// Parses groups.
+    /// Parses each group with all tags tied to them before returning a vector with all groups in it.
     pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
         let mut groups: Vec<Group> = Vec::new();
         loop {
@@ -235,6 +251,7 @@ impl TagParser {
         Ok(groups)
     }
 
+    /// Parses a group and all tags tied to it before returning the result.
     fn parse_group(&mut self) -> Result<Group, Error> {
         assert_eq!(self.parser.consume_char(), '[');
         let group_name = self.parser.consume_while(valid_group);
@@ -249,6 +266,7 @@ impl TagParser {
         Ok(group)
     }
 
+    /// Parses all tags for a group and stores it.
     fn parse_tags(&mut self, group: &mut Group) -> Result<(), Error> {
         let mut tags: Vec<Tag> = Vec::new();
         loop {
@@ -272,6 +290,7 @@ impl TagParser {
         Ok(())
     }
 
+    /// Parses a single tag and identifies it before returning the result.
     fn parse_tag(&mut self, group_name: &str) -> Result<Tag, Error> {
         match group_name {
             "artists" | "general" => {

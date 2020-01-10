@@ -72,17 +72,23 @@ impl Default for Config {
     }
 }
 
+/// `Login` contains all login information for obtaining information about a certain user.
+/// This is currently only used for the blacklist.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Login {
+    /// Username of user.
     #[serde(rename = "Username")]
     pub username: String,
+    /// The password hash (also known as the API key) for the user.
     #[serde(rename = "PasswordHash")]
     pub password_hash: String,
+    /// Whether or not the user wishes to download their favorites.
     #[serde(rename = "DownloadFavorites")]
     pub download_favorites: bool,
 }
 
 impl Login {
+    /// Loads the login file or creates one if it doesn't exist.
     pub fn load() -> Result<Self, Error> {
         let mut login = Login::default();
         let login_path = Path::new(LOGIN_NAME);
@@ -90,21 +96,12 @@ impl Login {
             login = from_str(&read_to_string(login_path)?)?;
         } else {
             login.create_login()?;
-
-            println!("The login file was created.");
-            println!(
-                "If you wish to use your Blacklist, \
-                 be sure to give your username and API hash key."
-            );
-            println!(
-                "Do not give out your API hash unless you trust this software completely, \
-                 always treat your API hash like your own password."
-            )
         }
 
         Ok(login)
     }
 
+    /// Checks if the login user and password is empty.
     pub fn is_empty(&self) -> bool {
         if self.username.is_empty() || self.password_hash.is_empty() {
             return true;
@@ -113,13 +110,26 @@ impl Login {
         false
     }
 
+    /// Creates a new login file.
     fn create_login(&self) -> Result<(), Error> {
         write(LOGIN_NAME, to_string_pretty(self)?)?;
+
+        println!("The login file was created.");
+        println!(
+            "If you wish to use your Blacklist, \
+             be sure to give your username and API hash key."
+        );
+        println!(
+            "Do not give out your API hash unless you trust this software completely, \
+             always treat your API hash like your own password."
+        );
+
         Ok(())
     }
 }
 
 impl Default for Login {
+    /// The default state for the login if none exists.
     fn default() -> Self {
         Login {
             username: String::new(),

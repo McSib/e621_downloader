@@ -8,13 +8,18 @@ use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 use failure::Error;
 use reqwest::Url;
 
+/// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
+    /// The url that leads to the file to download.
     pub file_url: String,
+    /// The name of the file to download.
     pub file_name: String,
+    /// The size of the file to download.
     pub file_size: i64,
 }
 
 impl GrabbedPost {
+    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
         let mut temp_vec = Vec::with_capacity(vec.len());
         for post in vec {
@@ -25,6 +30,7 @@ impl GrabbedPost {
 }
 
 impl From<PostEntry> for GrabbedPost {
+    /// Converts `PostEntry` to `Self`.
     fn from(post: PostEntry) -> Self {
         GrabbedPost {
             file_url: post.file_url.clone(),
@@ -40,17 +46,13 @@ impl From<PostEntry> for GrabbedPost {
     }
 }
 
-pub struct Category(String);
-
-impl ToString for Category {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
-
+/// A set of posts with category and name.
 pub struct PostSet {
+    /// The name of the set.
     pub set_name: String,
-    pub category: Category,
+    /// The category of the set.
+    pub category: String,
+    /// The posts in the set.
     pub posts: Vec<GrabbedPost>,
 }
 
@@ -58,7 +60,7 @@ impl PostSet {
     pub fn new(set_name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
         PostSet {
             set_name: set_name.to_string(),
-            category: Category(category.to_string()),
+            category: category.to_string(),
             posts,
         }
     }
@@ -66,11 +68,13 @@ impl PostSet {
 
 /// Grabs all posts under a set of searching tags.
 pub struct Grabber {
-    /// All grabbed posts
+    /// All grabbed posts.
     pub grabbed_posts: Vec<PostSet>,
+    /// All grabbed single posts.
     pub grabbed_single_posts: PostSet,
+    /// `RequestSender` for sending API calls.
     request_sender: RequestSender,
-    /// Blacklist used to throwaway posts that contain tags the user may not want
+    /// Blacklist used to throwaway posts that contain tags the user may not want.
     blacklist: Vec<String>,
 }
 
@@ -85,8 +89,7 @@ impl Grabber {
         }
     }
 
-    /// Gets posts on creation using `tags` and searching with `urls`.
-    /// Also modifies the `config` when searching general tags.
+    /// Gets posts on creation using `groups` and searching with `request_sender`.
     pub fn from_tags(
         groups: &[Group],
         request_sender: RequestSender,
@@ -101,6 +104,7 @@ impl Grabber {
         Ok(grabber)
     }
 
+    /// If the user supplies login information, this will grabbed the favorites from there account.
     pub fn grab_favorites(&mut self) -> Result<(), Error> {
         let login = Login::load()?;
         if !login.username.is_empty() && login.download_favorites {
@@ -117,7 +121,7 @@ impl Grabber {
         Ok(())
     }
 
-    /// Iterates through tags and perform searches for each, grabbing them and storing them in `self.grabbed_tags`.
+    /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
     pub fn grab_tags(&mut self, groups: &[Group]) -> Result<(), Error> {
         for group in groups {
             for tag in &group.tags {
@@ -180,7 +184,7 @@ impl Grabber {
     fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
-        for page in 1..limit {
+        for page in 1..=limit {
             let mut searched_posts: Vec<PostEntry> =
                 self.request_sender.bulk_search(searching_tag, page)?;
             if searched_posts.is_empty() {
@@ -198,7 +202,7 @@ impl Grabber {
         Ok(posts)
     }
 
-    /// Performs a special search that grabs from a date up to the current day.
+    /// Performs a special search that grabs all posts tied to the searching tag.
     fn special_search(&self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
@@ -221,7 +225,7 @@ impl Grabber {
         Ok(posts)
     }
 
-    /// Converts `SetEntry` to `NamedPost`.
+    /// Converts `SetEntry` to `PostSet`.
     fn set_to_named_entry(&self, set: &SetEntry) -> Result<PostSet, Error> {
         Ok(PostSet::new(
             &set.name,

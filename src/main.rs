@@ -14,10 +14,10 @@ mod e621;
 
 /// Main entry point of the application.
 fn main() -> Result<(), Error> {
-    // Check the config and load it.
+    // Check the config file and ensures that it is created.
     Config::check_config()?;
 
-    // Create tag if it doesn't exist, then parse it.
+    // Create tag if it doesn't exist.
     let tag_path = Path::new(TAG_NAME);
     create_tag_file(&tag_path)?;
 
@@ -27,7 +27,7 @@ fn main() -> Result<(), Error> {
     connector.should_enter_safe_mode();
     connector.grab_blacklist()?;
 
-    // Parse tag file
+    // Parses tag file.
     let groups = parse_tag_file(&tag_path, &request_sender)?;
     println!("Parsed tag file.");
 

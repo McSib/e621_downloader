@@ -22,11 +22,18 @@ pub mod grabber;
 pub mod io;
 pub mod sender;
 
+/// The `WebConnector` is the mother of all requests sent.
+/// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.
+///
+/// # Important
+/// This is a large struct built on bringing the best performance possible without sacrificing any idiomatic code in the process.
+/// When editing this struct, be sure that the changes you bring do not harm the overall performance, and if it does, be sure to give good reason on why the change is needed.
 pub struct WebConnector {
+    /// The sender used for all API calls.
     request_sender: RequestSender,
-    /// The config which is modified when grabbing posts
+    /// The config which is modified when grabbing posts.
     download_directory: String,
-    /// Blacklist grabbed from logged in user
+    /// Blacklist grabbed from logged in user.
     blacklist: String,
 }
 
@@ -41,13 +48,15 @@ impl WebConnector {
     }
 
     /// Gets input and checks if the user wants to enter safe mode.
-    /// If they do, this changes `self.urls` all to e926 and not e621.
+    /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
         if self.get_input("Should enter safe mode") {
             self.request_sender.update_to_safe();
         }
     }
 
+    /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
+    /// This should be the only time the connector ever logs in.
     pub fn grab_blacklist(&mut self) -> Result<(), Error> {
         let login = Login::load()?;
         if !login.is_empty() {
@@ -61,7 +70,7 @@ impl WebConnector {
         Ok(())
     }
 
-    /// Gets simply a yes/no for whether or not to do something.
+    /// Gets a simple yes/no for whether or not to do something.
     fn get_input(&self, msg: &str) -> bool {
         println!("{} (Y/N)?", msg);
         loop {
@@ -78,7 +87,7 @@ impl WebConnector {
         }
     }
 
-    /// Grabs all posts using `&[Group]` then converts grabbed posts and appends it to `self.collection`.
+    /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
     pub fn grab_posts(&mut self, groups: &[Group]) -> Result<(Vec<PostSet>, PostSet), Error> {
         let grabber = Grabber::from_tags(
             groups,
@@ -144,22 +153,19 @@ impl WebConnector {
         Ok(())
     }
 
+    /// Downloads tuple of general posts and single posts.
     pub fn download_grabbed_posts(
         &mut self,
         grabbed_posts: (Vec<PostSet>, PostSet),
     ) -> Result<(), Error> {
         let (mut posts, mut single_posts) = grabbed_posts;
         for post in posts.iter_mut() {
-            self.download_posts(
-                &mut post.set_name.clone(),
-                &post.category.to_string(),
-                &mut post.posts,
-            )?;
+            self.download_posts(&mut post.set_name.clone(), &post.category, &mut post.posts)?;
         }
 
         self.download_posts(
             &mut single_posts.set_name.clone(),
-            &single_posts.category.to_string(),
+            &single_posts.category,
             &mut single_posts.posts,
         )?;
         Ok(())

@@ -16,6 +16,7 @@ use std::io::Read;
 use std::rc::Rc;
 use std::time::Duration;
 
+/// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
 macro_rules! hashmap {
     ( $( $x:expr ),* ) => {
@@ -34,9 +35,9 @@ macro_rules! hashmap {
 /// If an error occurs from server, it will respond with this.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ErrorEntry {
-    /// If the attempted grab is a success
+    /// If the attempted grab is a success.
     pub success: bool,
-    /// Error message of failed grab if `success` is false
+    /// Error message of failed grab if `success` is false.
     pub msg: String,
 }
 
@@ -44,63 +45,71 @@ pub struct ErrorEntry {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeSet {
     pub json_class: String,
-    /// Time in seconds
+    /// Time in seconds.
     pub s: i64,
-    /// Time in nano-seconds
+    /// Time in nano-seconds.
     pub n: i64,
 }
 
 /// Alias tag with id linking to the tag it was aliased to.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AliasEntry {
+    /// ID of the alias.
     pub id: i64,
+    /// Name of the alias tag.
     pub name: String,
+    /// ID of the tag that the alias is tied to.
     pub alias_id: i64,
+    /// Approval status of the alias tag.
     pub pending: bool,
 }
 
 /// GET return for set entry on e621/e926.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SetEntry {
-    /// ID of set
+    /// ID of the set.
     pub id: i64,
-    /// Name of set
+    /// Name of the set.
     pub name: String,
-    /// Time the set was created
+    /// Time the set was created.
     pub created_at: TimeSet,
-    /// Time the set was last updated
+    /// Time the set was last updated.
     pub updated_at: TimeSet,
-    /// Id of user who created the set and updates it
+    /// ID of the user who created the set and updates it.
     pub user_id: i64,
-    /// Description of the set
+    /// Description of the set.
     pub description: String,
-    /// The short name of the set
+    /// The short name of the set.
     #[serde(rename = "shortname")]
     pub short_name: String,
-    /// The amount of posts contained in the set
+    /// The amount of posts contained in the set.
     pub post_count: i64,
-    /// Ids for all posts in the set
+    /// IDs for all posts in the set.
     pub posts: Vec<i64>,
 }
 
 /// GET return for post entry on e621/e926.
-///
-/// # Important
-///
-/// `type_locked` can be null of not set by admins.
 #[derive(Deserialize, Clone, Debug)]
 pub struct TagEntry {
-    /// Id of tag
+    /// Id of the tag.
     pub id: u32,
-    /// Name of tag
+    /// Name of the tag.
     pub name: String,
-    /// Number of all posts that use this tag
+    /// Number of all posts that use this tag.
     pub count: u32,
     /// The type of tag it is.
-    /// `0`: General; `1`: Artist; `2`: Nil (This used to be something, but was removed)
+    ///
+    /// # Important
+    /// This tag can be the following types:
+    /// `0`: General;
+    /// `1`: Artist;
+    /// `2`: Nil (This used to be something, but was removed);
+    /// `3`: Copyright;
+    /// `4`: Character;
+    /// `5`: Species;
     #[serde(rename = "type")]
     pub tag_type: u8,
-    /// If the type is locked (this value can also be [`None`])
+    /// If the type is locked (this value can also be `None` if not explicitly set by the admins).
     pub type_locked: Option<bool>,
 }
 
@@ -112,111 +121,158 @@ pub struct TagEntry {
 /// `source`, `sources`, `md5`, `file_size`, `file_ext`, `preview_width`, `preview_height`, `sample_url`, `sample_width`, `sample_height`, `has_children`, `children`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PostEntry {
-    /// The ID of the post
+    /// The ID of the post.
     pub id: i64,
-    /// Tags from the post
+    /// Tags from the post.
     pub tags: String,
-    /// Tags that are locked by the admins
+    /// Tags that are locked by the admins.
+    ///
+    /// # Important
+    /// Can be `None` if there are no tags.
     pub locked_tags: Option<String>,
-    /// Description of the post
+    /// Description of the post.
     pub description: String,
-    /// When the post was uploaded
+    /// When the post was uploaded.
     pub created_at: TimeSet,
-    /// User ID of the user who uploaded the post
+    /// User ID of the user who uploaded the post.
     pub creator_id: Option<i64>,
-    /// Username of the user who uploaded the post
+    /// Username of the user who uploaded the post.
     pub author: String,
-    /// The amount of changes that the post went through since uploaded
+    /// The amount of changes that the post went through since uploaded.
     pub change: i64,
-    /// The main source of the work (use `sources` instead when using all source listed on post)
+    /// The main source of the work, use `sources` instead when using all sources listed on post.
+    ///
+    /// # Important
+    /// Can be `None` if no sources are given.
     pub source: Option<String>,
-    /// How many upvoted or downvoted the post
+    /// How many upvoted or downvoted the post.
     pub score: i64,
-    /// How many favorites the post has
+    /// How many favorites the post has.
     pub fav_count: i64,
-    /// The MD5 certification of the post
+    /// The MD5 certification of the post.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub md5: Option<String>,
-    /// Size of the source file
+    /// Size of the source file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub file_size: Option<i64>,
-    /// URL of the source file
+    /// URL of the source file.
     pub file_url: String,
-    /// Extension of the source file (png, jpg, webm, gif, etc)
+    /// Extension of the source file (png, jpg, webm, gif, etc).
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub file_ext: Option<String>,
-    /// URL for the preview file
+    /// URL for the preview file.
     pub preview_url: String,
-    /// Width of the preview file
+    /// Width of the preview file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub preview_width: Option<i64>,
-    /// Height of the preview file
+    /// Height of the preview file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub preview_height: Option<i64>,
-    /// URL for the sample file
+    /// URL for the sample file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub sample_url: Option<String>,
-    /// Width of the sample file
+    /// Width of the sample file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub sample_width: Option<i64>,
-    /// Height of the sample file
+    /// Height of the sample file.
+    ///
+    /// # Important
+    /// Can be `None` if the post is deleted or taken down.
     pub sample_height: Option<i64>,
-    /// Rating of the post (safe, questionable, explicit), this will be "s", "q", "e"
+    /// Rating of the post (safe, questionable, explicit), this will be "s", "q", "e".
     pub rating: String,
-    /// Post status, one of: active, flagged, pending, deleted
+    /// Post status, one of: active, flagged, pending, deleted.
     pub status: String,
-    /// Width of image
+    /// Width of image.
     pub width: i64,
-    /// Height of image
+    /// Height of image.
     pub height: i64,
-    /// If the post has comments
+    /// If the post has comments.
     pub has_comments: bool,
-    /// If the post has notes
+    /// If the post has notes.
     pub has_notes: bool,
-    /// If the post has children
+    /// If the post has children.
+    ///
+    /// # Important
+    /// Can be `None` if the post has no children.
     pub has_children: Option<bool>,
-    /// All of the children attached to post
+    /// All of the children attached to post.
+    ///
+    /// # Important
+    /// Can be `None` if the post has no children.
     pub children: Option<String>,
-    /// If this post is a child, this will be the parent post's ID
+    /// If this post is a child, this will be the parent post's ID.
+    ///
+    /// # Important
+    /// Can be `None` if the post has no parent.
     pub parent_id: Option<i64>,
-    /// The artist or artists that drew this image
+    /// The artist or artists that drew this image.
     pub artist: Vec<String>,
-    /// All the sources for the work
+    /// All the sources for the work.
+    ///
+    /// # Important
+    /// Can be `None` if no sources are supplied to the post.
     pub sources: Option<Vec<String>>,
 }
 
 /// GET return for pool entry on e621/e926.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PoolEntry {
-    /// Time the pool was created
+    /// Time the pool was created.
     pub created_at: TimeSet,
-    /// Description of pool
+    /// Description of the pool.
     pub description: String,
-    /// Id of pool
+    /// Id of the pool.
     pub id: i64,
-    /// If the pool is active or not
+    /// If the pool is active or not.
     pub is_active: bool,
-    /// If the pool is locked or not
+    /// If the pool is locked or not.
     pub is_locked: bool,
-    /// Name of pool
+    /// Name of the pool.
     pub name: String,
-    /// The amount of posts added to the pool
+    /// The amount of posts added to the pool.
     pub post_count: i64,
-    /// Time the pool was updated
+    /// Time the pool was updated.
     pub updated_at: TimeSet,
-    /// Id of user who created and updated post
+    /// Id of user who created and updated post.
     pub user_id: i64,
-    /// All posts in pool
+    /// All posts in the pool.
     pub posts: Vec<PostEntry>,
 }
 
 /// Default user agent value.
 static USER_AGENT_VALUE: &str = "e621_downloader/1.4.3 (by McSib on e621)";
 
+/// Sender client is a modified form of the generic client, wrapping the client in a `Rc` so the sender client can be cloned without creating another instance of the root client.
 struct SenderClient {
+    /// `Client` wrapped in a `Rc` so only one instance of the client exists. This will prevent an overabundance of clients in the code.
     client: Rc<Client>,
 }
 
 impl SenderClient {
+    /// Creates root client for the `SenderClient`.
     fn new() -> Self {
         SenderClient {
             client: Rc::new(SenderClient::build_client()),
         }
     }
 
+    /// Runs client through a builder to give it required settings.
+    /// Cookies aren't stored in the client, TCP_NODELAY is on, and timeout is changed from 30 seconds to 60.
     fn build_client() -> Client {
         Client::builder()
             .cookie_store(false)
@@ -226,12 +282,15 @@ impl SenderClient {
             .unwrap_or_else(|_| Client::new())
     }
 
+    /// A wrapping function that acts the exact same as `self.client.get` but will instead attach the user agent header before returning the `RequestBuilder`.
+    /// This will ensure that all requests sent have the proper user agent info.
     pub fn get(&self, url: &str) -> RequestBuilder {
         self.client.get(url).header(USER_AGENT, USER_AGENT_VALUE)
     }
 }
 
 impl Clone for SenderClient {
+    /// Creates a new instance of SenderClient, but clones the `Rc` of the root client, ensuring that all requests are going to the same client.
     fn clone(&self) -> Self {
         SenderClient {
             client: self.client.clone(),
@@ -239,15 +298,21 @@ impl Clone for SenderClient {
     }
 }
 
+/// The `RequestSender`, it handles all calls to the API, so every single instance in the program must adhere to the `RequestSender`.
 pub struct RequestSender {
-    client: Rc<SenderClient>,
+    /// The client that will be used to send all requests.
+    ///
+    /// # Important
+    /// Even though the `SenderClient` isn't wrapped in a `Rc`, the main client inside of it is, this will ensure that all request are only sent through one client.
+    client: SenderClient,
+
     urls: Rc<RefCell<HashMap<String, String>>>,
 }
 
 impl RequestSender {
     pub fn new() -> Self {
         RequestSender {
-            client: Rc::new(SenderClient::new()),
+            client: SenderClient::new(),
             urls: Rc::new(RefCell::new(RequestSender::initialize_url_map())),
         }
     }
