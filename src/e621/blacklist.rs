@@ -51,11 +51,11 @@ struct TagToken {
 
 impl TagToken {
     fn is_user(&self) -> bool {
-        self.user.is_none()
+        self.user.is_some()
     }
 
     fn is_id(&self) -> bool {
-        self.id.is_none()
+        self.id.is_some()
     }
 
     fn is_rating(&self) -> bool {
