@@ -5,9 +5,9 @@ use std::path::Path;
 
 use failure::Error;
 
-use crate::e621::sender::RequestSender;
 use e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
 use e621::io::Config;
+use e621::sender::RequestSender;
 use e621::WebConnector;
 
 mod e621;

@@ -3,18 +3,20 @@ extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
 
-use crate::e621::io::{emergency_exit, Login};
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::Read;
+use std::rc::Rc;
+use std::time::Duration;
+
 use failure::Error;
 use reqwest::header::USER_AGENT;
 use reqwest::{Client, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io::Read;
-use std::rc::Rc;
-use std::time::Duration;
+
+use crate::e621::io::{emergency_exit, Login};
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]

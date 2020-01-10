@@ -1,12 +1,13 @@
 extern crate failure;
 extern crate reqwest;
 
+use failure::Error;
+use reqwest::Url;
+
 use crate::e621::blacklist::Blacklist;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
 use crate::e621::io::Login;
 use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
-use failure::Error;
-use reqwest::Url;
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {

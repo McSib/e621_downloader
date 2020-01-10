@@ -1,6 +1,9 @@
+extern crate failure;
+
+use failure::Error;
+
 use crate::e621::io::parser::Parser;
 use crate::e621::sender::PostEntry;
-use failure::Error;
 
 /// Parsed line token that contains all collected [`TagToken`]s on single input line.
 #[derive(Debug)]
@@ -224,7 +227,7 @@ fn valid_id(c: char) -> bool {
     }
 }
 
-/// The flag worker flags and removes any grabbed post that matches with all of the tags in a [`LineToken`].
+/// The flag worker flags and removes any grabbed post that matches with all of the tags in a `LineToken`.
 /// The worker works with the supplied syntax and rules on e621's main site listed [here](https://e621.net/help/show/blacklist).
 /// This ensures that the client-side blacklist works exactly the same as the server-side blacklist.
 ///
@@ -278,10 +281,10 @@ impl FlagWorker {
                     *flags += 1;
                 }
             }
-            Rating::None => unreachable!()
+            Rating::None => unreachable!(),
         }
     }
-    
+
     /// Raises the flag and immediately blacklists the post if its ID matches with the blacklisted ID.
     fn flag_id(&mut self, tag: &TagToken, post: &PostEntry) -> bool {
         if tag.is_id() {
@@ -292,7 +295,7 @@ impl FlagWorker {
                 }
             }
         }
-        
+
         false
     }
 
@@ -306,10 +309,10 @@ impl FlagWorker {
                 }
             }
         }
-        
+
         false
     }
-    
+
     /// Checks if a single post is blacklisted or safe.
     fn check_post(&mut self, post: &PostEntry, blacklist_line: &LineToken) {
         let mut flags: i16 = 0;
@@ -363,7 +366,7 @@ impl FlagWorker {
 }
 
 /// Blacklist that holds all of the blacklist entries.
-/// These entries will be looped through a parsed before being used for filtering posts that are blacklisted. 
+/// These entries will be looped through a parsed before being used for filtering posts that are blacklisted.
 pub struct Blacklist {
     blacklist_entries: Vec<String>,
 }

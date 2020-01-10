@@ -1,7 +1,6 @@
-extern crate chrono;
 extern crate failure;
 extern crate pbr;
-extern crate serde;
+extern crate serde_json;
 
 use std::fs::{create_dir_all, File};
 use std::io::{stdin, Write};
@@ -9,13 +8,14 @@ use std::path::Path;
 
 use failure::Error;
 use pbr::ProgressBar;
+use serde_json::Value;
+
+use io::tag::Group;
+use io::Config;
 
 use crate::e621::grabber::{GrabbedPost, Grabber, PostSet};
 use crate::e621::io::Login;
 use crate::e621::sender::RequestSender;
-use io::tag::Group;
-use io::Config;
-use serde_json::Value;
 
 pub mod blacklist;
 pub mod grabber;
