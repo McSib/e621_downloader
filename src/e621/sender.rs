@@ -257,7 +257,7 @@ pub struct PoolEntry {
 }
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &str = "e621_downloader/1.4.3 (by McSib on e621)";
+static USER_AGENT_VALUE: &str = "e621_downloader/1.5.3 (by McSib on e621)";
 
 /// Sender client is a modified form of the generic client, wrapping the client in a `Rc` so the sender client can be cloned without creating another instance of the root client.
 struct SenderClient {
