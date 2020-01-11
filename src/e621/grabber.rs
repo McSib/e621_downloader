@@ -183,6 +183,12 @@ impl Grabber {
 
     /// Performs a general search where it grabs only five pages of posts.
     fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
+        let blacklist = if !self.blacklist.is_empty() {
+            Some(Blacklist::new(&self.blacklist))
+        } else {
+            None
+        };
+
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
         for page in 1..limit {
@@ -192,9 +198,8 @@ impl Grabber {
                 break;
             }
 
-            if !self.blacklist.is_empty() {
-                let blacklist = Blacklist::new(&self.blacklist);
-                blacklist.filter_posts(&mut searched_posts);
+            if let Some(ref e) = blacklist {
+                e.filter_posts(&mut searched_posts);
             }
 
             posts.append(&mut searched_posts);
@@ -205,6 +210,12 @@ impl Grabber {
 
     /// Performs a special search that grabs all posts tied to the searching tag.
     fn special_search(&self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
+        let blacklist = if !self.blacklist.is_empty() {
+            Some(Blacklist::new(&self.blacklist))
+        } else {
+            None
+        };
+
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
         loop {
@@ -214,9 +225,8 @@ impl Grabber {
                 break;
             }
 
-            if !self.blacklist.is_empty() {
-                let blacklist = Blacklist::new(self.blacklist.as_slice());
-                blacklist.filter_posts(&mut searched_posts);
+            if let Some(ref e) = blacklist {
+                e.filter_posts(&mut searched_posts);
             }
 
             posts.append(&mut searched_posts);

@@ -1,4 +1,5 @@
 /// Parser that reads a tag file and parses the tags.
+#[derive(Default)]
 pub struct Parser {
     /// Current cursor position in the array of characters.
     pub pos: usize,

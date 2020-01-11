@@ -247,6 +247,11 @@ struct FlagWorker {
 }
 
 impl FlagWorker {
+    /// Resets the flag worker for the next post.
+    fn reset_worker(&mut self) {
+        *self = Self::default();
+    }
+
     /// Sets margin for how many flags need to be raised before the post is either blacklisted or considered safe.
     fn set_flag_margin(&mut self, tags: &[TagToken]) {
         let mut negated_length: i16 = 0;
@@ -381,16 +386,18 @@ impl Blacklist {
     /// Filters through a set of posts, only retaining posts that aren't blacklisted.
     pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
         let mut filtered = 0;
+        let mut flag_worker = FlagWorker::default();
+        let mut blacklist_parser = BlacklistParser {
+            parser: Parser::default(),
+        };
         for blacklist_entry in &self.blacklist_entries {
-            let mut parser = BlacklistParser {
-                parser: Parser {
-                    pos: 0,
-                    input: blacklist_entry.to_string(),
-                },
+            blacklist_parser.parser = Parser {
+                pos: 0,
+                input: blacklist_entry.clone(),
             };
-            let blacklist_line = parser.parse_tags().unwrap();
+            let blacklist_line = blacklist_parser.parse_tags().unwrap();
             posts.retain(|e| {
-                let mut flag_worker = FlagWorker::default();
+                flag_worker.reset_worker();
                 flag_worker.set_flag_margin(&blacklist_line.tags);
                 flag_worker.check_post(e, &blacklist_line);
                 if flag_worker.is_flagged() {
