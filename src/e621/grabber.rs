@@ -185,7 +185,7 @@ impl Grabber {
     fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
-        for page in 1..=limit {
+        for page in 1..limit {
             let mut searched_posts: Vec<PostEntry> =
                 self.request_sender.bulk_search(searching_tag, page)?;
             if searched_posts.is_empty() {
