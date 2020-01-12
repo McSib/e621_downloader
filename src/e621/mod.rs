@@ -94,6 +94,7 @@ impl WebConnector {
         category: &str,
         posts: &mut [GrabbedPost],
     ) -> Result<(), Error> {
+        // TODO: Do a better job at making this function understandable and idiomatic.
         let mut progress_bar = ProgressBar::new(posts.len() as u64);
         posts.reverse();
         for post in posts {
