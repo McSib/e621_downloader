@@ -68,7 +68,7 @@ impl WebConnector {
     pub fn should_enter_safe_mode(&mut self) {
         if Confirmation::new()
             .with_text("Should enter safe mode?")
-            .show_default(true)
+            .default(false)
             .interact()
             .unwrap_or_default()
         {
@@ -109,7 +109,7 @@ impl WebConnector {
             ]
             .iter()
             .collect();
-            create_dir_all(&file_path)?;
+            create_dir_all(file_path.parent().unwrap())?;
             if file_path.exists() {
                 self.progress_bar
                     .set_message("Duplicate found: skipping... ");
@@ -138,8 +138,6 @@ impl WebConnector {
     /// Initializes the progress bar for downloading process.
     fn initialize_progress_bar(&mut self, sets: &mut Vec<PostSet>, single_set: &mut PostSet) {
         let total_length = get_file_size_from_posts(&sets, &single_set);
-        self.progress_bar
-            .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.set_length(total_length);
         self.progress_bar.set_style(
             ProgressStyle::default_bar()
@@ -148,6 +146,10 @@ impl WebConnector {
                 )
                 .progress_chars("=>-"),
         );
+        self.progress_bar
+            .set_draw_target(ProgressDrawTarget::stderr());
+        self.progress_bar.reset();
+        self.progress_bar.enable_steady_tick(100);
     }
 
     /// Downloads tuple of general posts and single posts.
