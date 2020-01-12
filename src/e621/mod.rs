@@ -9,8 +9,8 @@ use dialoguer::Confirmation;
 use failure::Error;
 use indicatif::ProgressBar;
 
-use io::Config;
 use io::tag::Group;
+use io::Config;
 
 use crate::e621::grabber::{Grabber, PostSet};
 use crate::e621::sender::RequestSender;
@@ -22,7 +22,8 @@ pub mod grabber;
 pub mod io;
 pub mod sender;
 
-fn get_length_posts(sets: &[PostSet], single_set: &PostSet) -> u64 {
+/// Get the total file size from all sets and returns it.
+fn get_file_size_from_posts(sets: &[PostSet], single_set: &PostSet) -> u64 {
     let mut total_size = 0;
     for set in sets {
         for post in &set.posts {
@@ -106,8 +107,8 @@ impl WebConnector {
                 &set.set_name,
                 &post.file_name,
             ]
-                .iter()
-                .collect();
+            .iter()
+            .collect();
             create_dir_all(&file_path)?;
             if file_path.exists() {
                 self.progress_bar
@@ -136,7 +137,7 @@ impl WebConnector {
 
     /// Initializes the progress bar for downloading process.
     fn initialize_progress_bar(&mut self, sets: &mut Vec<PostSet>, single_set: &mut PostSet) {
-        let total_length = get_length_posts(&sets, &single_set);
+        let total_length = get_file_size_from_posts(&sets, &single_set);
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.set_length(total_length);
