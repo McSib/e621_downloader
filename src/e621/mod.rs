@@ -1,23 +1,35 @@
 extern crate failure;
-extern crate pbr;
+extern crate indicatif;
 
 use std::fs::{create_dir_all, File};
 use std::io::{stdin, Write};
 use std::path::Path;
 
 use failure::Error;
-use pbr::ProgressBar;
+use indicatif::ProgressBar;
 
 use io::tag::Group;
 use io::Config;
 
-use crate::e621::grabber::{GrabbedPost, Grabber, PostSet};
+use self::indicatif::ProgressStyle;
+use crate::e621::grabber::{Grabber, PostSet};
 use crate::e621::sender::RequestSender;
 
 pub mod blacklist;
 pub mod grabber;
 pub mod io;
 pub mod sender;
+
+fn get_total_posts(sets: &[PostSet]) -> u64 {
+    let mut total_posts = 0;
+    for set in sets {
+        for post in &set.posts {
+            total_posts += post.file_size as u64;
+        }
+    }
+
+    total_posts
+}
 
 /// The `WebConnector` is the mother of all requests sent.
 /// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.
@@ -30,6 +42,8 @@ pub struct WebConnector {
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts.
     download_directory: String,
+    /// Progress bar that displays the current progress in downloading posts.
+    progress_bar: ProgressBar,
 }
 
 impl WebConnector {
@@ -38,6 +52,7 @@ impl WebConnector {
         WebConnector {
             request_sender: request_sender.clone(),
             download_directory: Config::get_config().unwrap_or_default().download_directory,
+            progress_bar: ProgressBar::hidden(),
         }
     }
 
@@ -87,29 +102,28 @@ impl WebConnector {
         }
     }
 
-    /// Processes vec and downloads all posts from it.
-    fn download_posts(
-        &mut self,
-        set_name: &mut String,
-        category: &str,
-        posts: &mut [GrabbedPost],
-    ) -> Result<(), Error> {
+    /// Processes `PostSet` and downloads all posts from it.
+    fn download_set(&mut self, set: &mut PostSet) -> Result<(), Error> {
         // TODO: Do a better job at making this function understandable and idiomatic.
-        let mut progress_bar = ProgressBar::new(posts.len() as u64);
-        posts.reverse();
-        for post in posts {
-            self.remove_invalid_chars(set_name);
-            progress_bar.message(format!("Downloading: {} ", set_name).as_str());
-            let file_dir = if category.is_empty() {
-                format!("{}{}/", self.download_directory, set_name)
+        self.remove_invalid_chars(&mut set.set_name);
+        set.posts.reverse();
+        for post in &set.posts {
+            self.progress_bar
+                .set_message(format!("Downloading: {} ", set.set_name).as_str());
+            let file_dir = if set.category.is_empty() {
+                format!("{}{}/", self.download_directory, set.set_name)
             } else {
-                format!("{}{}/{}/", self.download_directory, category, set_name)
+                format!(
+                    "{}{}/{}/",
+                    self.download_directory, set.category, set.set_name
+                )
             };
 
             let file_path_string = format!("{}{}", file_dir, post.file_name);
             let file_path = Path::new(file_path_string.as_str());
             if file_path.exists() {
-                progress_bar.message("Duplicate found: skipping... ");
+                self.progress_bar
+                    .set_message("Duplicate found: skipping... ");
                 continue;
             }
 
@@ -122,28 +136,47 @@ impl WebConnector {
                 .download_image(&post.file_url, post.file_size)?;
             self.save_image(file_path, &bytes)?;
 
-            progress_bar.inc();
+            self.progress_bar.inc(post.file_size as u64);
         }
 
-        progress_bar.finish_println("");
+        Ok(())
+    }
+
+    /// Downloads all posts from an array of sets
+    fn download_sets(&mut self, sets: &mut [PostSet]) -> Result<(), Error> {
+        for set in sets {
+            self.download_set(set)?;
+        }
+
         Ok(())
     }
 
     /// Downloads tuple of general posts and single posts.
     pub fn download_grabbed_posts(
         &mut self,
-        grabbed_posts: (Vec<PostSet>, PostSet),
+        grabbed_sets: (Vec<PostSet>, PostSet),
     ) -> Result<(), Error> {
-        let (mut posts, mut single_posts) = grabbed_posts;
-        for post in posts.iter_mut() {
-            self.download_posts(&mut post.set_name.clone(), &post.category, &mut post.posts)?;
-        }
+        let (mut sets, mut single_set) = grabbed_sets;
+        let mut total_length = get_total_posts(&sets);
+        single_set
+            .posts
+            .iter()
+            .for_each(|e| total_length += e.file_size as u64);
 
-        self.download_posts(
-            &mut single_posts.set_name.clone(),
-            &single_posts.category,
-            &mut single_posts.posts,
-        )?;
+        self.progress_bar = ProgressBar::new(total_length);
+        self.progress_bar.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{msg} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
+                )
+                .progress_chars("=>-"),
+        );
+
+        self.download_sets(&mut sets)?;
+        self.download_set(&mut single_set)?;
+
+        self.progress_bar.finish_and_clear();
+
         Ok(())
     }
 }
