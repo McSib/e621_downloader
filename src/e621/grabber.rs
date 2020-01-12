@@ -214,6 +214,7 @@ impl Grabber {
                 e.filter_posts(&mut searched_posts);
             }
 
+            searched_posts.reverse();
             posts.append(&mut searched_posts);
         }
 
@@ -235,6 +236,7 @@ impl Grabber {
                 e.filter_posts(&mut searched_posts);
             }
 
+            searched_posts.reverse();
             posts.append(&mut searched_posts);
             page += 1;
         }
