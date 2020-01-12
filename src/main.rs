@@ -25,7 +25,6 @@ fn main() -> Result<(), Error> {
     let request_sender = RequestSender::new();
     let mut connector = WebConnector::new(&request_sender);
     connector.should_enter_safe_mode();
-    connector.grab_blacklist()?;
 
     // Parses tag file.
     let groups = parse_tag_file(&tag_path, &request_sender)?;

@@ -1,8 +1,10 @@
 extern crate failure;
 extern crate reqwest;
+extern crate serde_json;
 
 use failure::Error;
 use reqwest::Url;
+use serde_json::Value;
 
 use crate::e621::blacklist::Blacklist;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
@@ -76,33 +78,49 @@ pub struct Grabber {
     /// `RequestSender` for sending API calls.
     request_sender: RequestSender,
     /// Blacklist used to throwaway posts that contain tags the user may not want.
-    blacklist: Vec<String>,
+    blacklist: Option<Blacklist>,
 }
 
 impl Grabber {
     /// Creates new instance of `Self`.
-    pub fn new(request_sender: RequestSender, blacklist: Vec<String>) -> Self {
+    pub fn new(request_sender: RequestSender) -> Self {
         Grabber {
             grabbed_posts: Vec::new(),
             grabbed_single_posts: PostSet::new("Single Posts", "", Vec::new()),
             request_sender,
-            blacklist,
+            blacklist: None,
         }
     }
 
     /// Gets posts on creation using `groups` and searching with `request_sender`.
-    pub fn from_tags(
-        groups: &[Group],
-        request_sender: RequestSender,
-        blacklist: Vec<&str>,
-    ) -> Result<Grabber, Error> {
-        let mut grabber = Grabber::new(
-            request_sender,
-            blacklist.iter().map(|e| (*e).to_string()).collect(),
-        );
+    pub fn from_tags(groups: &[Group], request_sender: RequestSender) -> Result<Grabber, Error> {
+        let mut grabber = Grabber::new(request_sender);
+        grabber.grab_blacklist()?;
         grabber.grab_favorites()?;
         grabber.grab_tags(groups)?;
         Ok(grabber)
+    }
+
+    /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
+    /// This should be the only time the connector ever logs in.
+    pub fn grab_blacklist(&mut self) -> Result<(), Error> {
+        let login = Login::load()?;
+        if !login.is_empty() {
+            let json: Value = self.request_sender.get_blacklist(&login)?;
+            let blacklist_string = json["blacklist"]
+                .to_string()
+                .trim_matches('\"')
+                .replace("\\n", "\n");
+            let blacklist_entries: Vec<String> =
+                blacklist_string.lines().map(|e| (*e).to_string()).collect();
+            self.blacklist = if !blacklist_entries.is_empty() {
+                Some(Blacklist::new(&blacklist_entries))
+            } else {
+                None
+            };
+        }
+
+        Ok(())
     }
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
@@ -183,12 +201,6 @@ impl Grabber {
 
     /// Performs a general search where it grabs only five pages of posts.
     fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
-        let blacklist = if !self.blacklist.is_empty() {
-            Some(Blacklist::new(&self.blacklist))
-        } else {
-            None
-        };
-
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
         for page in 1..limit {
@@ -198,7 +210,7 @@ impl Grabber {
                 break;
             }
 
-            if let Some(ref e) = blacklist {
+            if let Some(ref e) = self.blacklist {
                 e.filter_posts(&mut searched_posts);
             }
 
@@ -210,12 +222,6 @@ impl Grabber {
 
     /// Performs a special search that grabs all posts tied to the searching tag.
     fn special_search(&self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
-        let blacklist = if !self.blacklist.is_empty() {
-            Some(Blacklist::new(&self.blacklist))
-        } else {
-            None
-        };
-
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
         loop {
@@ -225,7 +231,7 @@ impl Grabber {
                 break;
             }
 
-            if let Some(ref e) = blacklist {
+            if let Some(ref e) = self.blacklist {
                 e.filter_posts(&mut searched_posts);
             }
 

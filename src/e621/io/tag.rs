@@ -24,7 +24,7 @@ trait UnwrapOrFail<T> {
 impl<T> UnwrapOrFail<T> for Option<T> {
     /// Attempts to unwrap and return `T`. If `None`, it will run a closure that is expected to panic.
     ///
-    /// # Error
+    /// # Panics
     /// Will panic with `unreachable!()` if the closure does not panic itself.
     fn unwrap_or_fail<F>(self, closure: F) -> T
     where

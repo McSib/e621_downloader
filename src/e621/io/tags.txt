@@ -1,19 +1,19 @@
 # This is the tag file that you will use so the program can know what tags to search.
 # If you wish to comment in this file, simply put `#` at the beginning or end of line.
 
-# Insert tags here (remove all example tags and id with what you wish to download):
+# Insert tags you wish to download in the appropriate group (remove all example tags and IDs with what you wish to download):
 
-[artists]
+[artists] # All artist tags go here. You can attach other tags with the artist tag as well.
 fluff-kevlar
 
-[pools]
+[pools] # All pool IDs go here. Be sure to the comment the title of the pool for organizing!
 14397 # Title: The Ghost in My Attic 2
 
-[sets]
+[sets] # All set IDs go here. Be sure to the comment the title of the set for organizing!
 15932 # Title: Breeding Females
 
-[single-post]
+[single-post] # All posts' ID go here.
 1929543 # fuzzamorous animation. Basic description: female/male sitting deepthroat animation.
 
-[general]
+[general] # All general tag searches go here. They can be anything, as long as it's a valid alias or tag.
 artica_sparkle

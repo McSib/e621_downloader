@@ -1,6 +1,5 @@
 extern crate failure;
 extern crate pbr;
-extern crate serde_json;
 
 use std::fs::{create_dir_all, File};
 use std::io::{stdin, Write};
@@ -8,13 +7,11 @@ use std::path::Path;
 
 use failure::Error;
 use pbr::ProgressBar;
-use serde_json::Value;
 
 use io::tag::Group;
 use io::Config;
 
 use crate::e621::grabber::{GrabbedPost, Grabber, PostSet};
-use crate::e621::io::Login;
 use crate::e621::sender::RequestSender;
 
 pub mod blacklist;
@@ -33,8 +30,6 @@ pub struct WebConnector {
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts.
     download_directory: String,
-    /// Blacklist grabbed from logged in user.
-    blacklist: String,
 }
 
 impl WebConnector {
@@ -43,7 +38,6 @@ impl WebConnector {
         WebConnector {
             request_sender: request_sender.clone(),
             download_directory: Config::get_config().unwrap_or_default().download_directory,
-            blacklist: String::new(),
         }
     }
 
@@ -53,21 +47,6 @@ impl WebConnector {
         if self.get_input("Should enter safe mode") {
             self.request_sender.update_to_safe();
         }
-    }
-
-    /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
-    /// This should be the only time the connector ever logs in.
-    pub fn grab_blacklist(&mut self) -> Result<(), Error> {
-        let login = Login::load()?;
-        if !login.is_empty() {
-            let json: Value = self.request_sender.get_blacklist(&login)?;
-            self.blacklist = json["blacklist"]
-                .to_string()
-                .trim_matches('\"')
-                .replace("\\n", "\n");
-        }
-
-        Ok(())
     }
 
     /// Gets a simple yes/no for whether or not to do something.
@@ -89,11 +68,7 @@ impl WebConnector {
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
     pub fn grab_posts(&mut self, groups: &[Group]) -> Result<(Vec<PostSet>, PostSet), Error> {
-        let grabber = Grabber::from_tags(
-            groups,
-            self.request_sender.clone(),
-            self.blacklist.lines().collect::<Vec<&str>>(),
-        )?;
+        let grabber = Grabber::from_tags(groups, self.request_sender.clone())?;
         Ok((grabber.grabbed_posts, grabber.grabbed_single_posts))
     }
 

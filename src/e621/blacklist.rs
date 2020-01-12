@@ -84,13 +84,14 @@ impl Default for TagToken {
 }
 
 /// Parser that reads a tag file and parses the tags.
+#[derive(Default)]
 struct BlacklistParser {
     parser: Parser,
 }
 
 impl BlacklistParser {
     /// Parses each tag and collects them before return a [`LineToken`].
-    fn parse_tags(&mut self) -> Result<LineToken, Error> {
+    fn parse_tags(&mut self) -> LineToken {
         let mut tags: Vec<TagToken> = Vec::new();
         loop {
             self.parser.consume_whitespace();
@@ -98,10 +99,10 @@ impl BlacklistParser {
                 break;
             }
 
-            tags.push(self.parse_tag()?);
+            tags.push(self.parse_tag());
         }
 
-        Ok(LineToken::new(tags))
+        LineToken::new(tags)
     }
 
     /// Checks if tag starts with any special syntax.
@@ -117,7 +118,7 @@ impl BlacklistParser {
     }
 
     /// Parses tag and runs through basic identification before returning it as a [`TagToken`].
-    fn parse_tag(&mut self) -> Result<TagToken, Error> {
+    fn parse_tag(&mut self) -> TagToken {
         let mut token = TagToken::default();
         if self.is_tag_negated() {
             assert_eq!(self.parser.consume_char(), '-');
@@ -129,32 +130,33 @@ impl BlacklistParser {
         }
 
         if self.is_tag_special() {
-            self.parse_special_tag(&mut token)?;
+            self.parse_special_tag(&mut token);
         }
 
-        Ok(token)
+        token
     }
 
     /// Parses special tag and updates token with the appropriate type and value.
-    fn parse_special_tag(&mut self, token: &mut TagToken) -> Result<(), Error> {
+    ///
+    /// # Panic
+    /// If identifier doesn't match with any of the match arms, it will fail and throw an `Error`.
+    fn parse_special_tag(&mut self, token: &mut TagToken) {
         assert_eq!(self.parser.consume_char(), ':');
-        let value = self.parse_value(&token.tag)?;
+        let value = self
+            .parse_value(&token.tag)
+            .expect("Failed to identify special tag in blacklist!");
         match token.tag.as_str() {
             "rating" => {
                 token.rating = self.get_rating(&value);
             }
             "id" => {
-                token.id = Some(value.parse::<i64>()?);
+                token.id = Some(value.parse::<i64>().unwrap_or_default());
             }
             "user" => {
                 token.user = Some(value);
             }
-            _ => bail!(format_err!(
-                "Identifier doesn't match with any match parameters!"
-            )),
+            _ => {}
         };
-
-        Ok(())
     }
 
     /// Parses value and returns it.
@@ -163,9 +165,7 @@ impl BlacklistParser {
             "rating" => Ok(self.parser.consume_while(valid_rating)),
             "id" => Ok(self.parser.consume_while(valid_id)),
             "user" => Ok(self.parser.consume_while(valid_user)),
-            _ => bail!(format_err!(
-                "Identifier doesn't match with any match parameters!"
-            )),
+            _ => bail!(format_err!("Identifier doesn't match with any match arms!")),
         }
     }
 
@@ -385,17 +385,15 @@ impl Blacklist {
 
     /// Filters through a set of posts, only retaining posts that aren't blacklisted.
     pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
-        let mut filtered = 0;
+        let mut filtered: u16 = 0;
         let mut flag_worker = FlagWorker::default();
-        let mut blacklist_parser = BlacklistParser {
-            parser: Parser::default(),
-        };
+        let mut blacklist_parser = BlacklistParser::default();
         for blacklist_entry in &self.blacklist_entries {
             blacklist_parser.parser = Parser {
                 pos: 0,
                 input: blacklist_entry.clone(),
             };
-            let blacklist_line = blacklist_parser.parse_tags().unwrap();
+            let blacklist_line = blacklist_parser.parse_tags();
             posts.retain(|e| {
                 flag_worker.reset_worker();
                 flag_worker.set_flag_margin(&blacklist_line.tags);
