@@ -338,8 +338,8 @@ impl FlagWorker {
                     continue;
                 }
             } else {
-                for post_tag in &post_tags {
-                    if *post_tag == tag.tag {
+                for e in &post_tags {
+                    if *e == tag.tag {
                         if tag.is_negated() {
                             negated_flags += 1;
                         } else {
