@@ -347,13 +347,6 @@ impl FlagWorker {
                         }
                     }
                 }
-
-                for artist in &post.artist {
-                    if *artist == tag.tag {
-                        flags += 1;
-                        break;
-                    }
-                }
             }
         }
 
