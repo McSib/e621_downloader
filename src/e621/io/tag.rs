@@ -1,6 +1,6 @@
 extern crate failure;
 
-use std::fs::{read_to_string, File};
+use std::fs::{File, read_to_string};
 use std::io::Write;
 use std::path::Path;
 
@@ -17,8 +17,8 @@ static TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 /// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
 trait UnwrapOrFail<T> {
     fn unwrap_or_fail<F>(self, closure: F) -> T
-    where
-        F: FnOnce();
+        where
+            F: FnOnce();
 }
 
 impl<T> UnwrapOrFail<T> for Option<T> {
@@ -27,8 +27,8 @@ impl<T> UnwrapOrFail<T> for Option<T> {
     /// # Panics
     /// Will panic with `unreachable!()` if the closure does not panic itself.
     fn unwrap_or_fail<F>(self, closure: F) -> T
-    where
-        F: FnOnce(),
+        where
+            F: FnOnce(),
     {
         match self {
             Some(e) => e,
@@ -127,7 +127,7 @@ pub fn parse_tag_file(p: &Path, request_sender: &RequestSender) -> Result<Vec<Gr
         },
         request_sender: request_sender.clone(),
     }
-    .parse_groups()?)
+        .parse_groups()?)
 }
 
 /// Identifier to help categorize tags.
