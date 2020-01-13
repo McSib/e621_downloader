@@ -142,7 +142,7 @@ impl WebConnector {
         self.progress_bar.set_style(
             ProgressStyle::default_bar()
                 .template(
-                    "{msg} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
+                    "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
                 )
                 .progress_chars("=>-"),
         );
