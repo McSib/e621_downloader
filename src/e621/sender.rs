@@ -11,8 +11,8 @@ use std::time::Duration;
 use failure::Error;
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::USER_AGENT;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use crate::e621::io::{emergency_exit, Login};

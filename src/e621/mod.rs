@@ -2,7 +2,7 @@ extern crate dialoguer;
 extern crate failure;
 extern crate indicatif;
 
-use std::fs::create_dir_all;
+use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 
 use dialoguer::Confirmation;
@@ -84,7 +84,7 @@ impl WebConnector {
 
     /// Saves image to download directory.
     fn save_image(&mut self, file_path: &str, bytes: &[u8]) -> Result<(), Error> {
-        std::fs::write(file_path, bytes)?;
+        write(file_path, bytes)?;
         Ok(())
     }
 
