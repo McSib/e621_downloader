@@ -5,13 +5,12 @@ extern crate serde_json;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::io::Read;
 use std::rc::Rc;
 use std::time::Duration;
 
 use failure::Error;
+use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::USER_AGENT;
-use reqwest::{Client, RequestBuilder, Response};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -277,7 +276,6 @@ impl SenderClient {
     /// Cookies aren't stored in the client, TCP_NODELAY is on, and timeout is changed from 30 seconds to 60.
     fn build_client() -> Client {
         Client::builder()
-            .cookie_store(false)
             .tcp_nodelay()
             .timeout(Duration::from_secs(60))
             .build()
@@ -416,7 +414,7 @@ impl RequestSender {
     pub fn download_image(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
         let mut image_response = self.check_result(self.client.get(url).send());
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
-        image_response.read_to_end(&mut image_bytes)?;
+        image_response.copy_to(&mut image_bytes)?;
 
         Ok(image_bytes)
     }

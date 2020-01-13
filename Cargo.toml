@@ -5,9 +5,10 @@ authors = ["MightyChubz <theradcast16@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+console = "0.9.1"
 dialoguer = "0.5.0"
 indicatif = "0.13.0"
-reqwest = "0.9.24"
-serde = { version = "1.0.103", features = ["derive"]}
+reqwest = { version = "0.10.1", features = ["blocking", "json"] }
+serde = { version = "1.0.104", features = ["derive"]}
 serde_json = "1.0.44"
 failure = "0.1.6"

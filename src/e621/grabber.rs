@@ -129,11 +129,8 @@ impl Grabber {
         if !login.username.is_empty() && login.download_favorites {
             let tag_str = format!("fav:{}", login.username);
             let posts = self.special_search(tag_str.as_str())?;
-            self.grabbed_posts.push(PostSet::new(
-                &tag_str,
-                "Favorites",
-                GrabbedPost::entry_to_vec(posts),
-            ));
+            self.grabbed_posts
+                .push(PostSet::new(&tag_str, "", GrabbedPost::entry_to_vec(posts)));
             println!("\"{}\" grabbed!", tag_str);
         }
 
