@@ -11,8 +11,8 @@ use std::time::Duration;
 use failure::Error;
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::USER_AGENT;
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::e621::io::{emergency_exit, Login};
@@ -256,7 +256,7 @@ pub struct PoolEntry {
 }
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &str = "e621_downloader/1.5.4 (by McSib on e621)";
+static USER_AGENT_VALUE: &str = "e621_downloader/1.5.6 (by McSib on e621)";
 
 /// Sender client is a modified form of the generic client, wrapping the client in a `Rc` so the sender client can be cloned without creating another instance of the root client.
 struct SenderClient {
@@ -317,6 +317,7 @@ impl RequestSender {
         }
     }
 
+    /// Initialized all the urls that will be used by the sender.
     fn initialize_url_map() -> HashMap<String, String> {
         hashmap![
             ("posts", "https://e621.net/post/index.json"),
@@ -330,6 +331,7 @@ impl RequestSender {
         ]
     }
 
+    /// Updates all the urls from e621 to e926.
     pub fn update_to_safe(&mut self) {
         self.urls
             .borrow_mut()
@@ -337,6 +339,7 @@ impl RequestSender {
             .for_each(|(_, value)| *value = value.replace("e621", "e926"));
     }
 
+    /// If a request failed, this will output what type of error it is before exiting.
     fn output_error(&self, error: &reqwest::Error) {
         eprintln!(
             "Error occurred from sent request. \
@@ -384,6 +387,7 @@ impl RequestSender {
         emergency_exit("To prevent the program from crashing, it will do an emergency exit.");
     }
 
+    /// Gets the response from a sent request and checks to ensure it was successful.
     pub fn check_result(&self, result: Result<Response, reqwest::Error>) -> Response {
         match result {
             Ok(response) => response,
@@ -394,6 +398,7 @@ impl RequestSender {
         }
     }
 
+    /// Gets an entry of `T` by their ID and returns it.
     pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> Result<T, Error>
     where
         T: DeserializeOwned,
@@ -410,6 +415,19 @@ impl RequestSender {
         Ok(entry)
     }
 
+    /// Get a single pool entry by ID and grabbing a page of posts from it.
+    pub fn get_pool_entry(&self, id: &str, page: u16) -> Result<PoolEntry, Error> {
+        let entry: PoolEntry = self
+            .check_result(
+                self.client
+                    .get(&self.urls.borrow()["pool"])
+                    .query(&[("id", id), ("page", &page.to_string())])
+                    .send(),
+            )
+            .json()?;
+        Ok(entry)
+    }
+
     /// Sends request to download image.
     pub fn download_image(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
         let mut image_response = self.check_result(self.client.get(url).send());
@@ -419,6 +437,7 @@ impl RequestSender {
         Ok(image_bytes)
     }
 
+    /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> Result<Vec<PostEntry>, Error> {
         let searched_posts: Vec<PostEntry> = self
             .check_result(
@@ -435,6 +454,7 @@ impl RequestSender {
         Ok(searched_posts)
     }
 
+    /// Gets tags by their name.
     pub fn get_tags_by_name(&self, tag: &str) -> Result<Vec<TagEntry>, Error> {
         let tags: Vec<TagEntry> = self
             .check_result(
@@ -447,6 +467,7 @@ impl RequestSender {
         Ok(tags)
     }
 
+    /// Gets tags by their ID.
     pub fn get_tag_by_id(&self, id: &str) -> Result<TagEntry, Error> {
         let tag: TagEntry = self
             .check_result(
@@ -459,6 +480,7 @@ impl RequestSender {
         Ok(tag)
     }
 
+    /// Queries aliases and returns response.
     pub fn query_aliases(&self, tag: &str) -> Result<Vec<AliasEntry>, Error> {
         let alias = self
             .check_result(
@@ -471,6 +493,7 @@ impl RequestSender {
         Ok(alias)
     }
 
+    /// Gets the blacklist and returns the value.
     pub fn get_blacklist(&self, login: &Login) -> Result<Value, Error> {
         let blacklist = self
             .check_result(

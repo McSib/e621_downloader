@@ -7,8 +7,8 @@ use reqwest::Url;
 use serde_json::Value;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::Login;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
+use crate::e621::io::Login;
 use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
@@ -29,6 +29,34 @@ impl GrabbedPost {
             temp_vec.push(GrabbedPost::from(post));
         }
         temp_vec
+    }
+
+    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s for pools.
+    pub fn entry_to_pool_vec(vec: Vec<PostEntry>, pool_name: &str) -> Vec<GrabbedPost> {
+        let mut temp_vec = Vec::with_capacity(vec.len());
+        for (i, post) in vec.iter().enumerate() {
+            temp_vec.push(GrabbedPost::from_entry_to_pool(
+                post,
+                pool_name,
+                (i + 1) as u16,
+            ));
+        }
+        temp_vec
+    }
+
+    /// Converts `PostEntry` to `Self`.
+    pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
+        let ext = if let Some(extension) = &post.file_ext {
+            extension.clone()
+        } else {
+            String::new()
+        };
+
+        GrabbedPost {
+            file_url: post.file_url.clone(),
+            file_name: format!("{}{:04}.{}", name, current_page, ext),
+            file_size: post.file_size.unwrap_or_default(),
+        }
     }
 }
 
@@ -143,15 +171,14 @@ impl Grabber {
             for tag in &group.tags {
                 match tag.tag_type {
                     TagType::Pool => {
-                        let entry: PoolEntry =
-                            self.request_sender.get_entry_from_id(&tag.raw, "pool")?;
+                        let (name, posts) = self.get_posts_from_pool(&tag.raw)?;
                         self.grabbed_posts.push(PostSet::new(
-                            &entry.name,
+                            &name,
                             "Pools",
-                            GrabbedPost::entry_to_vec(entry.posts),
+                            GrabbedPost::entry_to_pool_vec(posts, &name),
                         ));
 
-                        println!("\"{}\" grabbed!", entry.name);
+                        println!("\"{}\" grabbed!", name);
                     }
                     TagType::Set => {
                         let entry: SetEntry =
@@ -185,6 +212,34 @@ impl Grabber {
         }
 
         Ok(())
+    }
+
+    /// Grabs all posts from pool.
+    pub fn get_posts_from_pool(&self, id: &str) -> Result<(String, Vec<PostEntry>), Error> {
+        let mut page: u16 = 1;
+        let mut name = String::new();
+        let mut posts: Vec<PostEntry> = vec![];
+        loop {
+            let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page)?;
+            if searched_pool.posts.is_empty() {
+                break;
+            }
+
+            if name.is_empty() {
+                name = searched_pool.name.clone();
+            }
+
+            // Sets the capacity to the total amount of posts in the pool
+            // so the next pages to add will be done quicker.
+            if posts.capacity() == 0 {
+                posts = Vec::with_capacity(searched_pool.post_count as usize);
+            }
+
+            posts.append(&mut searched_pool.posts);
+            page += 1;
+        }
+
+        Ok((name, posts))
     }
 
     /// Grabs posts from general tag.
