@@ -113,6 +113,7 @@ impl WebConnector {
             if file_path.exists() {
                 self.progress_bar
                     .set_message("Duplicate found: skipping... ");
+                self.progress_bar.inc(post.file_size as u64);
                 continue;
             }
 
