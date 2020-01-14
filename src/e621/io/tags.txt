@@ -3,17 +3,22 @@
 
 # Insert tags you wish to download in the appropriate group (remove all example tags and IDs with what you wish to download):
 
-[artists] # All artist tags go here. You can attach other tags with the artist tag as well.
+# All artist tags go here. You can attach other tags with the artist tag as well.
+[artists]
 fluff-kevlar
 
-[pools] # All pool IDs go here. Be sure to the comment the title of the pool for organizing!
+# All pool IDs go here. Be sure to the comment the title of the pool for organizing!
+[pools]
 14397 # Title: The Ghost in My Attic 2
 
-[sets] # All set IDs go here. Be sure to the comment the title of the set for organizing!
+# All set IDs go here. Be sure to the comment the title of the set for organizing!
+[sets]
 15932 # Title: Breeding Females
 
-[single-post] # All posts' ID go here.
+# All posts' ID go here.
+[single-post]
 1929543 # fuzzamorous animation. Basic description: female/male sitting deepthroat animation.
 
-[general] # All general tag searches go here. They can be anything, as long as it's a valid alias or tag.
+# All general tag searches go here. They can be anything, as long as it's a valid alias or tag.
+[general]
 artica_sparkle
