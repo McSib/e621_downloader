@@ -15,6 +15,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::e621::io::tag::TagType;
 use crate::e621::io::{emergency_exit, Login};
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
@@ -31,6 +32,11 @@ macro_rules! hashmap {
             hash_map
         }
     };
+}
+
+pub trait ToTagType {
+    /// Converts `self` to `TagType`.
+    fn to_tag_type(&self) -> TagType;
 }
 
 /// If an error occurs from server, it will respond with this.
@@ -112,6 +118,22 @@ pub struct TagEntry {
     pub tag_type: u8,
     /// If the type is locked (this value can also be `None` if not explicitly set by the admins).
     pub type_locked: Option<bool>,
+}
+
+impl ToTagType for TagEntry {
+    /// Constrains the `TagType` enum to a tags type specifically.
+    /// This can only be `TagType::General` or `TagType::Artist`.
+    fn to_tag_type(&self) -> TagType {
+        match self.tag_type {
+            // `0`: General; `3`: Copyright; `5`: Species;
+            0 | 3 | 5 => TagType::General,
+            // `4`: Character;
+            4 => TagType::General,
+            // `1`: Artist;
+            1 => TagType::Artist,
+            _ => unreachable!(),
+        }
+    }
 }
 
 /// GET return for post entry on e621/e926.
@@ -256,7 +278,7 @@ pub struct PoolEntry {
 }
 
 /// Default user agent value.
-static USER_AGENT_VALUE: &str = "e621_downloader/1.5.6 (by McSib on e621)";
+const USER_AGENT_VALUE: &str = "e621_downloader/1.5.6 (by McSib on e621)";
 
 /// Sender client is a modified form of the generic client, wrapping the client in a `Rc` so the sender client can be cloned without creating another instance of the root client.
 struct SenderClient {

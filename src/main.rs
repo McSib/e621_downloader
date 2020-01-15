@@ -1,11 +1,9 @@
 #[macro_use]
 extern crate failure;
 
-use std::path::Path;
-
 use failure::Error;
 
-use e621::io::tag::{create_tag_file, parse_tag_file, TAG_NAME};
+use e621::io::tag::{create_tag_file, parse_tag_file};
 use e621::io::Config;
 use e621::sender::RequestSender;
 use e621::WebConnector;
@@ -18,8 +16,7 @@ fn main() -> Result<(), Error> {
     Config::check_config()?;
 
     // Create tag if it doesn't exist.
-    let tag_path = Path::new(TAG_NAME);
-    create_tag_file(&tag_path)?;
+    create_tag_file()?;
 
     // Creates connector and requester to prepare for downloading posts.
     let request_sender = RequestSender::new();
@@ -27,7 +24,7 @@ fn main() -> Result<(), Error> {
     connector.should_enter_safe_mode();
 
     // Parses tag file.
-    let groups = parse_tag_file(&tag_path, &request_sender)?;
+    let groups = parse_tag_file(&request_sender)?;
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.

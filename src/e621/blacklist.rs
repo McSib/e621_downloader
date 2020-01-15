@@ -271,21 +271,10 @@ impl FlagWorker {
     /// Flags post based on blacklisted rating.
     fn flag_rating(&self, flags: &mut i16, tag: &TagToken, post: &PostEntry) {
         match tag.rating {
-            Rating::Safe => {
-                if post.rating == "s" {
-                    *flags += 1;
-                }
-            }
-            Rating::Questionable => {
-                if post.rating == "q" {
-                    *flags += 1;
-                }
-            }
-            Rating::Explicit => {
-                if post.rating == "e" {
-                    *flags += 1;
-                }
-            }
+            Rating::Safe | Rating::Questionable | Rating::Explicit => match post.rating.as_str() {
+                "s" | "q" | "e" => *flags += 1,
+                _ => {}
+            },
             Rating::None => unreachable!(),
         }
     }
@@ -322,7 +311,6 @@ impl FlagWorker {
     fn check_post(&mut self, post: &PostEntry, blacklist_line: &LineToken) {
         let mut flags: i16 = 0;
         let mut negated_flags: i16 = 0;
-        let post_tags: Vec<&str> = post.tags.split(' ').collect();
         for tag in &blacklist_line.tags {
             if tag.is_special() {
                 if self.flag_id(tag, post) {
@@ -337,15 +325,11 @@ impl FlagWorker {
                     self.flag_rating(&mut flags, tag, post);
                     continue;
                 }
-            } else {
-                for e in &post_tags {
-                    if *e == tag.tag {
-                        if tag.is_negated() {
-                            negated_flags += 1;
-                        } else {
-                            flags += 1;
-                        }
-                    }
+            } else if post.tags.split(' ').any(|e| e == tag.tag.as_str()) {
+                if tag.is_negated() {
+                    negated_flags += 1;
+                } else {
+                    flags += 1;
                 }
             }
         }
@@ -370,10 +354,8 @@ pub struct Blacklist {
 }
 
 impl Blacklist {
-    pub fn new(blacklist_entries: &[String]) -> Self {
-        Blacklist {
-            blacklist_entries: blacklist_entries.to_vec(),
-        }
+    pub fn new(blacklist_entries: Vec<String>) -> Self {
+        Blacklist { blacklist_entries }
     }
 
     /// Filters through a set of posts, only retaining posts that aren't blacklisted.

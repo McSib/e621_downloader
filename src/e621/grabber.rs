@@ -46,15 +46,14 @@ impl GrabbedPost {
 
     /// Converts `PostEntry` to `Self`.
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
-        let ext = if let Some(extension) = &post.file_ext {
-            extension.clone()
-        } else {
-            String::new()
-        };
-
         GrabbedPost {
             file_url: post.file_url.clone(),
-            file_name: format!("{}{:04}.{}", name, current_page, ext),
+            file_name: format!(
+                "{}{:04}.{}",
+                name,
+                current_page,
+                post.file_ext.as_ref().unwrap()
+            ),
             file_size: post.file_size.unwrap_or_default(),
         }
     }
@@ -140,9 +139,9 @@ impl Grabber {
                 .trim_matches('\"')
                 .replace("\\n", "\n");
             let blacklist_entries: Vec<String> =
-                blacklist_string.lines().map(|e| (*e).to_string()).collect();
+                blacklist_string.lines().map(|e| e.to_string()).collect();
             self.blacklist = if !blacklist_entries.is_empty() {
-                Some(Blacklist::new(&blacklist_entries))
+                Some(Blacklist::new(blacklist_entries))
             } else {
                 None
             };
