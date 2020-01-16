@@ -159,9 +159,6 @@ impl TagIdentifier {
     }
 
     /// Search for tag on e621.
-    ///
-    /// # Important
-    /// This does not identify an alias right now, that may change in the future.
     fn search_for_tag(&self, tag_str: &str) -> Result<Tag, Error> {
         let tags: Vec<&str> = tag_str
             .split(' ')
