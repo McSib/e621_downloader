@@ -24,18 +24,12 @@ pub mod sender;
 
 /// Get the total file size from all sets and returns it.
 fn get_file_size_from_posts(sets: &[PostSet], single_set: &PostSet) -> u64 {
-    let mut total_size = 0;
-    for set in sets {
-        for post in &set.posts {
-            total_size += post.file_size as u64;
-        }
-    }
-
-    for post in &single_set.posts {
-        total_size += post.file_size as u64;
-    }
-
-    total_size
+    let sets_total_size: i64 = sets
+        .iter()
+        .map(|e| e.posts.iter().map(|f| f.file_size).sum::<i64>())
+        .sum();
+    let single_total_size: i64 = single_set.posts.iter().map(|e| e.file_size).sum();
+    (sets_total_size + single_total_size) as u64
 }
 
 /// The `WebConnector` is the mother of all requests sent.
@@ -56,9 +50,10 @@ pub struct WebConnector {
 impl WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
     pub fn new(request_sender: &RequestSender) -> Self {
+        let config = Config::get_config().unwrap_or_default();
         WebConnector {
             request_sender: request_sender.clone(),
-            download_directory: Config::get_config().unwrap_or_default().download_directory,
+            download_directory: config.download_directory,
             progress_bar: ProgressBar::hidden(),
         }
     }
@@ -66,33 +61,35 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
-        if Confirmation::new()
+        let confirmation_result = Confirmation::new()
             .with_text("Should enter safe mode?")
             .default(false)
-            .interact()
-            .unwrap_or_default()
-        {
+            .interact();
+        if confirmation_result.unwrap_or_default() {
             self.request_sender.update_to_safe();
         }
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
-    pub fn grab_posts(&mut self, groups: &[Group]) -> Result<(Vec<PostSet>, PostSet), Error> {
-        let grabber = Grabber::from_tags(groups, self.request_sender.clone())?;
-        Ok((grabber.grabbed_posts, grabber.grabbed_single_posts))
+    pub fn grab_posts(&mut self, groups: &[Group]) -> (Vec<PostSet>, PostSet) {
+        let grabber = Grabber::from_tags(groups, self.request_sender.clone());
+        (grabber.grabbed_posts, grabber.grabbed_single_posts)
     }
 
     /// Saves image to download directory.
-    fn save_image(&mut self, file_path: &str, bytes: &[u8]) -> Result<(), Error> {
-        write(file_path, bytes)?;
-        Ok(())
+    fn save_image(&mut self, file_path: &str, bytes: &[u8]) {
+        write(file_path, bytes).expect("Failed to save image!");
     }
 
     /// Removes invalid characters from directory name.
     fn remove_invalid_chars(&self, dir_name: &mut String) {
-        for character in &["?", ":", "*", "<", ">", "\"", "|"] {
-            *dir_name = dir_name.replace(character, "_");
-        }
+        *dir_name = dir_name
+            .chars()
+            .map(|e| match e {
+                '?' | ':' | '*' | '<' | '>' | '\"' | '|' => '_',
+                _ => e,
+            })
+            .collect();
     }
 
     /// Processes `PostSet` and downloads all posts from it.
@@ -119,8 +116,8 @@ impl WebConnector {
 
             let bytes = self
                 .request_sender
-                .download_image(&post.file_url, post.file_size)?;
-            self.save_image(file_path.to_str().unwrap(), &bytes)?;
+                .download_image(&post.file_url, post.file_size);
+            self.save_image(file_path.to_str().unwrap(), &bytes);
             self.progress_bar.inc(post.file_size as u64);
         }
 

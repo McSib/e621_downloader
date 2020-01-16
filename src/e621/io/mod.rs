@@ -58,7 +58,7 @@ impl Config {
 
     /// Loads and returns `config` for quick management and settings.
     pub fn get_config() -> Result<Config, Error> {
-        let config = from_str::<Config>(&read_to_string(Path::new(CONFIG_NAME)).unwrap())?;
+        let config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
         Ok(config)
     }
 }
@@ -147,5 +147,5 @@ pub fn emergency_exit(error: &str) {
     let mut line = String::new();
     io::stdin().read_line(&mut line).unwrap_or_default();
 
-    exit(0);
+    exit(0x00FF);
 }

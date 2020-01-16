@@ -1,4 +1,3 @@
-extern crate failure;
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
@@ -8,7 +7,6 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
 
-use failure::Error;
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::USER_AGENT;
 use serde::de::DeserializeOwned;
@@ -420,115 +418,109 @@ impl RequestSender {
         }
     }
 
+    /// Sends request to download image.
+    pub fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
+        let mut image_response = self.check_result(self.client.get(url).send());
+        let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
+        image_response
+            .copy_to(&mut image_bytes)
+            .expect("Failed to download image!");
+
+        image_bytes
+    }
+
     /// Gets an entry of `T` by their ID and returns it.
-    pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> Result<T, Error>
+    pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> T
     where
         T: DeserializeOwned,
     {
-        let entry: T = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()[url_type_key])
-                    .query(&[("id", id)])
-                    .send(),
-            )
-            .json()?;
-
-        Ok(entry)
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()[url_type_key])
+                .query(&[("id", id)])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to entry!")
     }
 
     /// Get a single pool entry by ID and grabbing a page of posts from it.
-    pub fn get_pool_entry(&self, id: &str, page: u16) -> Result<PoolEntry, Error> {
-        let entry: PoolEntry = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["pool"])
-                    .query(&[("id", id), ("page", &page.to_string())])
-                    .send(),
-            )
-            .json()?;
-        Ok(entry)
-    }
-
-    /// Sends request to download image.
-    pub fn download_image(&self, url: &str, file_size: i64) -> Result<Vec<u8>, Error> {
-        let mut image_response = self.check_result(self.client.get(url).send());
-        let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
-        image_response.copy_to(&mut image_bytes)?;
-
-        Ok(image_bytes)
+    pub fn get_pool_entry(&self, id: &str, page: u16) -> PoolEntry {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["pool"])
+                .query(&[("id", id), ("page", &page.to_string())])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to PoolEntry!")
     }
 
     /// Performs a bulk search for posts using tags to filter the response.
-    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> Result<Vec<PostEntry>, Error> {
-        let searched_posts: Vec<PostEntry> = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["posts"])
-                    .query(&[
-                        ("tags", searching_tag),
-                        ("page", &format!("{}", page)),
-                        ("limit", &format!("{}", 320)),
-                    ])
-                    .send(),
-            )
-            .json()?;
-        Ok(searched_posts)
+    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> Vec<PostEntry> {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["posts"])
+                .query(&[
+                    ("tags", searching_tag),
+                    ("page", &format!("{}", page)),
+                    ("limit", &format!("{}", 320)),
+                ])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to Vec<PostEntry>!")
     }
 
     /// Gets tags by their name.
-    pub fn get_tags_by_name(&self, tag: &str) -> Result<Vec<TagEntry>, Error> {
-        let tags: Vec<TagEntry> = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["tag_bulk"])
-                    .query(&[("name", tag)])
-                    .send(),
-            )
-            .json()?;
-        Ok(tags)
+    pub fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["tag_bulk"])
+                .query(&[("name", tag)])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to Vec<TagEntry>!")
     }
 
     /// Gets tags by their ID.
-    pub fn get_tag_by_id(&self, id: &str) -> Result<TagEntry, Error> {
-        let tag: TagEntry = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["tag"])
-                    .query(&[("id", id)])
-                    .send(),
-            )
-            .json()?;
-        Ok(tag)
+    pub fn get_tag_by_id(&self, id: &str) -> TagEntry {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["tag"])
+                .query(&[("id", id)])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to TagEntry!")
     }
 
     /// Queries aliases and returns response.
-    pub fn query_aliases(&self, tag: &str) -> Result<Vec<AliasEntry>, Error> {
-        let alias = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["alias"])
-                    .query(&[("query", tag)])
-                    .send(),
-            )
-            .json()?;
-        Ok(alias)
+    pub fn query_aliases(&self, tag: &str) -> Vec<AliasEntry> {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["alias"])
+                .query(&[("query", tag)])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to Vec<AliasEntry>!")
     }
 
     /// Gets the blacklist and returns the value.
-    pub fn get_blacklist(&self, login: &Login) -> Result<Value, Error> {
-        let blacklist = self
-            .check_result(
-                self.client
-                    .get(&self.urls.borrow()["blacklist"])
-                    .query(&[
-                        ("login", login.username.as_str()),
-                        ("password_hash", login.password_hash.as_str()),
-                    ])
-                    .send(),
-            )
-            .json()?;
-        Ok(blacklist)
+    pub fn get_blacklist(&self, login: &Login) -> Value {
+        self.check_result(
+            self.client
+                .get(&self.urls.borrow()["blacklist"])
+                .query(&[
+                    ("login", login.username.as_str()),
+                    ("password_hash", login.password_hash.as_str()),
+                ])
+                .send(),
+        )
+        .json()
+        .expect("Json was unable to deserialize to Value!")
     }
 }
 

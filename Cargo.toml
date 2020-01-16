@@ -5,7 +5,6 @@ authors = ["MightyChubz <theradcast16@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-console = "0.9.1"
 dialoguer = "0.5.0"
 indicatif = "0.13.0"
 reqwest = { version = "0.10.1", features = ["blocking", "json"] }

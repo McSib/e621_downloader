@@ -120,20 +120,24 @@ impl Grabber {
     }
 
     /// Gets posts on creation using `groups` and searching with `request_sender`.
-    pub fn from_tags(groups: &[Group], request_sender: RequestSender) -> Result<Grabber, Error> {
+    pub fn from_tags(groups: &[Group], request_sender: RequestSender) -> Grabber {
         let mut grabber = Grabber::new(request_sender);
-        grabber.grab_blacklist()?;
-        grabber.grab_favorites()?;
-        grabber.grab_tags(groups)?;
-        Ok(grabber)
+        grabber.grab_blacklist();
+        grabber.grab_favorites();
+        grabber.grab_tags(groups);
+        grabber
     }
 
     /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
     /// This should be the only time the connector ever logs in.
-    pub fn grab_blacklist(&mut self) -> Result<(), Error> {
-        let login = Login::load()?;
+    pub fn grab_blacklist(&mut self) {
+        let login = Login::load().unwrap_or_else(|e| {
+            println!("Unable to load `login.json`. Error: {}", e);
+            println!("The program will use default values, but it is highly recommended to check your login.json file to ensure that everything is correct.");
+            Login::default()
+        });
         if !login.is_empty() {
-            let json: Value = self.request_sender.get_blacklist(&login)?;
+            let json: Value = self.request_sender.get_blacklist(&login);
             let blacklist_string = json["blacklist"]
                 .to_string()
                 .trim_matches('\"')
@@ -146,31 +150,31 @@ impl Grabber {
                 None
             };
         }
-
-        Ok(())
     }
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
-    pub fn grab_favorites(&mut self) -> Result<(), Error> {
-        let login = Login::load()?;
+    pub fn grab_favorites(&mut self) {
+        let login = Login::load().unwrap_or_else(|e| {
+            println!("Unable to load `login.json`. Error: {}", e);
+            println!("The program will use default values, but it is highly recommended to check your login.json file to ensure that everything is correct.");
+            Login::default()
+        });
         if !login.username.is_empty() && login.download_favorites {
             let tag_str = format!("fav:{}", login.username);
-            let posts = self.special_search(tag_str.as_str())?;
+            let posts = self.special_search(tag_str.as_str());
             self.grabbed_posts
                 .push(PostSet::new(&tag_str, "", GrabbedPost::entry_to_vec(posts)));
             println!("\"{}\" grabbed!", tag_str);
         }
-
-        Ok(())
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
-    pub fn grab_tags(&mut self, groups: &[Group]) -> Result<(), Error> {
+    pub fn grab_tags(&mut self, groups: &[Group]) {
         for group in groups {
             for tag in &group.tags {
                 match tag.tag_type {
                     TagType::Pool => {
-                        let (name, posts) = self.get_posts_from_pool(&tag.raw)?;
+                        let (name, posts) = self.get_posts_from_pool(&tag.raw);
                         self.grabbed_posts.push(PostSet::new(
                             &name,
                             "Pools",
@@ -181,14 +185,14 @@ impl Grabber {
                     }
                     TagType::Set => {
                         let entry: SetEntry =
-                            self.request_sender.get_entry_from_id(&tag.raw, "set")?;
-                        self.grabbed_posts.push(self.set_to_named_entry(&entry)?);
+                            self.request_sender.get_entry_from_id(&tag.raw, "set");
+                        self.grabbed_posts.push(self.set_to_named_entry(&entry));
 
                         println!("\"{}\" grabbed!", entry.name);
                     }
                     TagType::Post => {
                         let entry: PostEntry =
-                            self.request_sender.get_entry_from_id(&tag.raw, "single")?;
+                            self.request_sender.get_entry_from_id(&tag.raw, "single");
                         let id = entry.id;
                         self.grabbed_single_posts
                             .posts
@@ -197,7 +201,7 @@ impl Grabber {
                         println!("Post with ID \"{}\" grabbed!", id);
                     }
                     TagType::General | TagType::Artist => {
-                        let posts = self.get_posts_from_tag(tag)?;
+                        let posts = self.get_posts_from_tag(tag);
                         self.grabbed_posts.push(PostSet::new(
                             &tag.raw,
                             "General Searches",
@@ -209,17 +213,15 @@ impl Grabber {
                 };
             }
         }
-
-        Ok(())
     }
 
     /// Grabs all posts from pool.
-    pub fn get_posts_from_pool(&self, id: &str) -> Result<(String, Vec<PostEntry>), Error> {
+    pub fn get_posts_from_pool(&self, id: &str) -> (String, Vec<PostEntry>) {
         let mut page: u16 = 1;
         let mut name = String::new();
         let mut posts: Vec<PostEntry> = vec![];
         loop {
-            let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page)?;
+            let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page);
             if searched_pool.posts.is_empty() {
                 break;
             }
@@ -238,25 +240,25 @@ impl Grabber {
             page += 1;
         }
 
-        Ok((name, posts))
+        (name, posts)
     }
 
     /// Grabs posts from general tag.
-    fn get_posts_from_tag(&mut self, tag: &Tag) -> Result<Vec<PostEntry>, Error> {
+    fn get_posts_from_tag(&mut self, tag: &Tag) -> Vec<PostEntry> {
         match tag.search_type {
-            TagCategory::General => Ok(self.general_search(&tag.raw)?),
-            TagCategory::Special => Ok(self.special_search(&tag.raw)?),
+            TagCategory::General => self.general_search(&tag.raw),
+            TagCategory::Special => self.special_search(&tag.raw),
             TagCategory::None => unreachable!(),
         }
     }
 
     /// Performs a general search where it grabs only five pages of posts.
-    fn general_search(&mut self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
+    fn general_search(&mut self, searching_tag: &str) -> Vec<PostEntry> {
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
         for page in 1..limit {
             let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page)?;
+                self.request_sender.bulk_search(searching_tag, page);
             if searched_posts.is_empty() {
                 break;
             }
@@ -269,16 +271,16 @@ impl Grabber {
             posts.append(&mut searched_posts);
         }
 
-        Ok(posts)
+        posts
     }
 
     /// Performs a special search that grabs all posts tied to the searching tag.
-    fn special_search(&self, searching_tag: &str) -> Result<Vec<PostEntry>, Error> {
+    fn special_search(&self, searching_tag: &str) -> Vec<PostEntry> {
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
         loop {
             let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page)?;
+                self.request_sender.bulk_search(searching_tag, page);
             if searched_posts.is_empty() {
                 break;
             }
@@ -292,15 +294,15 @@ impl Grabber {
             page += 1;
         }
 
-        Ok(posts)
+        posts
     }
 
     /// Converts `SetEntry` to `PostSet`.
-    fn set_to_named_entry(&self, set: &SetEntry) -> Result<PostSet, Error> {
-        Ok(PostSet::new(
+    fn set_to_named_entry(&self, set: &SetEntry) -> PostSet {
+        PostSet::new(
             &set.name,
             "Sets",
-            GrabbedPost::entry_to_vec(self.special_search(&format!("set:{}", set.short_name))?),
-        ))
+            GrabbedPost::entry_to_vec(self.special_search(&format!("set:{}", set.short_name))),
+        )
     }
 }

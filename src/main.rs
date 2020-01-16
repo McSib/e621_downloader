@@ -28,7 +28,7 @@ fn main() -> Result<(), Error> {
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.
-    let grabbed_posts = connector.grab_posts(&groups)?;
+    let grabbed_posts = connector.grab_posts(&groups);
     connector.download_grabbed_posts(grabbed_posts)?;
 
     Ok(())
