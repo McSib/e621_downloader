@@ -1,8 +1,6 @@
-extern crate failure;
 extern crate reqwest;
 extern crate serde_json;
 
-use failure::Error;
 use reqwest::Url;
 use serde_json::Value;
 

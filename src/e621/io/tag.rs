@@ -132,7 +132,7 @@ pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Erro
     Ok(TagParser {
         parser: Parser {
             pos: 0,
-            input: read_to_string(TAG_NAME)?,
+            input: read_to_string(TAG_NAME).expect("Unable to read tag file!"),
         },
         request_sender: request_sender.clone(),
     }
@@ -152,23 +152,22 @@ impl TagIdentifier {
     }
 
     /// Identifies tag and returns `Tag`.
-    fn id_tag(tags: &str, request_sender: RequestSender) -> Result<Tag, Error> {
+    fn id_tag(tags: &str, request_sender: RequestSender) -> Tag {
         let identifier = TagIdentifier::new(request_sender);
-        let tag_type = identifier.search_for_tag(tags)?;
-        Ok(tag_type)
+        identifier.search_for_tag(tags)
     }
 
     /// Search for tag on e621.
-    fn search_for_tag(&self, tag_str: &str) -> Result<Tag, Error> {
+    fn search_for_tag(&self, tag_str: &str) -> Tag {
         let tags: Vec<&str> = tag_str
             .split(' ')
             .filter(|elem| !elem.contains(':') && !elem.starts_with('-'))
             .collect();
         let mut temp_tag = Tag::default();
         for tag in tags {
-            temp_tag = match self.request_sender.get_tags_by_name(tag)?.first() {
+            temp_tag = match self.request_sender.get_tags_by_name(tag).first() {
                 Some(entry) => self.create_tag(tag_str, entry),
-                None => self.create_tag(tag_str, &self.is_alias(tag)?),
+                None => self.create_tag(tag_str, &self.is_alias(tag)),
             };
 
             if temp_tag.search_type == TagCategory::Special {
@@ -176,20 +175,20 @@ impl TagIdentifier {
             }
         }
 
-        Ok(temp_tag)
+        temp_tag
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
-    fn is_alias(&self, tag: &str) -> Result<TagEntry, Error> {
-        let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag)?;
+    fn is_alias(&self, tag: &str) -> TagEntry {
+        let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag);
         let entry = alias_entries
             .first()
             .unwrap_or_fail(|| self.exit_tag_failure(&tag));
         if !entry.pending {
             let tag_entry: TagEntry = self
                 .request_sender
-                .get_tag_by_id(&format!("{}", entry.alias_id))?;
-            return Ok(tag_entry);
+                .get_tag_by_id(&format!("{}", entry.alias_id));
+            return tag_entry;
         } else {
             self.exit_tag_failure(&tag);
         }
@@ -252,7 +251,7 @@ impl TagParser {
             }
 
             if self.parser.starts_with("[") {
-                groups.push(self.parse_group()?);
+                groups.push(self.parse_group());
             } else {
                 bail!(format_err!("Tags can't be outside of groups!"));
             }
@@ -262,19 +261,19 @@ impl TagParser {
     }
 
     /// Parses a group and all tags tied to it before returning the result.
-    fn parse_group(&mut self) -> Result<Group, Error> {
+    fn parse_group(&mut self) -> Group {
         assert_eq!(self.parser.consume_char(), '[');
         let group_name = self.parser.consume_while(valid_group);
         assert_eq!(self.parser.consume_char(), ']');
 
         let mut group = Group::new(group_name);
-        self.parse_tags(&mut group)?;
+        self.parse_tags(&mut group);
 
-        Ok(group)
+        group
     }
 
     /// Parses all tags for a group and stores it.
-    fn parse_tags(&mut self, group: &mut Group) -> Result<(), Error> {
+    fn parse_tags(&mut self, group: &mut Group) {
         let mut tags: Vec<Tag> = Vec::new();
         loop {
             self.parser.consume_whitespace();
@@ -290,19 +289,18 @@ impl TagParser {
                 break;
             }
 
-            tags.push(self.parse_tag(&group.name)?);
+            tags.push(self.parse_tag(&group.name));
         }
 
         group.tags = tags;
-        Ok(())
     }
 
     /// Parses a single tag and identifies it before returning the result.
-    fn parse_tag(&mut self, group_name: &str) -> Result<Tag, Error> {
+    fn parse_tag(&mut self, group_name: &str) -> Tag {
         match group_name {
             "artists" | "general" => {
                 let tag = self.parser.consume_while(valid_tag);
-                Ok(TagIdentifier::id_tag(&tag, self.request_sender.clone())?)
+                TagIdentifier::id_tag(&tag, self.request_sender.clone())
             }
             e => {
                 let tag = self.parser.consume_while(valid_id);
@@ -313,7 +311,7 @@ impl TagParser {
                     _ => unreachable!(),
                 };
 
-                Ok(Tag::new(&tag, TagCategory::Special, tag_type))
+                Tag::new(&tag, TagCategory::Special, tag_type)
             }
         }
     }
