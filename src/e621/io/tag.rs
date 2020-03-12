@@ -180,18 +180,15 @@ impl TagIdentifier {
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
     fn is_alias(&self, tag: &str) -> TagEntry {
+        // TODO: Checking if a tag is an alias is much simpler now, so this needs to be changed.
         let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag);
         let entry = alias_entries
             .first()
             .unwrap_or_fail(|| self.exit_tag_failure(&tag));
-        if !entry.pending {
-            let tag_entry: TagEntry = self
-                .request_sender
-                .get_tag_by_id(&format!("{}", entry.alias_id));
-            return tag_entry;
-        } else {
-            self.exit_tag_failure(&tag);
-        }
+        let tag_entry: TagEntry = self
+            .request_sender
+            .get_tag_by_id(&format!("{}", entry.alias_id));
+        return tag_entry;
 
         unreachable!()
     }
@@ -210,8 +207,8 @@ impl TagIdentifier {
         let category = match tag_type {
             TagType::General => {
                 // Checks if the tag type is Character
-                if tag_entry.tag_type == 4 {
-                    if tag_entry.count > 1500 {
+                if tag_entry.category == 4 {
+                    if tag_entry.post_count > 1500 {
                         TagCategory::General
                     } else {
                         TagCategory::Special

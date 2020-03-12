@@ -45,14 +45,14 @@ impl GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
         GrabbedPost {
-            file_url: post.file_url.clone(),
+            file_url: post.file.url.clone(),
             file_name: format!(
                 "{}{:04}.{}",
                 name,
                 current_page,
-                post.file_ext.as_ref().unwrap()
+                post.file.ext
             ),
-            file_size: post.file_size.unwrap_or_default(),
+            file_size: post.file.size,
         }
     }
 }
@@ -61,15 +61,9 @@ impl From<PostEntry> for GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     fn from(post: PostEntry) -> Self {
         GrabbedPost {
-            file_url: post.file_url.clone(),
-            file_name: Url::parse(post.file_url.as_str())
-                .unwrap()
-                .path_segments()
-                .unwrap()
-                .last()
-                .unwrap()
-                .to_string(),
-            file_size: post.file_size.unwrap_or_default(),
+            file_url: post.file.url.clone(),
+            file_name: post.file.md5.clone(),
+            file_size: post.file.size,
         }
     }
 }
@@ -91,6 +85,11 @@ impl PostSet {
             category: category.to_string(),
             posts,
         }
+    }
+
+    /// Converts `SetEntry` to `Self`.
+    pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
+        PostSet::new(&set.name, "Sets", posts)
     }
 }
 
@@ -184,7 +183,10 @@ impl Grabber {
                     TagType::Set => {
                         let entry: SetEntry =
                             self.request_sender.get_entry_from_id(&tag.raw, "set");
-                        self.grabbed_posts.push(self.set_to_named_entry(&entry));
+                        // Grabs posts from IDs in the set entry.
+                        let posts = self.special_search(&format!("set:{}", entry.shortname));
+                        self.grabbed_posts
+                            .push(PostSet::from_set(&entry, GrabbedPost::entry_to_vec(posts)));
 
                         println!("\"{}\" grabbed!", entry.name);
                     }
@@ -218,9 +220,10 @@ impl Grabber {
         let mut page: u16 = 1;
         let mut name = String::new();
         let mut posts: Vec<PostEntry> = vec![];
+        // TODO: Since all posts are now grabbed when the pool entry is grabbed, looping is no longer needed for pages
         loop {
             let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page);
-            if searched_pool.posts.is_empty() {
+            if searched_pool.post_ids.is_empty() {
                 break;
             }
 
@@ -293,14 +296,5 @@ impl Grabber {
         }
 
         posts
-    }
-
-    /// Converts `SetEntry` to `PostSet`.
-    fn set_to_named_entry(&self, set: &SetEntry) -> PostSet {
-        PostSet::new(
-            &set.name,
-            "Sets",
-            GrabbedPost::entry_to_vec(self.special_search(&format!("set:{}", set.short_name))),
-        )
     }
 }

@@ -37,71 +37,44 @@ pub trait ToTagType {
     fn to_tag_type(&self) -> TagType;
 }
 
-/// If an error occurs from server, it will respond with this.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ErrorEntry {
-    /// If the attempted grab is a success.
-    pub success: bool,
-    /// Error message of failed grab if `success` is false.
-    pub msg: String,
-}
-
-/// Time the post was created.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TimeSet {
-    pub json_class: String,
-    /// Time in seconds.
-    pub s: i64,
-    /// Time in nano-seconds.
-    pub n: i64,
-}
-
-/// Alias tag with id linking to the tag it was aliased to.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AliasEntry {
-    /// ID of the alias.
     pub id: i64,
-    /// Name of the alias tag.
-    pub name: String,
-    /// ID of the tag that the alias is tied to.
-    pub alias_id: i64,
-    /// Approval status of the alias tag.
-    pub pending: bool,
-}
-
-/// GET return for set entry on e621/e926.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct SetEntry {
-    /// ID of the set.
-    pub id: i64,
-    /// Name of the set.
-    pub name: String,
-    /// Time the set was created.
-    pub created_at: TimeSet,
-    /// Time the set was last updated.
-    pub updated_at: TimeSet,
-    /// ID of the user who created the set and updates it.
-    pub user_id: i64,
-    /// Description of the set.
-    pub description: String,
-    /// The short name of the set.
-    #[serde(rename = "shortname")]
-    pub short_name: String,
-    /// The amount of posts contained in the set.
+    pub antecedent_name: String,
+    pub reason: String,
+    pub creator_id: i64,
+    pub created_at: String,
+    pub forum_post_id: Option<i64>,
+    pub updated_at: Option<String>,
+    pub forum_topic_id: Option<i64>,
+    pub consequent_name: String,
+    pub status: String,
     pub post_count: i64,
-    /// IDs for all posts in the set.
-    pub posts: Vec<i64>,
+    pub approver_id: Option<i64>,
 }
 
-/// GET return for post entry on e621/e926.
-#[derive(Deserialize, Clone, Debug)]
-pub struct TagEntry {
-    /// Id of the tag.
-    pub id: u32,
-    /// Name of the tag.
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SetEntry {
+    pub id: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    pub creator_id: i64,
+    pub is_public: bool,
     pub name: String,
-    /// Number of all posts that use this tag.
-    pub count: u32,
+    pub shortname: String,
+    pub description: String,
+    pub post_count: i64,
+    pub transfer_on_delete: bool,
+    pub post_ids: Vec<i64>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TagEntry {
+    pub id: i64,
+    pub name: String,
+    pub post_count: i64,
+    pub related_tags: String,
+    pub related_tags_updated_at: String,
     /// The type of tag it is.
     ///
     /// # Important
@@ -112,17 +85,17 @@ pub struct TagEntry {
     /// `3`: Copyright;
     /// `4`: Character;
     /// `5`: Species;
-    #[serde(rename = "type")]
-    pub tag_type: u8,
-    /// If the type is locked (this value can also be `None` if not explicitly set by the admins).
-    pub type_locked: Option<bool>,
+    pub category: u8,
+    pub is_locked: bool,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 impl ToTagType for TagEntry {
     /// Constrains the `TagType` enum to a tags type specifically.
     /// This can only be `TagType::General` or `TagType::Artist`.
     fn to_tag_type(&self) -> TagType {
-        match self.tag_type {
+        match self.category {
             // `0`: General; `3`: Copyright; `5`: Species;
             0 | 3 | 5 => TagType::General,
             // `4`: Character;
@@ -135,144 +108,107 @@ impl ToTagType for TagEntry {
 }
 
 /// GET return for post entry on e621/e926.
-///
-/// # Important
-///
-/// If the post that is loaded happens to be deleted when loaded, these properties will not be usable:
-/// `source`, `sources`, `md5`, `file_size`, `file_ext`, `preview_width`, `preview_height`, `sample_url`, `sample_width`, `sample_height`, `has_children`, `children`.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostEntry {
-    /// The ID of the post.
     pub id: i64,
-    /// Tags from the post.
-    pub tags: String,
-    /// Tags that are locked by the admins.
-    ///
-    /// # Important
-    /// Can be `None` if there are no tags.
-    pub locked_tags: Option<String>,
-    /// Description of the post.
-    pub description: String,
-    /// When the post was uploaded.
-    pub created_at: TimeSet,
-    /// User ID of the user who uploaded the post.
-    pub creator_id: Option<i64>,
-    /// Username of the user who uploaded the post.
-    pub author: String,
-    /// The amount of changes that the post went through since uploaded.
-    pub change: i64,
-    /// The main source of the work, use `sources` instead when using all sources listed on post.
-    ///
-    /// # Important
-    /// Can be `None` if no sources are given.
-    pub source: Option<String>,
-    /// How many upvoted or downvoted the post.
-    pub score: i64,
-    /// How many favorites the post has.
-    pub fav_count: i64,
-    /// The MD5 certification of the post.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub md5: Option<String>,
-    /// Size of the source file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub file_size: Option<i64>,
-    /// URL of the source file.
-    pub file_url: String,
-    /// Extension of the source file (png, jpg, webm, gif, etc).
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub file_ext: Option<String>,
-    /// URL for the preview file.
-    pub preview_url: String,
-    /// Width of the preview file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub preview_width: Option<i64>,
-    /// Height of the preview file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub preview_height: Option<i64>,
-    /// URL for the sample file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub sample_url: Option<String>,
-    /// Width of the sample file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub sample_width: Option<i64>,
-    /// Height of the sample file.
-    ///
-    /// # Important
-    /// Can be `None` if the post is deleted or taken down.
-    pub sample_height: Option<i64>,
-    /// Rating of the post (safe, questionable, explicit), this will be "s", "q", "e".
+    pub created_at: String,
+    pub updated_at: String,
+    pub file: File,
+    pub preview: Preview,
+    pub sample: Sample,
+    pub score: Score,
+    pub tags: Tags,
+    pub locked_tags: Vec<String>,
+    pub change_seq: i64,
+    pub flags: Flags,
     pub rating: String,
-    /// Post status, one of: active, flagged, pending, deleted.
-    pub status: String,
-    /// Width of image.
-    pub width: i64,
-    /// Height of image.
-    pub height: i64,
-    /// If the post has comments.
-    pub has_comments: bool,
-    /// If the post has notes.
-    pub has_notes: bool,
-    /// If the post has children.
-    ///
-    /// # Important
-    /// Can be `None` if the post has no children.
-    pub has_children: Option<bool>,
-    /// All of the children attached to post.
-    ///
-    /// # Important
-    /// Can be `None` if the post has no children.
-    pub children: Option<String>,
-    /// If this post is a child, this will be the parent post's ID.
-    ///
-    /// # Important
-    /// Can be `None` if the post has no parent.
-    pub parent_id: Option<i64>,
-    /// The artist or artists that drew this image.
-    pub artist: Vec<String>,
-    /// All the sources for the work.
-    ///
-    /// # Important
-    /// Can be `None` if no sources are supplied to the post.
-    pub sources: Option<Vec<String>>,
+    pub fav_count: i64,
+    pub sources: Vec<String>,
+    pub pools: Vec<i64>,
+    pub relationships: Relationships,
+    pub approver_id: Option<i64>,
+    pub uploader_id: i64,
+    pub description: String,
+    pub comment_count: i64,
+    pub is_favorited: bool,
 }
 
-/// GET return for pool entry on e621/e926.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct File {
+    pub width: i64,
+    pub height: i64,
+    pub ext: String,
+    pub size: i64,
+    pub md5: String,
+    pub url: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Preview {
+    pub width: i64,
+    pub height: i64,
+    pub url: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Sample {
+    pub has: Option<bool>,
+    pub height: i64,
+    pub width: i64,
+    pub url: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Score {
+    pub up: i64,
+    pub down: i64,
+    pub total: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Tags {
+    pub general: Vec<String>,
+    pub species: Vec<String>,
+    pub character: Vec<String>,
+    pub copyright: Vec<String>,
+    pub artist: Vec<String>,
+    pub invalid: Vec<String>,
+    pub lore: Vec<String>,
+    pub meta: Vec<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Flags {
+    pub pending: bool,
+    pub flagged: bool,
+    pub note_locked: bool,
+    pub status_locked: bool,
+    pub rating_locked: bool,
+    pub deleted: bool,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Relationships {
+    pub parent_id: Option<i64>,
+    pub has_children: bool,
+    pub has_active_children: bool,
+    pub children: Vec<i64>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PoolEntry {
-    /// Time the pool was created.
-    pub created_at: TimeSet,
-    /// Description of the pool.
-    pub description: String,
-    /// Id of the pool.
     pub id: i64,
-    /// If the pool is active or not.
-    pub is_active: bool,
-    /// If the pool is locked or not.
-    pub is_locked: bool,
-    /// Name of the pool.
     pub name: String,
-    /// The amount of posts added to the pool.
+    pub created_at: String,
+    pub updated_at: String,
+    pub creator_id: i64,
+    pub description: String,
+    pub is_active: bool,
+    pub category: String,
+    pub is_deleted: bool,
+    pub post_ids: Vec<i64>,
+    pub creator_name: String,
     pub post_count: i64,
-    /// Time the pool was updated.
-    pub updated_at: TimeSet,
-    /// Id of user who created and updated post.
-    pub user_id: i64,
-    /// All posts in the pool.
-    pub posts: Vec<PostEntry>,
 }
 
 /// Default user agent value.
@@ -325,10 +261,10 @@ pub struct RequestSender {
     /// # Important
     /// Even though the `SenderClient` isn't wrapped in a `Rc`, the main client inside of it is, this will ensure that all request are only sent through one client.
     client: SenderClient,
-
     urls: Rc<RefCell<HashMap<String, String>>>,
 }
 
+// TODO: All API calls here need to be rewritten for the new API, none of these requests will work.
 impl RequestSender {
     pub fn new() -> Self {
         RequestSender {
@@ -339,15 +275,19 @@ impl RequestSender {
 
     /// Initialized all the urls that will be used by the sender.
     fn initialize_url_map() -> HashMap<String, String> {
+        // TODO: Urls need to be updated to reflect the new API calls
         hashmap![
-            ("posts", "https://e621.net/post/index.json"),
-            ("pool", "https://e621.net/pool/show.json"),
-            ("set", "https://e621.net/set/show.json"),
-            ("single", "https://e621.net/post/show.json"),
-            ("blacklist", "https://e621.net/user/blacklist.json"),
-            ("tag", "https://e621.net/tag/show.json"),
-            ("tag_bulk", "https://e621.net/tag/index.json"),
-            ("alias", "https://e621.net/tag_alias/index.json")
+            ("posts", "https://e621.net/posts.json"),
+            ("pool", "https://e621.net/pools.json"),
+            ("set", "https://e621.net/post_sets.json"),
+            // TODO: Single posts requires the proper ID to be appended to the url.
+            ("single", "https://e621.net/posts/"),
+            // TODO: The blacklist url requires the user to be logged in, as well as there ID being supplied.
+            ("blacklist", "https://e621.net/users/"),
+            // TODO: Single tags requires the proper ID to be appended to the url.
+            ("tag", "https://e621.net/tags/"),
+            ("tag_bulk", "https://e621.net/tags.json"),
+            ("alias", "https://e621.net/tag_aliases.json")
         ]
     }
 
