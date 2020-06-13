@@ -11,10 +11,11 @@ use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::USER_AGENT;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
+use self::serde_json::{from_value, to_string, Value};
 use crate::e621::io::tag::TagType;
 use crate::e621::io::{emergency_exit, Login};
+use std::fs::write;
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -51,21 +52,6 @@ pub struct AliasEntry {
     pub status: String,
     pub post_count: i64,
     pub approver_id: Option<i64>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SetEntry {
-    pub id: i64,
-    pub created_at: String,
-    pub updated_at: String,
-    pub creator_id: i64,
-    pub is_public: bool,
-    pub name: String,
-    pub shortname: String,
-    pub description: String,
-    pub post_count: i64,
-    pub transfer_on_delete: bool,
-    pub post_ids: Vec<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -107,12 +93,17 @@ impl ToTagType for TagEntry {
     }
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BulkPostEntry {
+    pub posts: Vec<PostEntry>,
+}
+
 /// GET return for post entry on e621/e926.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PostEntry {
     pub id: i64,
     pub created_at: String,
-    pub updated_at: String,
+    pub updated_at: Option<String>,
     pub file: File,
     pub preview: Preview,
     pub sample: Sample,
@@ -140,14 +131,14 @@ pub struct File {
     pub ext: String,
     pub size: i64,
     pub md5: String,
-    pub url: String,
+    pub url: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Preview {
     pub width: i64,
     pub height: i64,
-    pub url: String,
+    pub url: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -155,7 +146,7 @@ pub struct Sample {
     pub has: Option<bool>,
     pub height: i64,
     pub width: i64,
-    pub url: String,
+    pub url: Option<String>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -177,12 +168,47 @@ pub struct Tags {
     pub meta: Vec<String>,
 }
 
+impl Tags {
+    pub fn combine_tags(&mut self) -> Vec<String> {
+        let vecs: Vec<&mut Vec<String>> = vec![
+            &mut self.general,
+            &mut self.species,
+            &mut self.character,
+            &mut self.copyright,
+            &mut self.artist,
+            &mut self.invalid,
+            &mut self.lore,
+            &mut self.meta,
+        ];
+        let capacity = Tags::get_total_tags_len(&vecs);
+        let mut tags: Vec<String> = Vec::with_capacity(capacity);
+        Tags::append_all_vecs(&mut tags, vecs);
+
+        tags
+    }
+
+    fn get_total_tags_len<T>(vecs: &[&mut Vec<T>]) -> usize {
+        let mut len: usize = 0;
+        for vec in vecs {
+            len += vec.len();
+        }
+
+        len
+    }
+
+    fn append_all_vecs<T>(dest: &mut Vec<T>, src: Vec<&mut Vec<T>>) {
+        for vec in src {
+            dest.append(vec);
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Flags {
     pub pending: bool,
     pub flagged: bool,
     pub note_locked: bool,
-    pub status_locked: bool,
+    pub status_locked: Option<bool>,
     pub rating_locked: bool,
     pub deleted: bool,
 }
@@ -193,6 +219,21 @@ pub struct Relationships {
     pub has_children: bool,
     pub has_active_children: bool,
     pub children: Vec<i64>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SetEntry {
+    pub id: i64,
+    pub created_at: String,
+    pub updated_at: String,
+    pub creator_id: i64,
+    pub is_public: bool,
+    pub name: String,
+    pub shortname: String,
+    pub description: String,
+    pub post_count: i64,
+    pub transfer_on_delete: bool,
+    pub post_ids: Vec<i64>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -209,6 +250,75 @@ pub struct PoolEntry {
     pub post_ids: Vec<i64>,
     pub creator_name: String,
     pub post_count: i64,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UserEntry {
+    pub wiki_page_version_count: i64,
+    pub artist_version_count: i64,
+    pub pool_version_count: i64,
+    pub forum_post_count: i64,
+    pub comment_count: i64,
+    pub appeal_count: i64,
+    pub flag_count: i64,
+    pub positive_feedback_count: i64,
+    pub neutral_feedback_count: i64,
+    pub negative_feedback_count: i64,
+    pub upload_limit: i64,
+    pub id: i64,
+    pub created_at: String,
+    pub name: String,
+    pub level: i64,
+    pub base_upload_limit: i64,
+    pub post_upload_count: i64,
+    pub post_update_count: i64,
+    pub note_update_count: i64,
+    pub is_banned: bool,
+    pub can_approve_posts: bool,
+    pub can_upload_free: bool,
+    pub level_string: String,
+    pub show_avatars: Option<bool>,
+    pub blacklist_avatars: Option<bool>,
+    pub blacklist_users: Option<bool>,
+    pub description_collapsed_initially: Option<bool>,
+    pub hide_comments: Option<bool>,
+    pub show_hidden_comments: Option<bool>,
+    pub show_post_statistics: Option<bool>,
+    pub has_mail: Option<bool>,
+    pub receive_email_notifications: Option<bool>,
+    pub enable_keyboard_navigation: Option<bool>,
+    pub enable_privacy_mode: Option<bool>,
+    pub style_usernames: Option<bool>,
+    pub enable_auto_complete: Option<bool>,
+    pub has_saved_searches: Option<bool>,
+    pub disable_cropped_thumbnails: Option<bool>,
+    pub disable_mobile_gestures: Option<bool>,
+    pub enable_safe_mode: Option<bool>,
+    pub disable_responsive_mode: Option<bool>,
+    pub disable_post_tooltips: Option<bool>,
+    pub no_flagging: Option<bool>,
+    pub no_feedback: Option<bool>,
+    pub disable_user_dmails: Option<bool>,
+    pub enable_compact_uploader: Option<bool>,
+    pub updated_at: Option<String>,
+    pub email: Option<String>,
+    pub last_logged_in_at: Option<String>,
+    pub last_forum_read_at: Option<String>,
+    pub recent_tags: Option<String>,
+    pub comment_threshold: Option<i64>,
+    pub default_image_size: Option<String>,
+    pub favorite_tags: Option<String>,
+    pub blacklisted_tags: Option<String>,
+    pub time_zone: Option<String>,
+    pub per_page: Option<i64>,
+    pub custom_style: Option<String>,
+    pub favorite_count: Option<i64>,
+    pub api_regen_multiplier: Option<i64>,
+    pub api_burst_limit: Option<i64>,
+    pub remaining_api_limit: Option<i64>,
+    pub statement_timeout: Option<i64>,
+    pub favorite_limit: Option<i64>,
+    pub tag_query_limit: Option<i64>,
 }
 
 /// Default user agent value.
@@ -275,11 +385,12 @@ impl RequestSender {
 
     /// Initialized all the urls that will be used by the sender.
     fn initialize_url_map() -> HashMap<String, String> {
-        // TODO: Urls need to be updated to reflect the new API calls
         hashmap![
             ("posts", "https://e621.net/posts.json"),
-            ("pool", "https://e621.net/pools.json"),
-            ("set", "https://e621.net/post_sets.json"),
+            // TODO: Pools must now have the supplied id appended.
+            ("pool", "https://e621.net/pools/"),
+            // TODO: Sets must now have the supplied id appended.
+            ("set", "https://e621.net/post_sets/"),
             // TODO: Single posts requires the proper ID to be appended to the url.
             ("single", "https://e621.net/posts/"),
             // TODO: The blacklist url requires the user to be logged in, as well as there ID being supplied.
@@ -287,7 +398,8 @@ impl RequestSender {
             // TODO: Single tags requires the proper ID to be appended to the url.
             ("tag", "https://e621.net/tags/"),
             ("tag_bulk", "https://e621.net/tags.json"),
-            ("alias", "https://e621.net/tag_aliases.json")
+            ("alias", "https://e621.net/tag_aliases.json"),
+            ("user", "https://e621.net/users/")
         ]
     }
 
@@ -369,6 +481,15 @@ impl RequestSender {
         image_bytes
     }
 
+    pub fn append_url(&self, url: &str, append: &str) -> String {
+        format!("{}{}.json", url, append)
+    }
+
+    #[deprecated(
+        since = "1.5.6",
+        note = "This uses old workarounds and loopholes in the old API to make lesser calls to it. \
+        This no longer works with the new API."
+    )]
     /// Gets an entry of `T` by their ID and returns it.
     pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> T
     where
@@ -377,13 +498,53 @@ impl RequestSender {
         self.check_result(
             self.client
                 .get(&self.urls.borrow()[url_type_key])
-                .query(&[("id", id)])
+                .query(&[("search[id]", id)])
                 .send(),
         )
         .json()
         .expect("Json was unable to deserialize to entry!")
     }
 
+    pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
+    where
+        T: DeserializeOwned,
+    {
+        // let json: Value = self
+        //     .check_result(
+        //         self.client
+        //             .get(&self.append_url(&self.urls.borrow()[url_type_key], id))
+        //             .send(),
+        //     )
+        //     .json()
+        //     .unwrap();
+        // let result = if url_type_key == "single" {
+        //     json.get("post").unwrap().clone()
+        // } else {
+        //     json
+        // };
+        // write("posts.json", to_string(&result).unwrap()).unwrap();
+
+        let value: Value = self
+            .check_result(
+                self.client
+                    .get(&self.append_url(&self.urls.borrow()[url_type_key], id))
+                    .send(),
+            )
+            .json()
+            .expect("Json was unable to deserialize to entry!");
+        if url_type_key == "single" {
+            from_value(value.get("post").unwrap().clone())
+                .expect("Json was unable to deserialize to entry!")
+        } else {
+            from_value(value).expect("Json was unable to deserialize to entry!")
+        }
+    }
+
+    #[deprecated(
+        since = "1.5.6",
+        note = "This uses the old API to grab the pool and is no longer used for the new API"
+    )]
+    // TODO: This actually needs to be updated now since there is a simpler way of gathering all the posts without burning the API server.
     /// Get a single pool entry by ID and grabbing a page of posts from it.
     pub fn get_pool_entry(&self, id: &str, page: u16) -> PoolEntry {
         self.check_result(
@@ -397,7 +558,21 @@ impl RequestSender {
     }
 
     /// Performs a bulk search for posts using tags to filter the response.
-    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> Vec<PostEntry> {
+    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
+        // let json: Value = self
+        //     .check_result(
+        //         self.client
+        //             .get(&self.urls.borrow()["posts"])
+        //             .query(&[
+        //                 ("tags", searching_tag),
+        //                 ("page", &format!("{}", page)),
+        //                 ("limit", &format!("{}", 320)),
+        //             ])
+        //             .send(),
+        //     )
+        //     .json()
+        //     .unwrap();
+        // write("posts.json", to_string(&json).unwrap()).unwrap();
         self.check_result(
             self.client
                 .get(&self.urls.borrow()["posts"])
@@ -414,16 +589,29 @@ impl RequestSender {
 
     /// Gets tags by their name.
     pub fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
-        self.check_result(
-            self.client
-                .get(&self.urls.borrow()["tag_bulk"])
-                .query(&[("name", tag)])
-                .send(),
-        )
-        .json()
-        .expect("Json was unable to deserialize to Vec<TagEntry>!")
+        let result: Value = self
+            .check_result(
+                self.client
+                    .get(&self.urls.borrow()["tag_bulk"])
+                    .query(&[("search[name]", tag)])
+                    .send(),
+            )
+            .json()
+            .expect("Json was unable to deserialize!");
+        if result.is_object() {
+            vec![]
+        } else {
+            from_value::<Vec<TagEntry>>(result)
+                .expect("Json was unable to deserialize to Vec<TagEntry>!")
+        }
     }
 
+    #[deprecated(
+        since = "1.5.6",
+        note = "This code is no longer needed since the alias checker has to \
+    send a general search to the api, rather than id specific."
+    )]
+    // TODO: This is no longer valid and will need the id to be appended to the url.
     /// Gets tags by their ID.
     pub fn get_tag_by_id(&self, id: &str) -> TagEntry {
         self.check_result(
@@ -441,26 +629,27 @@ impl RequestSender {
         self.check_result(
             self.client
                 .get(&self.urls.borrow()["alias"])
-                .query(&[("query", tag)])
+                .query(&[("search[antecedent_name]", tag)])
                 .send(),
         )
         .json()
         .expect("Json was unable to deserialize to Vec<AliasEntry>!")
     }
 
+    // TODO: This is so incredibly broken now as a blacklist url no longer even exists.
     /// Gets the blacklist and returns the value.
-    pub fn get_blacklist(&self, login: &Login) -> Value {
+    pub fn get_blacklist(&self, login: &Login) -> UserEntry {
         self.check_result(
             self.client
-                .get(&self.urls.borrow()["blacklist"])
+                .get(&self.append_url(&self.urls.borrow()["user"], &login.user_id))
                 .query(&[
                     ("login", login.username.as_str()),
-                    ("password_hash", login.password_hash.as_str()),
+                    ("api_key", login.password_hash.as_str()),
                 ])
                 .send(),
         )
         .json()
-        .expect("Json was unable to deserialize to Value!")
+        .expect("Json was unable to deserialize to User entry!")
     }
 }
 

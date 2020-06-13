@@ -3,7 +3,7 @@ extern crate failure;
 use failure::Error;
 
 use crate::e621::io::parser::Parser;
-use crate::e621::sender::PostEntry;
+use crate::e621::sender::{PostEntry, RequestSender, UserEntry};
 
 /// Parsed line token that contains all collected [`TagToken`]s on single input line.
 #[derive(Debug)]
@@ -236,7 +236,6 @@ fn valid_id(c: char) -> bool {
 /// This will ensure that there aren't any unexpected behavior, or issues with the worker that weren't noticed.
 /// A good thing to focus on is how many posts are blacklisted in total.
 /// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted, it's safe to assume there is a problem with how the worker is blacklisting posts.
-#[derive(Default)]
 struct FlagWorker {
     /// The margin of how many flags that should be raised before a post is determined to be blacklisted
     margin: i16,
@@ -244,12 +243,23 @@ struct FlagWorker {
     negated_margin: i16,
     /// Whether the post is flagged or not
     flagged: bool,
+    request_sender: RequestSender,
 }
 
 impl FlagWorker {
+    pub fn new(request_sender: RequestSender) -> Self {
+        FlagWorker {
+            margin: 0,
+            negated_margin: 0,
+            flagged: false,
+            request_sender,
+        }
+    }
+
     /// Resets the flag worker for the next post.
     fn reset_worker(&mut self) {
-        *self = Self::default();
+        let request_sender = self.request_sender.clone();
+        *self = Self::new(request_sender);
     }
 
     /// Sets margin for how many flags need to be raised before the post is either blacklisted or considered safe.
@@ -272,7 +282,9 @@ impl FlagWorker {
     fn flag_rating(&self, flags: &mut i16, tag: &TagToken, post: &PostEntry) {
         match tag.rating {
             Rating::Safe | Rating::Questionable | Rating::Explicit => match post.rating.as_str() {
-                "s" | "q" | "e" => *flags += 1,
+                "s" | "q" | "e" => {
+                    *flags += 1;
+                }
                 _ => {}
             },
             Rating::None => unreachable!(),
@@ -297,7 +309,11 @@ impl FlagWorker {
     fn flag_user(&mut self, tag: &TagToken, post: &PostEntry) -> bool {
         if tag.is_user() {
             if let Some(username) = &tag.user {
-                if post.author == *username {
+                // Calls for a user entry to obtain the username for flagging.
+                let user: UserEntry = self
+                    .request_sender
+                    .get_entry_from_appended_id(&format!("{}", post.uploader_id), "user");
+                if user.name == *username {
                     self.flagged = true;
                     return true;
                 }
@@ -311,6 +327,7 @@ impl FlagWorker {
     fn check_post(&mut self, post: &PostEntry, blacklist_line: &LineToken) {
         let mut flags: i16 = 0;
         let mut negated_flags: i16 = 0;
+        let post_tags = post.tags.clone().combine_tags();
         for tag in &blacklist_line.tags {
             if tag.is_special() {
                 if self.flag_id(tag, post) {
@@ -325,7 +342,7 @@ impl FlagWorker {
                     self.flag_rating(&mut flags, tag, post);
                     continue;
                 }
-            } else if post.tags.split(' ').any(|e| e == tag.tag.as_str()) {
+            } else if post_tags.iter().any(|e| e == tag.tag.as_str()) {
                 if tag.is_negated() {
                     negated_flags += 1;
                 } else {
@@ -359,9 +376,9 @@ impl Blacklist {
     }
 
     /// Filters through a set of posts, only retaining posts that aren't blacklisted.
-    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
+    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>, request_sender: &RequestSender) {
         let mut filtered: u16 = 0;
-        let mut flag_worker = FlagWorker::default();
+        let mut flag_worker = FlagWorker::new(request_sender.clone());
         let mut blacklist_parser = BlacklistParser::default();
         for blacklist_entry in &self.blacklist_entries {
             blacklist_parser.parser = Parser {

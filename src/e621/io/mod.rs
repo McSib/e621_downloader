@@ -82,6 +82,8 @@ pub struct Login {
     /// The password hash (also known as the API key) for the user.
     #[serde(rename = "PasswordHash")]
     pub password_hash: String,
+    #[serde(rename = "UserID")]
+    pub user_id: String,
     /// Whether or not the user wishes to download their favorites.
     #[serde(rename = "DownloadFavorites")]
     pub download_favorites: bool,
@@ -134,6 +136,7 @@ impl Default for Login {
         Login {
             username: String::new(),
             password_hash: String::new(),
+            user_id: String::new(),
             download_favorites: true,
         }
     }

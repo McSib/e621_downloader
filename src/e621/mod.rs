@@ -5,7 +5,7 @@ extern crate indicatif;
 use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 
-use dialoguer::Confirmation;
+use dialoguer::Confirm;
 use failure::Error;
 use indicatif::ProgressBar;
 
@@ -61,8 +61,8 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
-        let confirmation_result = Confirmation::new()
-            .with_text("Should enter safe mode?")
+        let confirmation_result = Confirm::new()
+            .with_prompt("Should enter safe mode?")
             .default(false)
             .interact();
         if confirmation_result.unwrap_or_default() {

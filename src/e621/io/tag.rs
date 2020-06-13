@@ -167,7 +167,7 @@ impl TagIdentifier {
         for tag in tags {
             temp_tag = match self.request_sender.get_tags_by_name(tag).first() {
                 Some(entry) => self.create_tag(tag_str, entry),
-                None => self.create_tag(tag_str, &self.is_alias(tag)),
+                None => self.create_tag(tag_str, &self.get_tag_from_alias(tag)),
             };
 
             if temp_tag.search_type == TagCategory::Special {
@@ -179,18 +179,17 @@ impl TagIdentifier {
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
-    fn is_alias(&self, tag: &str) -> TagEntry {
-        // TODO: Checking if a tag is an alias is much simpler now, so this needs to be changed.
+    fn get_tag_from_alias(&self, tag: &str) -> TagEntry {
         let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag);
         let entry = alias_entries
             .first()
             .unwrap_or_fail(|| self.exit_tag_failure(&tag));
-        let tag_entry: TagEntry = self
-            .request_sender
-            .get_tag_by_id(&format!("{}", entry.alias_id));
-        return tag_entry;
-
-        unreachable!()
+        // Is there possibly a way to make this better?
+        self.request_sender
+            .get_tags_by_name(entry.consequent_name.as_str())
+            .first()
+            .unwrap()
+            .clone()
     }
 
     /// Emergency exits if a tag isn't identified.

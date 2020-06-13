@@ -1,13 +1,14 @@
 extern crate reqwest;
 extern crate serde_json;
 
-use reqwest::Url;
 use serde_json::Value;
 
 use crate::e621::blacklist::Blacklist;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
 use crate::e621::io::Login;
-use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
+use crate::e621::sender::{
+    BulkPostEntry, PoolEntry, PostEntry, RequestSender, SetEntry, UserEntry,
+};
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
@@ -45,13 +46,8 @@ impl GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
         GrabbedPost {
-            file_url: post.file.url.clone(),
-            file_name: format!(
-                "{}{:04}.{}",
-                name,
-                current_page,
-                post.file.ext
-            ),
+            file_url: post.file.url.clone().unwrap(),
+            file_name: format!("{}{:04}.{}", name, current_page, post.file.ext),
             file_size: post.file.size,
         }
     }
@@ -61,8 +57,8 @@ impl From<PostEntry> for GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     fn from(post: PostEntry) -> Self {
         GrabbedPost {
-            file_url: post.file.url.clone(),
-            file_name: post.file.md5.clone(),
+            file_url: post.file.url.clone().unwrap(),
+            file_name: format!("{}.{}", post.file.md5, post.file.ext),
             file_size: post.file.size,
         }
     }
@@ -134,11 +130,12 @@ impl Grabber {
             Login::default()
         });
         if !login.is_empty() {
-            let json: Value = self.request_sender.get_blacklist(&login);
-            let blacklist_string = json["blacklist"]
-                .to_string()
+            let user: UserEntry = self.request_sender.get_blacklist(&login);
+            let blacklist_string = user
+                .blacklisted_tags
+                .unwrap()
                 .trim_matches('\"')
-                .replace("\\n", "\n");
+                .to_string();
             let blacklist_entries: Vec<String> =
                 blacklist_string.lines().map(|e| e.to_string()).collect();
             self.blacklist = if !blacklist_entries.is_empty() {
@@ -171,18 +168,23 @@ impl Grabber {
             for tag in &group.tags {
                 match tag.tag_type {
                     TagType::Pool => {
-                        let (name, posts) = self.get_posts_from_pool(&tag.raw);
+                        let entry: PoolEntry = self
+                            .request_sender
+                            .get_entry_from_appended_id(&tag.raw, "pool");
+                        let name = &entry.name;
+                        let posts = self.special_search(&format!("pool:{}", entry.id));
                         self.grabbed_posts.push(PostSet::new(
-                            &name,
+                            name,
                             "Pools",
-                            GrabbedPost::entry_to_pool_vec(posts, &name),
+                            GrabbedPost::entry_to_pool_vec(posts, name),
                         ));
 
                         println!("\"{}\" grabbed!", name);
                     }
                     TagType::Set => {
-                        let entry: SetEntry =
-                            self.request_sender.get_entry_from_id(&tag.raw, "set");
+                        let entry: SetEntry = self
+                            .request_sender
+                            .get_entry_from_appended_id(&tag.raw, "set");
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
                         self.grabbed_posts
@@ -191,8 +193,9 @@ impl Grabber {
                         println!("\"{}\" grabbed!", entry.name);
                     }
                     TagType::Post => {
-                        let entry: PostEntry =
-                            self.request_sender.get_entry_from_id(&tag.raw, "single");
+                        let entry: PostEntry = self
+                            .request_sender
+                            .get_entry_from_appended_id(&tag.raw, "single");
                         let id = entry.id;
                         self.grabbed_single_posts
                             .posts
@@ -215,6 +218,10 @@ impl Grabber {
         }
     }
 
+    #[deprecated(
+        since = "1.5.6",
+        note = "Avoid this function as it uses the old API system."
+    )]
     /// Grabs all posts from pool.
     pub fn get_posts_from_pool(&self, id: &str) -> (String, Vec<PostEntry>) {
         let mut page: u16 = 1;
@@ -237,7 +244,7 @@ impl Grabber {
                 posts = Vec::with_capacity(searched_pool.post_count as usize);
             }
 
-            posts.append(&mut searched_pool.posts);
+            // posts.append(&mut searched_pool.posts);
             page += 1;
         }
 
@@ -259,14 +266,16 @@ impl Grabber {
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
         for page in 1..limit {
             let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page);
+                self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }
 
             if let Some(ref e) = self.blacklist {
-                e.filter_posts(&mut searched_posts);
+                e.filter_posts(&mut searched_posts, &self.request_sender);
             }
+
+            self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
@@ -281,14 +290,16 @@ impl Grabber {
         let mut posts: Vec<PostEntry> = vec![];
         loop {
             let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page);
+                self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }
 
             if let Some(ref e) = self.blacklist {
-                e.filter_posts(&mut searched_posts);
+                e.filter_posts(&mut searched_posts, &self.request_sender);
             }
+
+            self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
@@ -296,5 +307,26 @@ impl Grabber {
         }
 
         posts
+    }
+
+    fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) {
+        // Sometimes, even if a post is available, the url for it isn't;
+        // To handle this, the vector will retain only the posts that has an available url.
+        let mut invalid_posts = 0;
+        posts.retain(|e| {
+            if !e.flags.deleted {
+                true
+            } else {
+                invalid_posts += 1;
+                false
+            }
+        });
+
+        if invalid_posts > 0 {
+            println!(
+                "Over {} posts had to be filtered because the file url wasn't available.",
+                invalid_posts
+            )
+        }
     }
 }
