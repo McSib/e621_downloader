@@ -5,6 +5,7 @@ authors = ["MightyChubz <theradcast16@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+base64-url = "1.2.0"
 dialoguer = "0.6.2"
 indicatif = "0.14.0"
 reqwest = { version = "0.10.6", features = ["blocking", "json"] }

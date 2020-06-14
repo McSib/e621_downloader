@@ -136,6 +136,7 @@ impl Grabber {
                 .unwrap()
                 .trim_matches('\"')
                 .to_string();
+            println!("{}", blacklist_string);
             let blacklist_entries: Vec<String> =
                 blacklist_string.lines().map(|e| e.to_string()).collect();
             self.blacklist = if !blacklist_entries.is_empty() {
@@ -271,9 +272,9 @@ impl Grabber {
                 break;
             }
 
-            if let Some(ref e) = self.blacklist {
-                e.filter_posts(&mut searched_posts, &self.request_sender);
-            }
+            // if let Some(ref e) = self.blacklist {
+            //     e.filter_posts(&mut searched_posts, &self.request_sender);
+            // }
 
             self.remove_invalid_posts(&mut searched_posts);
 
@@ -295,9 +296,9 @@ impl Grabber {
                 break;
             }
 
-            if let Some(ref e) = self.blacklist {
-                e.filter_posts(&mut searched_posts, &self.request_sender);
-            }
+            // if let Some(ref e) = self.blacklist {
+            //     e.filter_posts(&mut searched_posts, &self.request_sender);
+            // }
 
             self.remove_invalid_posts(&mut searched_posts);
 
@@ -314,7 +315,7 @@ impl Grabber {
         // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
         posts.retain(|e| {
-            if !e.flags.deleted {
+            if !e.flags.deleted && e.file.url != None {
                 true
             } else {
                 invalid_posts += 1;

@@ -12,6 +12,7 @@ use reqwest::header::USER_AGENT;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
+use self::reqwest::header::{AUTHORIZATION, WWW_AUTHENTICATE};
 use self::serde_json::{from_value, to_string, Value};
 use crate::e621::io::tag::TagType;
 use crate::e621::io::{emergency_exit, Login};
@@ -328,13 +329,15 @@ const USER_AGENT_VALUE: &str = "e621_downloader/1.5.6 (by McSib on e621)";
 struct SenderClient {
     /// `Client` wrapped in a `Rc` so only one instance of the client exists. This will prevent an overabundance of clients in the code.
     client: Rc<Client>,
+    auth: Rc<String>,
 }
 
 impl SenderClient {
     /// Creates root client for the `SenderClient`.
-    fn new() -> Self {
+    fn new(auth: String) -> Self {
         SenderClient {
             client: Rc::new(SenderClient::build_client()),
+            auth: Rc::new(auth),
         }
     }
 
@@ -342,7 +345,6 @@ impl SenderClient {
     /// Cookies aren't stored in the client, TCP_NODELAY is on, and timeout is changed from 30 seconds to 60.
     fn build_client() -> Client {
         Client::builder()
-            .tcp_nodelay()
             .timeout(Duration::from_secs(60))
             .build()
             .unwrap_or_else(|_| Client::new())
@@ -351,7 +353,10 @@ impl SenderClient {
     /// A wrapping function that acts the exact same as `self.client.get` but will instead attach the user agent header before returning the `RequestBuilder`.
     /// This will ensure that all requests sent have the proper user agent info.
     pub fn get(&self, url: &str) -> RequestBuilder {
-        self.client.get(url).header(USER_AGENT, USER_AGENT_VALUE)
+        self.client
+            .get(url)
+            .header(USER_AGENT, USER_AGENT_VALUE)
+            .header(AUTHORIZATION, self.auth.as_str())
     }
 }
 
@@ -360,6 +365,7 @@ impl Clone for SenderClient {
     fn clone(&self) -> Self {
         SenderClient {
             client: self.client.clone(),
+            auth: self.auth.clone(),
         }
     }
 }
@@ -376,9 +382,9 @@ pub struct RequestSender {
 
 // TODO: All API calls here need to be rewritten for the new API, none of these requests will work.
 impl RequestSender {
-    pub fn new() -> Self {
+    pub fn new(user_auth: String) -> Self {
         RequestSender {
-            client: SenderClient::new(),
+            client: SenderClient::new(user_auth),
             urls: Rc::new(RefCell::new(RequestSender::initialize_url_map())),
         }
     }
@@ -642,10 +648,10 @@ impl RequestSender {
         self.check_result(
             self.client
                 .get(&self.append_url(&self.urls.borrow()["user"], &login.user_id))
-                .query(&[
-                    ("login", login.username.as_str()),
-                    ("api_key", login.password_hash.as_str()),
-                ])
+                // .query(&[
+                //     ("login", login.username.as_str()),
+                //     ("api_key", login.password_hash.as_str()),
+                // ])
                 .send(),
         )
         .json()
