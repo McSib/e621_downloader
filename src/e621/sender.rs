@@ -323,7 +323,7 @@ pub struct UserEntry {
 }
 
 /// Default user agent value.
-const USER_AGENT_VALUE: &str = "e621_downloader/1.5.6 (by McSib on e621)";
+const USER_AGENT_VALUE: &str = "e621_downloader/1.6.0 (by McSib on e621)";
 
 /// Sender client is a modified form of the generic client, wrapping the client in a `Rc` so the sender client can be cloned without creating another instance of the root client.
 struct SenderClient {
