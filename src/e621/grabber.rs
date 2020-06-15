@@ -272,10 +272,7 @@ impl Grabber {
                 break;
             }
 
-            // if let Some(ref e) = self.blacklist {
-            //     e.filter_posts(&mut searched_posts, &self.request_sender);
-            // }
-
+            self.filter_posts_with_blacklist(&mut searched_posts);
             self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
@@ -296,10 +293,7 @@ impl Grabber {
                 break;
             }
 
-            // if let Some(ref e) = self.blacklist {
-            //     e.filter_posts(&mut searched_posts, &self.request_sender);
-            // }
-
+            self.filter_posts_with_blacklist(&mut searched_posts);
             self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
@@ -308,6 +302,14 @@ impl Grabber {
         }
 
         posts
+    }
+
+    fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) {
+        if self.request_sender.is_authenticated() {
+            if let Some(ref e) = self.blacklist {
+                e.filter_posts(posts, &self.request_sender);
+            }
+        }
     }
 
     fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) {

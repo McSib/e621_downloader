@@ -353,10 +353,16 @@ impl SenderClient {
     /// A wrapping function that acts the exact same as `self.client.get` but will instead attach the user agent header before returning the `RequestBuilder`.
     /// This will ensure that all requests sent have the proper user agent info.
     pub fn get(&self, url: &str) -> RequestBuilder {
-        self.client
-            .get(url)
-            .header(USER_AGENT, USER_AGENT_VALUE)
-            .header(AUTHORIZATION, self.auth.as_str())
+        self.client.get(url).header(USER_AGENT, USER_AGENT_VALUE)
+    }
+
+    /// This is the same as `self.get(url)` but will attach the authorization header with username and API hash.
+    pub fn get_with_auth(&self, url: &str) -> RequestBuilder {
+        if self.auth.is_empty() {
+            self.get(url)
+        } else {
+            self.get(url).header(AUTHORIZATION, self.auth.as_str())
+        }
     }
 }
 
@@ -382,9 +388,15 @@ pub struct RequestSender {
 
 // TODO: All API calls here need to be rewritten for the new API, none of these requests will work.
 impl RequestSender {
-    pub fn new(user_auth: String) -> Self {
+    pub fn new(login: Login) -> Self {
+        let auth = if login.is_empty() {
+            String::new()
+        } else {
+            base64_url::encode(format!("{}:{}", login.username, login.api_key).as_str())
+        };
+
         RequestSender {
-            client: SenderClient::new(user_auth),
+            client: SenderClient::new(auth),
             urls: Rc::new(RefCell::new(RequestSender::initialize_url_map())),
         }
     }
@@ -407,6 +419,10 @@ impl RequestSender {
             ("alias", "https://e621.net/tag_aliases.json"),
             ("user", "https://e621.net/users/")
         ]
+    }
+
+    pub fn is_authenticated(&self) -> bool {
+        !self.client.auth.is_empty()
     }
 
     /// Updates all the urls from e621 to e926.
@@ -533,7 +549,7 @@ impl RequestSender {
         let value: Value = self
             .check_result(
                 self.client
-                    .get(&self.append_url(&self.urls.borrow()[url_type_key], id))
+                    .get_with_auth(&self.append_url(&self.urls.borrow()[url_type_key], id))
                     .send(),
             )
             .json()
@@ -581,7 +597,7 @@ impl RequestSender {
         // write("posts.json", to_string(&json).unwrap()).unwrap();
         self.check_result(
             self.client
-                .get(&self.urls.borrow()["posts"])
+                .get_with_auth(&self.urls.borrow()["posts"])
                 .query(&[
                     ("tags", searching_tag),
                     ("page", &format!("{}", page)),
@@ -647,7 +663,7 @@ impl RequestSender {
     pub fn get_blacklist(&self, login: &Login) -> UserEntry {
         self.check_result(
             self.client
-                .get(&self.append_url(&self.urls.borrow()["user"], &login.user_id))
+                .get_with_auth(&self.append_url(&self.urls.borrow()["user"], &login.user_id))
                 // .query(&[
                 //     ("login", login.username.as_str()),
                 //     ("api_key", login.password_hash.as_str()),

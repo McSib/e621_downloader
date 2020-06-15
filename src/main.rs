@@ -21,9 +21,14 @@ fn main() -> Result<(), Error> {
 
     // Creates connector and requester to prepare for downloading posts.
     let login = Login::load().unwrap();
-    let request_sender = RequestSender::new(base64_url::encode(
-        format!("{}:{}", login.username, login.password_hash).as_str(),
-    ));
+    // let request_sender = if login.is_empty() {
+    //     RequestSender::new(String::new())
+    // } else {
+    //     RequestSender::new(base64_url::encode(
+    //         format!("{}:{}", login.username, login.api_key).as_str(),
+    //     ))
+    // };
+    let request_sender = RequestSender::new(login);
     let mut connector = WebConnector::new(&request_sender);
     connector.should_enter_safe_mode();
 
