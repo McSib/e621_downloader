@@ -9,6 +9,8 @@ use crate::e621::io::Login;
 use crate::e621::sender::{
     BulkPostEntry, PoolEntry, PostEntry, RequestSender, SetEntry, UserEntry,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
@@ -65,7 +67,7 @@ impl From<PostEntry> for GrabbedPost {
 }
 
 /// A set of posts with category and name.
-pub struct PostSet {
+pub struct PostCollection {
     /// The name of the set.
     pub set_name: String,
     /// The category of the set.
@@ -74,9 +76,9 @@ pub struct PostSet {
     pub posts: Vec<GrabbedPost>,
 }
 
-impl PostSet {
+impl PostCollection {
     pub fn new(set_name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
-        PostSet {
+        PostCollection {
             set_name: set_name.to_string(),
             category: category.to_string(),
             posts,
@@ -85,28 +87,25 @@ impl PostSet {
 
     /// Converts `SetEntry` to `Self`.
     pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
-        PostSet::new(&set.name, "Sets", posts)
+        PostCollection::new(&set.name, "Sets", posts)
     }
 }
 
 /// Grabs all posts under a set of searching tags.
 pub struct Grabber {
     /// All grabbed posts.
-    pub grabbed_posts: Vec<PostSet>,
-    /// All grabbed single posts.
-    pub grabbed_single_posts: PostSet,
+    pub posts: Vec<PostCollection>,
     /// `RequestSender` for sending API calls.
     request_sender: RequestSender,
     /// Blacklist used to throwaway posts that contain tags the user may not want.
-    blacklist: Option<Blacklist>,
+    blacklist: Option<Rc<RefCell<Blacklist>>>,
 }
 
 impl Grabber {
     /// Creates new instance of `Self`.
     pub fn new(request_sender: RequestSender) -> Self {
         Grabber {
-            grabbed_posts: Vec::new(),
-            grabbed_single_posts: PostSet::new("Single Posts", "", Vec::new()),
+            posts: vec![PostCollection::new("Single Posts", "", Vec::new())],
             request_sender,
             blacklist: None,
         }
@@ -117,10 +116,20 @@ impl Grabber {
         let mut grabber = Grabber::new(request_sender);
         grabber.grab_blacklist();
         grabber.grab_favorites();
-        grabber.grab_tags(groups);
+        grabber.grab_posts_by_tags(groups);
         grabber
     }
 
+    pub fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
+        if !blacklist.borrow_mut().is_empty() {
+            self.blacklist = Some(blacklist);
+        }
+    }
+
+    #[deprecated(
+        since = "1.5.6",
+        note = "This has been deprecated as the new blacklist system is being developed."
+    )]
     /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
     /// This should be the only time the connector ever logs in.
     pub fn grab_blacklist(&mut self) {
@@ -139,11 +148,11 @@ impl Grabber {
             println!("{}", blacklist_string);
             let blacklist_entries: Vec<String> =
                 blacklist_string.lines().map(|e| e.to_string()).collect();
-            self.blacklist = if !blacklist_entries.is_empty() {
-                Some(Blacklist::new(blacklist_entries))
-            } else {
-                None
-            };
+            // self.blacklist = if !blacklist_entries.is_empty() {
+            //     Some(Blacklist::new(blacklist_entries))
+            // } else {
+            //     None
+            // };
         }
     }
 
@@ -157,14 +166,17 @@ impl Grabber {
         if !login.username.is_empty() && login.download_favorites {
             let tag_str = format!("fav:{}", login.username);
             let posts = self.special_search(tag_str.as_str());
-            self.grabbed_posts
-                .push(PostSet::new(&tag_str, "", GrabbedPost::entry_to_vec(posts)));
+            self.posts.push(PostCollection::new(
+                &tag_str,
+                "",
+                GrabbedPost::entry_to_vec(posts),
+            ));
             println!("\"{}\" grabbed!", tag_str);
         }
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
-    pub fn grab_tags(&mut self, groups: &[Group]) {
+    pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
         for group in groups {
             for tag in &group.tags {
                 match tag.tag_type {
@@ -174,7 +186,7 @@ impl Grabber {
                             .get_entry_from_appended_id(&tag.raw, "pool");
                         let name = &entry.name;
                         let posts = self.special_search(&format!("pool:{}", entry.id));
-                        self.grabbed_posts.push(PostSet::new(
+                        self.posts.push(PostCollection::new(
                             name,
                             "Pools",
                             GrabbedPost::entry_to_pool_vec(posts, name),
@@ -188,8 +200,10 @@ impl Grabber {
                             .get_entry_from_appended_id(&tag.raw, "set");
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
-                        self.grabbed_posts
-                            .push(PostSet::from_set(&entry, GrabbedPost::entry_to_vec(posts)));
+                        self.posts.push(PostCollection::from_set(
+                            &entry,
+                            GrabbedPost::entry_to_vec(posts),
+                        ));
 
                         println!("\"{}\" grabbed!", entry.name);
                     }
@@ -198,7 +212,9 @@ impl Grabber {
                             .request_sender
                             .get_entry_from_appended_id(&tag.raw, "single");
                         let id = entry.id;
-                        self.grabbed_single_posts
+                        self.posts
+                            .first_mut()
+                            .unwrap()
                             .posts
                             .push(GrabbedPost::from(entry));
 
@@ -206,7 +222,7 @@ impl Grabber {
                     }
                     TagType::General | TagType::Artist => {
                         let posts = self.get_posts_from_tag(tag);
-                        self.grabbed_posts.push(PostSet::new(
+                        self.posts.push(PostCollection::new(
                             &tag.raw,
                             "General Searches",
                             GrabbedPost::entry_to_vec(posts),
@@ -228,7 +244,6 @@ impl Grabber {
         let mut page: u16 = 1;
         let mut name = String::new();
         let mut posts: Vec<PostEntry> = vec![];
-        // TODO: Since all posts are now grabbed when the pool entry is grabbed, looping is no longer needed for pages
         loop {
             let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page);
             if searched_pool.post_ids.is_empty() {
@@ -306,8 +321,8 @@ impl Grabber {
 
     fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) {
         if self.request_sender.is_authenticated() {
-            if let Some(ref e) = self.blacklist {
-                e.filter_posts(posts, &self.request_sender);
+            if let Some(ref blacklist) = self.blacklist {
+                blacklist.borrow_mut().filter_posts(posts);
             }
         }
     }

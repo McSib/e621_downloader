@@ -28,7 +28,7 @@ fn main() -> Result<(), Error> {
     //         format!("{}:{}", login.username, login.api_key).as_str(),
     //     ))
     // };
-    let request_sender = RequestSender::new(login);
+    let request_sender = RequestSender::new(&login);
     let mut connector = WebConnector::new(&request_sender);
     connector.should_enter_safe_mode();
 
@@ -37,8 +37,9 @@ fn main() -> Result<(), Error> {
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.
-    let grabbed_posts = connector.grab_posts(&groups);
-    connector.download_grabbed_posts(grabbed_posts)?;
+    connector.process_blacklist(&login.user_id);
+    connector.grab_posts(&groups);
+    connector.download_posts();
 
     Ok(())
 }

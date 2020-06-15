@@ -386,9 +386,8 @@ pub struct RequestSender {
     urls: Rc<RefCell<HashMap<String, String>>>,
 }
 
-// TODO: All API calls here need to be rewritten for the new API, none of these requests will work.
 impl RequestSender {
-    pub fn new(login: Login) -> Self {
+    pub fn new(login: &Login) -> Self {
         let auth = if login.is_empty() {
             String::new()
         } else {
@@ -405,15 +404,10 @@ impl RequestSender {
     fn initialize_url_map() -> HashMap<String, String> {
         hashmap![
             ("posts", "https://e621.net/posts.json"),
-            // TODO: Pools must now have the supplied id appended.
             ("pool", "https://e621.net/pools/"),
-            // TODO: Sets must now have the supplied id appended.
             ("set", "https://e621.net/post_sets/"),
-            // TODO: Single posts requires the proper ID to be appended to the url.
             ("single", "https://e621.net/posts/"),
-            // TODO: The blacklist url requires the user to be logged in, as well as there ID being supplied.
             ("blacklist", "https://e621.net/users/"),
-            // TODO: Single tags requires the proper ID to be appended to the url.
             ("tag", "https://e621.net/tags/"),
             ("tag_bulk", "https://e621.net/tags.json"),
             ("alias", "https://e621.net/tag_aliases.json"),
@@ -566,7 +560,6 @@ impl RequestSender {
         since = "1.5.6",
         note = "This uses the old API to grab the pool and is no longer used for the new API"
     )]
-    // TODO: This actually needs to be updated now since there is a simpler way of gathering all the posts without burning the API server.
     /// Get a single pool entry by ID and grabbing a page of posts from it.
     pub fn get_pool_entry(&self, id: &str, page: u16) -> PoolEntry {
         self.check_result(
@@ -633,7 +626,6 @@ impl RequestSender {
         note = "This code is no longer needed since the alias checker has to \
     send a general search to the api, rather than id specific."
     )]
-    // TODO: This is no longer valid and will need the id to be appended to the url.
     /// Gets tags by their ID.
     pub fn get_tag_by_id(&self, id: &str) -> TagEntry {
         self.check_result(
@@ -658,7 +650,7 @@ impl RequestSender {
         .expect("Json was unable to deserialize to Vec<AliasEntry>!")
     }
 
-    // TODO: This is so incredibly broken now as a blacklist url no longer even exists.
+    // FIXME: This function could do with some nice cleaning.
     /// Gets the blacklist and returns the value.
     pub fn get_blacklist(&self, login: &Login) -> UserEntry {
         self.check_result(
