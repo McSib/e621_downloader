@@ -49,7 +49,7 @@ struct TagToken {
     /// If the tag is a user, this will contain the username
     user: Option<String>,
     /// The tag (value for special tags)
-    tag: String,
+    name: String,
 }
 
 impl TagToken {
@@ -81,7 +81,7 @@ impl Default for TagToken {
             rating: Rating::None,
             id: None,
             user: None,
-            tag: String::new(),
+            name: String::new(),
         }
     }
 }
@@ -151,7 +151,7 @@ impl BlacklistParser {
             token.negated = true;
         }
 
-        token.tag = self.base_parser.consume_while(valid_tag).to_lowercase();
+        token.name = self.base_parser.consume_while(valid_tag).to_lowercase();
 
         // This will be considered a special tag if it contains the syntax of one.
         if !self.base_parser.eof() && self.base_parser.next_char() == ':' {
@@ -167,7 +167,7 @@ impl BlacklistParser {
     /// If identifier doesn't match with any of the match arms, it will fail and throw an `Error`.
     fn parse_special_tag(&mut self, token: &mut TagToken) {
         assert_eq!(self.base_parser.consume_char(), ':');
-        match token.tag.as_str() {
+        match token.name.as_str() {
             "rating" => {
                 let rating_string = self.base_parser.consume_while(valid_rating);
                 token.rating = self.get_rating(&rating_string);
@@ -347,7 +347,7 @@ impl FlagWorker {
         tag: &TagToken,
         uploader_id: i64,
     ) {
-        let user_id = tag.tag.parse::<i64>().expect("Failed to parse ID!");
+        let user_id = tag.name.parse::<i64>().expect("Failed to parse ID!");
         if user_id == uploader_id {
             if tag.negated {
                 *negated_flags += 1;
@@ -378,7 +378,7 @@ impl FlagWorker {
                     self.flag_rating(&mut flags, &mut negated_flags, tag, post);
                     continue;
                 }
-            } else if post_tags.iter().any(|e| e == tag.tag.as_str()) {
+            } else if post_tags.iter().any(|e| e == tag.name.as_str()) {
                 if tag.is_negated() {
                     negated_flags += 1;
                 } else {
@@ -433,7 +433,7 @@ impl Blacklist {
                     let user: UserEntry = self
                         .request_sender
                         .get_entry_from_appended_id(username, "user");
-                    tag.tag = format!("{}", user.id);
+                    tag.name = format!("{}", user.id);
                 }
             }
         }

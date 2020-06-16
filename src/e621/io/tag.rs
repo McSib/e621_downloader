@@ -62,11 +62,11 @@ pub enum TagType {
     None,
 }
 
-/// A tag that contains its raw name, search type, and tag type.
+/// A tag that contains its name, search type, and tag type.
 #[derive(Debug, Clone)]
 pub struct Tag {
-    /// The raw string of the tag.
-    pub raw: String,
+    /// The name of the tag.
+    pub name: String,
     /// The search type of the tag.
     pub search_type: TagCategory,
     /// The tag type of the tag.
@@ -76,7 +76,7 @@ pub struct Tag {
 impl Tag {
     fn new(tag: &str, category: TagCategory, tag_type: TagType) -> Self {
         Tag {
-            raw: String::from(tag),
+            name: String::from(tag),
             search_type: category,
             tag_type,
         }
@@ -86,7 +86,7 @@ impl Tag {
 impl Default for Tag {
     fn default() -> Self {
         Tag {
-            raw: String::new(),
+            name: String::new(),
             search_type: TagCategory::None,
             tag_type: TagType::None,
         }

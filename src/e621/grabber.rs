@@ -140,7 +140,7 @@ impl Grabber {
                     TagType::Pool => {
                         let entry: PoolEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.raw, "pool");
+                            .get_entry_from_appended_id(&tag.name, "pool");
                         let name = &entry.name;
                         let posts = self.special_search(&format!("pool:{}", entry.id));
                         self.posts.push(PostCollection::new(
@@ -154,7 +154,7 @@ impl Grabber {
                     TagType::Set => {
                         let entry: SetEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.raw, "set");
+                            .get_entry_from_appended_id(&tag.name, "set");
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
                         self.posts.push(PostCollection::from_set(
@@ -167,7 +167,7 @@ impl Grabber {
                     TagType::Post => {
                         let entry: PostEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.raw, "single");
+                            .get_entry_from_appended_id(&tag.name, "single");
                         let id = entry.id;
                         self.posts
                             .first_mut()
@@ -180,11 +180,11 @@ impl Grabber {
                     TagType::General | TagType::Artist => {
                         let posts = self.get_posts_from_tag(tag);
                         self.posts.push(PostCollection::new(
-                            &tag.raw,
+                            &tag.name,
                             "General Searches",
                             GrabbedPost::entry_to_vec(posts),
                         ));
-                        println!("\"{}\" grabbed!", tag.raw);
+                        println!("\"{}\" grabbed!", tag.name);
                     }
                     TagType::None => unreachable!(),
                 };
@@ -195,8 +195,8 @@ impl Grabber {
     /// Grabs posts from general tag.
     fn get_posts_from_tag(&mut self, tag: &Tag) -> Vec<PostEntry> {
         match tag.search_type {
-            TagCategory::General => self.general_search(&tag.raw),
-            TagCategory::Special => self.special_search(&tag.raw),
+            TagCategory::General => self.general_search(&tag.name),
+            TagCategory::Special => self.special_search(&tag.name),
             TagCategory::None => unreachable!(),
         }
     }
