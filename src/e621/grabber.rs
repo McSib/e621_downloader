@@ -1,16 +1,10 @@
-extern crate reqwest;
-extern crate serde_json;
-
-use serde_json::Value;
-
-use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
-use crate::e621::io::Login;
-use crate::e621::sender::{
-    BulkPostEntry, PoolEntry, PostEntry, RequestSender, SetEntry, UserEntry,
-};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use crate::e621::blacklist::Blacklist;
+use crate::e621::io::Login;
+use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
+use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
@@ -111,48 +105,9 @@ impl Grabber {
         }
     }
 
-    /// Gets posts on creation using `groups` and searching with `request_sender`.
-    pub fn from_tags(groups: &[Group], request_sender: RequestSender) -> Grabber {
-        let mut grabber = Grabber::new(request_sender);
-        grabber.grab_blacklist();
-        grabber.grab_favorites();
-        grabber.grab_posts_by_tags(groups);
-        grabber
-    }
-
     pub fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
-        }
-    }
-
-    #[deprecated(
-        since = "1.5.6",
-        note = "This has been deprecated as the new blacklist system is being developed."
-    )]
-    /// If login information is supplied, the connector will log into the supplied account and obtain it's blacklist.
-    /// This should be the only time the connector ever logs in.
-    pub fn grab_blacklist(&mut self) {
-        let login = Login::load().unwrap_or_else(|e| {
-            println!("Unable to load `login.json`. Error: {}", e);
-            println!("The program will use default values, but it is highly recommended to check your login.json file to ensure that everything is correct.");
-            Login::default()
-        });
-        if !login.is_empty() {
-            let user: UserEntry = self.request_sender.get_blacklist(&login);
-            let blacklist_string = user
-                .blacklisted_tags
-                .unwrap()
-                .trim_matches('\"')
-                .to_string();
-            println!("{}", blacklist_string);
-            let blacklist_entries: Vec<String> =
-                blacklist_string.lines().map(|e| e.to_string()).collect();
-            // self.blacklist = if !blacklist_entries.is_empty() {
-            //     Some(Blacklist::new(blacklist_entries))
-            // } else {
-            //     None
-            // };
         }
     }
 
@@ -233,38 +188,6 @@ impl Grabber {
                 };
             }
         }
-    }
-
-    #[deprecated(
-        since = "1.5.6",
-        note = "Avoid this function as it uses the old API system."
-    )]
-    /// Grabs all posts from pool.
-    pub fn get_posts_from_pool(&self, id: &str) -> (String, Vec<PostEntry>) {
-        let mut page: u16 = 1;
-        let mut name = String::new();
-        let mut posts: Vec<PostEntry> = vec![];
-        loop {
-            let mut searched_pool: PoolEntry = self.request_sender.get_pool_entry(id, page);
-            if searched_pool.post_ids.is_empty() {
-                break;
-            }
-
-            if name.is_empty() {
-                name = searched_pool.name.clone();
-            }
-
-            // Sets the capacity to the total amount of posts in the pool
-            // so the next pages to add will be done quicker.
-            if posts.capacity() == 0 {
-                posts = Vec::with_capacity(searched_pool.post_count as usize);
-            }
-
-            // posts.append(&mut searched_pool.posts);
-            page += 1;
-        }
-
-        (name, posts)
     }
 
     /// Grabs posts from general tag.

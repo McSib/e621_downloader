@@ -8,15 +8,14 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use reqwest::blocking::{Client, RequestBuilder, Response};
+use reqwest::header::AUTHORIZATION;
 use reqwest::header::USER_AGENT;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde_json::{from_value, Value};
 
-use self::reqwest::header::{AUTHORIZATION, WWW_AUTHENTICATE};
-use self::serde_json::{from_value, to_string, Value};
-use crate::e621::io::tag::TagType;
 use crate::e621::io::{emergency_exit, Login};
-use std::fs::write;
+use crate::e621::io::tag::TagType;
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -501,45 +500,10 @@ impl RequestSender {
         format!("{}{}.json", url, append)
     }
 
-    #[deprecated(
-        since = "1.5.6",
-        note = "This uses old workarounds and loopholes in the old API to make lesser calls to it. \
-        This no longer works with the new API."
-    )]
-    /// Gets an entry of `T` by their ID and returns it.
-    pub fn get_entry_from_id<T>(&self, id: &str, url_type_key: &str) -> T
-    where
-        T: DeserializeOwned,
-    {
-        self.check_result(
-            self.client
-                .get(&self.urls.borrow()[url_type_key])
-                .query(&[("search[id]", id)])
-                .send(),
-        )
-        .json()
-        .expect("Json was unable to deserialize to entry!")
-    }
-
     pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
-    where
-        T: DeserializeOwned,
+        where
+            T: DeserializeOwned,
     {
-        // let json: Value = self
-        //     .check_result(
-        //         self.client
-        //             .get(&self.append_url(&self.urls.borrow()[url_type_key], id))
-        //             .send(),
-        //     )
-        //     .json()
-        //     .unwrap();
-        // let result = if url_type_key == "single" {
-        //     json.get("post").unwrap().clone()
-        // } else {
-        //     json
-        // };
-        // write("posts.json", to_string(&result).unwrap()).unwrap();
-
         let value: Value = self
             .check_result(
                 self.client
@@ -556,38 +520,8 @@ impl RequestSender {
         }
     }
 
-    #[deprecated(
-        since = "1.5.6",
-        note = "This uses the old API to grab the pool and is no longer used for the new API"
-    )]
-    /// Get a single pool entry by ID and grabbing a page of posts from it.
-    pub fn get_pool_entry(&self, id: &str, page: u16) -> PoolEntry {
-        self.check_result(
-            self.client
-                .get(&self.urls.borrow()["pool"])
-                .query(&[("id", id), ("page", &page.to_string())])
-                .send(),
-        )
-        .json()
-        .expect("Json was unable to deserialize to PoolEntry!")
-    }
-
     /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
-        // let json: Value = self
-        //     .check_result(
-        //         self.client
-        //             .get(&self.urls.borrow()["posts"])
-        //             .query(&[
-        //                 ("tags", searching_tag),
-        //                 ("page", &format!("{}", page)),
-        //                 ("limit", &format!("{}", 320)),
-        //             ])
-        //             .send(),
-        //     )
-        //     .json()
-        //     .unwrap();
-        // write("posts.json", to_string(&json).unwrap()).unwrap();
         self.check_result(
             self.client
                 .get_with_auth(&self.urls.borrow()["posts"])
@@ -598,8 +532,8 @@ impl RequestSender {
                 ])
                 .send(),
         )
-        .json()
-        .expect("Json was unable to deserialize to Vec<PostEntry>!")
+            .json()
+            .expect("Json was unable to deserialize to Vec<PostEntry>!")
     }
 
     /// Gets tags by their name.
@@ -621,23 +555,6 @@ impl RequestSender {
         }
     }
 
-    #[deprecated(
-        since = "1.5.6",
-        note = "This code is no longer needed since the alias checker has to \
-    send a general search to the api, rather than id specific."
-    )]
-    /// Gets tags by their ID.
-    pub fn get_tag_by_id(&self, id: &str) -> TagEntry {
-        self.check_result(
-            self.client
-                .get(&self.urls.borrow()["tag"])
-                .query(&[("id", id)])
-                .send(),
-        )
-        .json()
-        .expect("Json was unable to deserialize to TagEntry!")
-    }
-
     /// Queries aliases and returns response.
     pub fn query_aliases(&self, tag: &str) -> Vec<AliasEntry> {
         self.check_result(
@@ -646,24 +563,8 @@ impl RequestSender {
                 .query(&[("search[antecedent_name]", tag)])
                 .send(),
         )
-        .json()
-        .expect("Json was unable to deserialize to Vec<AliasEntry>!")
-    }
-
-    // FIXME: This function could do with some nice cleaning.
-    /// Gets the blacklist and returns the value.
-    pub fn get_blacklist(&self, login: &Login) -> UserEntry {
-        self.check_result(
-            self.client
-                .get_with_auth(&self.append_url(&self.urls.borrow()["user"], &login.username))
-                // .query(&[
-                //     ("login", login.username.as_str()),
-                //     ("api_key", login.password_hash.as_str()),
-                // ])
-                .send(),
-        )
-        .json()
-        .expect("Json was unable to deserialize to User entry!")
+            .json()
+            .expect("Json was unable to deserialize to Vec<AliasEntry>!")
     }
 }
 

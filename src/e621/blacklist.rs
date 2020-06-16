@@ -1,10 +1,5 @@
-extern crate failure;
-
-use failure::Error;
-
 use crate::e621::io::parser::Parser;
 use crate::e621::sender::{PostEntry, RequestSender, UserEntry};
-use reqwest::get;
 
 #[derive(Default, Debug)]
 struct RootToken {
@@ -90,7 +85,6 @@ impl Default for TagToken {
 }
 
 /// Parser that reads a tag file and parses the tags.
-// TODO: Remove default when new blacklist is made.
 #[derive(Default)]
 struct BlacklistParser {
     base_parser: Parser,
@@ -138,11 +132,6 @@ impl BlacklistParser {
         }
 
         LineToken::new(tags)
-    }
-
-    /// Checks if tag starts with any special syntax.
-    fn is_tag_special(&self, tag: &String) -> bool {
-        tag == "rating" || tag == "id" || tag == "user"
     }
 
     /// Checks if tag is negated.
@@ -289,9 +278,6 @@ impl FlagWorker {
             }
         });
 
-        // println!("Margin: {}", length);
-        // println!("Negated Margin: {}", negated_length);
-
         self.margin = length;
         self.negated_margin = negated_length;
     }
@@ -309,13 +295,8 @@ impl FlagWorker {
                 if post.rating == "s" {
                     if tag.negated {
                         *negated_flags += 1;
-                    // println!(
-                    //     "Negated flag raised {}/{}",
-                    //     negated_flags, self.negated_margin
-                    // );
                     } else {
                         *flags += 1;
-                        // println!("Flag raised {}/{}", flags, self.margin);
                     }
                 }
             }
@@ -323,13 +304,8 @@ impl FlagWorker {
                 if post.rating == "q" {
                     if tag.negated {
                         *negated_flags += 1;
-                    // println!(
-                    //     "Negated flag raised {}/{}",
-                    //     negated_flags, self.negated_margin
-                    // );
                     } else {
                         *flags += 1;
-                        // println!("Flag raised {}/{}", flags, self.margin);
                     }
                 }
             }
@@ -337,13 +313,8 @@ impl FlagWorker {
                 if post.rating == "e" {
                     if tag.negated {
                         *negated_flags += 1;
-                    // println!(
-                    //     "Negated flag raised {}/{}",
-                    //     negated_flags, self.negated_margin
-                    // );
                     } else {
                         *flags += 1;
-                        // println!("Flag raised {}/{}", flags, self.margin);
                     }
                 }
             }
@@ -357,13 +328,8 @@ impl FlagWorker {
             if post_id == id {
                 if tag.negated {
                     *negated_flags += 1;
-                // println!(
-                //     "Negated flag raised {}/{}",
-                //     negated_flags, self.negated_margin
-                // );
                 } else {
                     *flags += 1;
-                    // println!("Flag raised {}/{}", flags, self.margin);
                 }
             }
         }
@@ -381,13 +347,8 @@ impl FlagWorker {
         if user_id == uploader_id {
             if tag.negated {
                 *negated_flags += 1;
-            // println!(
-            //     "Negated flag raised {}/{}",
-            //     negated_flags, self.negated_margin
-            // );
             } else {
                 *flags += 1;
-                // println!("Flag raised {}/{}", flags, self.margin);
             }
         }
     }
@@ -416,13 +377,8 @@ impl FlagWorker {
             } else if post_tags.iter().any(|e| e == tag.tag.as_str()) {
                 if tag.is_negated() {
                     negated_flags += 1;
-                // println!(
-                //     "Negated flag raised {}/{}",
-                //     negated_flags, self.negated_margin
-                // );
                 } else {
                     flags += 1;
-                    // println!("Flag raised {}/{}", flags, self.margin);
                 }
             }
         }
@@ -446,7 +402,6 @@ pub struct Blacklist {
     blacklist_parser: BlacklistParser,
     blacklist_tokens: RootToken,
     request_sender: RequestSender,
-    blacklist_entries: Vec<String>,
 }
 
 impl Blacklist {
@@ -455,7 +410,6 @@ impl Blacklist {
             blacklist_parser: BlacklistParser::default(),
             blacklist_tokens: RootToken::default(),
             request_sender,
-            blacklist_entries: Vec::default(),
         }
     }
 
@@ -485,7 +439,6 @@ impl Blacklist {
     pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
         let mut filtered: u16 = 0;
         let mut flag_worker = FlagWorker::default();
-        // println!("{:#?}", self.blacklist_tokens);
         for blacklist_line in &self.blacklist_tokens.lines {
             posts.retain(|e| {
                 flag_worker.reset_worker();

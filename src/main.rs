@@ -3,9 +3,9 @@ extern crate failure;
 
 use failure::Error;
 
-use crate::e621::io::Login;
-use e621::io::tag::{create_tag_file, parse_tag_file};
 use e621::io::Config;
+use e621::io::Login;
+use e621::io::tag::{create_tag_file, parse_tag_file};
 use e621::sender::RequestSender;
 use e621::WebConnector;
 
@@ -21,13 +21,6 @@ fn main() -> Result<(), Error> {
 
     // Creates connector and requester to prepare for downloading posts.
     let login = Login::load().unwrap();
-    // let request_sender = if login.is_empty() {
-    //     RequestSender::new(String::new())
-    // } else {
-    //     RequestSender::new(base64_url::encode(
-    //         format!("{}:{}", login.username, login.api_key).as_str(),
-    //     ))
-    // };
     let request_sender = RequestSender::new(&login);
     let mut connector = WebConnector::new(&request_sender);
     connector.should_enter_safe_mode();

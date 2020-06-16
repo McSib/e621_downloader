@@ -1,25 +1,20 @@
 extern crate dialoguer;
-extern crate failure;
 extern crate indicatif;
 
+use std::cell::RefCell;
 use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use dialoguer::Confirm;
-use failure::Error;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
 use indicatif::ProgressBar;
 
-use io::tag::Group;
+use blacklist::Blacklist;
+use grabber::Grabber;
 use io::Config;
-
-use crate::e621::grabber::{Grabber, PostCollection};
-use crate::e621::sender::{RequestSender, UserEntry};
-
-use self::indicatif::{ProgressDrawTarget, ProgressStyle};
-use crate::e621::blacklist::Blacklist;
-use crate::e621::io::Login;
-use std::cell::RefCell;
-use std::rc::Rc;
+use io::tag::Group;
+use sender::{RequestSender, UserEntry};
 
 pub mod blacklist;
 pub mod grabber;
@@ -95,7 +90,7 @@ impl WebConnector {
     }
 
     /// Removes invalid characters from directory name.
-    fn remove_invalid_chars(&self, dir_name: &String) -> String {
+    fn remove_invalid_chars(&self, dir_name: &str) -> String {
         dir_name
             .chars()
             .map(|e| match e {
@@ -118,8 +113,8 @@ impl WebConnector {
                     &collection_name,
                     &post.file_name,
                 ]
-                .iter()
-                .collect();
+                    .iter()
+                    .collect();
                 create_dir_all(file_path.parent().unwrap())
                     .expect("Could not create directories for images!");
                 if file_path.exists() {
