@@ -68,7 +68,7 @@ impl WebConnector {
         }
     }
 
-    pub fn process_blacklist(&mut self, user_id: &String) {
+    pub fn process_blacklist(&mut self, user_id: &str) {
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(user_id, "user");

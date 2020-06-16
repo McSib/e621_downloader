@@ -37,7 +37,10 @@ fn main() -> Result<(), Error> {
     println!("Parsed tag file.");
 
     // Collects all grabbed posts and moves it to connector to start downloading.
-    connector.process_blacklist(&login.user_id);
+    if !login.is_empty() {
+        connector.process_blacklist(&login.user_id);
+    }
+
     connector.grab_posts(&groups);
     connector.download_posts();
 
