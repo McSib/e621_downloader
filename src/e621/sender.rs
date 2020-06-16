@@ -10,12 +10,12 @@ use std::time::Duration;
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::USER_AGENT;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use serde_json::{from_value, Value};
 
-use crate::e621::io::tag::TagType;
 use crate::e621::io::{emergency_exit, Login};
+use crate::e621::io::tag::TagType;
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -703,8 +703,8 @@ impl RequestSender {
 
     /// Gets entry by type `T`, this is used for every request where the url needs to be appended to.
     pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
-    where
-        T: DeserializeOwned,
+        where
+            T: DeserializeOwned,
     {
         let value: Value = self
             .check_result(
@@ -734,8 +734,8 @@ impl RequestSender {
                 ])
                 .send(),
         )
-        .json()
-        .expect("Json was unable to deserialize to Vec<PostEntry>!")
+            .json()
+            .expect("Json was unable to deserialize to Vec<PostEntry>!")
     }
 
     /// Gets tags by their name.
@@ -765,8 +765,8 @@ impl RequestSender {
                 .query(&[("search[antecedent_name]", tag)])
                 .send(),
         )
-        .json()
-        .expect("Json was unable to deserialize to Vec<AliasEntry>!")
+            .json()
+            .expect("Json was unable to deserialize to Vec<AliasEntry>!")
     }
 }
 

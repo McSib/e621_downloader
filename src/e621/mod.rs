@@ -7,13 +7,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use dialoguer::Confirm;
-use indicatif::ProgressBar;
 use indicatif::{ProgressDrawTarget, ProgressStyle};
+use indicatif::ProgressBar;
 
 use blacklist::Blacklist;
 use grabber::Grabber;
-use io::tag::Group;
 use io::Config;
+use io::tag::Group;
 use sender::{RequestSender, UserEntry};
 
 pub mod blacklist;
@@ -104,7 +104,7 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
-            let collection_name = self.remove_invalid_chars(&collection.set_name);
+            let collection_name = self.remove_invalid_chars(&collection.name);
             for post in &collection.posts {
                 self.progress_bar
                     .set_message(format!("Downloading: {} ", collection_name).as_str());
@@ -112,10 +112,10 @@ impl WebConnector {
                     &self.download_directory,
                     &collection.category,
                     &collection_name,
-                    &post.file_name,
+                    &post.name,
                 ]
-                .iter()
-                .collect();
+                    .iter()
+                    .collect();
                 create_dir_all(file_path.parent().unwrap())
                     .expect("Could not create directories for images!");
                 if file_path.exists() {
@@ -127,7 +127,7 @@ impl WebConnector {
 
                 let bytes = self
                     .request_sender
-                    .download_image(&post.file_url, post.file_size);
+                    .download_image(&post.url, post.file_size);
                 self.save_image(file_path.to_str().unwrap(), &bytes);
                 self.progress_bar.inc(post.file_size as u64);
             }

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
@@ -9,9 +10,9 @@ use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
     /// The url that leads to the file to download.
-    pub file_url: String,
+    pub url: String,
     /// The name of the file to download.
-    pub file_name: String,
+    pub name: String,
     /// The size of the file to download.
     pub file_size: i64,
 }
@@ -42,8 +43,8 @@ impl GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
         GrabbedPost {
-            file_url: post.file.url.clone().unwrap(),
-            file_name: format!("{}{:04}.{}", name, current_page, post.file.ext),
+            url: post.file.url.clone().unwrap(),
+            name: format!("{}{:04}.{}", name, current_page, post.file.ext),
             file_size: post.file.size,
         }
     }
@@ -53,8 +54,8 @@ impl From<PostEntry> for GrabbedPost {
     /// Converts `PostEntry` to `Self`.
     fn from(post: PostEntry) -> Self {
         GrabbedPost {
-            file_url: post.file.url.clone().unwrap(),
-            file_name: format!("{}.{}", post.file.md5, post.file.ext),
+            url: post.file.url.clone().unwrap(),
+            name: format!("{}.{}", post.file.md5, post.file.ext),
             file_size: post.file.size,
         }
     }
@@ -63,7 +64,7 @@ impl From<PostEntry> for GrabbedPost {
 /// A set of posts with category and name.
 pub struct PostCollection {
     /// The name of the set.
-    pub set_name: String,
+    pub name: String,
     /// The category of the set.
     pub category: String,
     /// The posts in the set.
@@ -71,9 +72,9 @@ pub struct PostCollection {
 }
 
 impl PostCollection {
-    pub fn new(set_name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
+    pub fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
         PostCollection {
-            set_name: set_name.to_string(),
+            name: name.to_string(),
             category: category.to_string(),
             posts,
         }
@@ -266,11 +267,14 @@ impl Grabber {
             }
         });
 
-        if invalid_posts > 0 {
-            println!(
-                "Over {} posts had to be filtered because the file url wasn't available.",
-                invalid_posts
-            )
+        match invalid_posts.cmp(&1) {
+            Ordering::Less => {}
+            Ordering::Equal => {
+                println!("A post had to be filtered by e621/e926.");
+            }
+            Ordering::Greater => {
+                println!("{} posts had to be filtered by e621/e926.", invalid_posts);
+            }
         }
     }
 }
