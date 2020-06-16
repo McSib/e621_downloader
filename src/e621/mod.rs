@@ -68,10 +68,10 @@ impl WebConnector {
         }
     }
 
-    pub fn process_blacklist(&mut self, user_id: &str) {
+    pub fn process_blacklist(&mut self, username: &str) {
         let user: UserEntry = self
             .request_sender
-            .get_entry_from_appended_id(user_id, "user");
+            .get_entry_from_appended_id(username, "user");
         if let Some(blacklist_tags) = user.blacklisted_tags {
             if !blacklist_tags.is_empty() {
                 self.blacklist.borrow_mut().parse_blacklist(blacklist_tags);

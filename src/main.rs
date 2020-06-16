@@ -38,7 +38,7 @@ fn main() -> Result<(), Error> {
 
     // Collects all grabbed posts and moves it to connector to start downloading.
     if !login.is_empty() {
-        connector.process_blacklist(&login.user_id);
+        connector.process_blacklist(&login.username);
     }
 
     connector.grab_posts(&groups);

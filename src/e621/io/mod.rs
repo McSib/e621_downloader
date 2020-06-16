@@ -82,8 +82,6 @@ pub struct Login {
     /// The password hash (also known as the API key) for the user.
     #[serde(rename = "APIKey")]
     pub api_key: String,
-    #[serde(rename = "UserID")]
-    pub user_id: String,
     /// Whether or not the user wishes to download their favorites.
     #[serde(rename = "DownloadFavorites")]
     pub download_favorites: bool,
@@ -105,7 +103,7 @@ impl Login {
 
     /// Checks if the login user and password is empty.
     pub fn is_empty(&self) -> bool {
-        if self.username.is_empty() || self.api_key.is_empty() || self.user_id.is_empty() {
+        if self.username.is_empty() || self.api_key.is_empty() {
             return true;
         }
 
@@ -136,7 +134,6 @@ impl Default for Login {
         Login {
             username: String::new(),
             api_key: String::new(),
-            user_id: String::new(),
             download_favorites: true,
         }
     }

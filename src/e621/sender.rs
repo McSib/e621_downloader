@@ -655,7 +655,7 @@ impl RequestSender {
     pub fn get_blacklist(&self, login: &Login) -> UserEntry {
         self.check_result(
             self.client
-                .get_with_auth(&self.append_url(&self.urls.borrow()["user"], &login.user_id))
+                .get_with_auth(&self.append_url(&self.urls.borrow()["user"], &login.username))
                 // .query(&[
                 //     ("login", login.username.as_str()),
                 //     ("api_key", login.password_hash.as_str()),
