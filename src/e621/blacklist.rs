@@ -165,8 +165,6 @@ impl BlacklistParser {
             self.parse_special_tag(&mut token);
         }
 
-        println!("{:#?}", token);
-
         token
     }
 
@@ -355,40 +353,41 @@ impl FlagWorker {
 
     /// Raises the flag and immediately blacklists the post if its ID matches with the blacklisted ID.
     fn flag_id(&mut self, flags: &mut i16, negated_flags: &mut i16, tag: &TagToken, post_id: i64) {
-        if tag.is_id() {
-            if let Some(id) = tag.id {
-                if post_id == id {
-                    if tag.negated {
-                        *negated_flags += 1;
-                    // println!(
-                    //     "Negated flag raised {}/{}",
-                    //     negated_flags, self.negated_margin
-                    // );
-                    } else {
-                        *flags += 1;
-                        // println!("Flag raised {}/{}", flags, self.margin);
-                    }
+        if let Some(id) = tag.id {
+            if post_id == id {
+                if tag.negated {
+                    *negated_flags += 1;
+                // println!(
+                //     "Negated flag raised {}/{}",
+                //     negated_flags, self.negated_margin
+                // );
+                } else {
+                    *flags += 1;
+                    // println!("Flag raised {}/{}", flags, self.margin);
                 }
             }
         }
     }
 
     /// Raises the flag and immediately blacklists the post if the user who uploaded it is blacklisted.
-    fn flag_user(&mut self, flags: &mut i16, negated_flags: &mut i16, tag: &TagToken) {
-        if tag.is_user() {
-            if let Some(username) = &tag.user {
-                if tag.tag == *username {
-                    if tag.negated {
-                        *negated_flags += 1;
-                    // println!(
-                    //     "Negated flag raised {}/{}",
-                    //     negated_flags, self.negated_margin
-                    // );
-                    } else {
-                        *flags += 1;
-                        // println!("Flag raised {}/{}", flags, self.margin);
-                    }
-                }
+    fn flag_user(
+        &mut self,
+        flags: &mut i16,
+        negated_flags: &mut i16,
+        tag: &TagToken,
+        uploader_id: i64,
+    ) {
+        let user_id = tag.tag.parse::<i64>().expect("Failed to parse ID!");
+        if user_id == uploader_id {
+            if tag.negated {
+                *negated_flags += 1;
+            // println!(
+            //     "Negated flag raised {}/{}",
+            //     negated_flags, self.negated_margin
+            // );
+            } else {
+                *flags += 1;
+                // println!("Flag raised {}/{}", flags, self.margin);
             }
         }
     }
@@ -406,7 +405,7 @@ impl FlagWorker {
                 }
 
                 if tag.is_user() {
-                    self.flag_user(&mut flags, &mut negated_flags, tag);
+                    self.flag_user(&mut flags, &mut negated_flags, tag, post.uploader_id);
                     continue;
                 }
 
@@ -468,11 +467,11 @@ impl Blacklist {
     pub fn cache_users(&mut self) {
         for blacklist_token in &mut self.blacklist_tokens.lines {
             for tag in &mut blacklist_token.tags {
-                if tag.is_user() {
+                if let Some(username) = &tag.user {
                     let user: UserEntry = self
                         .request_sender
-                        .get_entry_from_appended_id(&tag.tag, "user");
-                    tag.tag = user.name;
+                        .get_entry_from_appended_id(username, "user");
+                    tag.tag = format!("{}", user.id);
                 }
             }
         }

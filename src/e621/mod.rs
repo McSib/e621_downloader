@@ -72,11 +72,13 @@ impl WebConnector {
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(user_id, "user");
-        self.blacklist
-            .borrow_mut()
-            .parse_blacklist(user.blacklisted_tags.expect("User isn't logged in!"));
-        self.blacklist.borrow_mut().cache_users();
-        self.grabber.set_blacklist(self.blacklist.clone());
+        if let Some(blacklist_tags) = user.blacklisted_tags {
+            if !blacklist_tags.is_empty() {
+                self.blacklist.borrow_mut().parse_blacklist(blacklist_tags);
+                self.blacklist.borrow_mut().cache_users();
+                self.grabber.set_blacklist(self.blacklist.clone());
+            }
+        }
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
