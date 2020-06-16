@@ -12,7 +12,7 @@ use crate::e621::sender::{AliasEntry, RequestSender, TagEntry, ToTagType};
 
 /// Constant of the tag file's name.
 pub const TAG_NAME: &str = "tags.txt";
-static TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
+const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
 trait UnwrapOrFail<T> {

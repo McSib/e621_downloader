@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::Login;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
+use crate::e621::io::Login;
 use crate::e621::sender::{PoolEntry, PostEntry, RequestSender, SetEntry};
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
@@ -105,6 +105,7 @@ impl Grabber {
         }
     }
 
+    /// Sets the blacklist.
     pub fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
@@ -242,6 +243,7 @@ impl Grabber {
         posts
     }
 
+    /// Scans through array of posts and removes any that violets the blacklist.
     fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) {
         if self.request_sender.is_authenticated() {
             if let Some(ref blacklist) = self.blacklist {
@@ -250,6 +252,7 @@ impl Grabber {
         }
     }
 
+    /// Removes invalid posts, this is dependant on if the file url is null or if the post was deleted.
     fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) {
         // Sometimes, even if a post is available, the url for it isn't;
         // To handle this, the vector will retain only the posts that has an available url.

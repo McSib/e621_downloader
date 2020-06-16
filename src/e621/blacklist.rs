@@ -1,6 +1,7 @@
 use crate::e621::io::parser::Parser;
 use crate::e621::sender::{PostEntry, RequestSender, UserEntry};
 
+/// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
 struct RootToken {
     lines: Vec<LineToken>,
@@ -47,6 +48,7 @@ struct TagToken {
     id: Option<i64>,
     /// If the tag is a user, this will contain the username
     user: Option<String>,
+    /// The tag (value for special tags)
     tag: String,
 }
 
@@ -87,6 +89,7 @@ impl Default for TagToken {
 /// Parser that reads a tag file and parses the tags.
 #[derive(Default)]
 struct BlacklistParser {
+    /// The base parser which parses the blacklist character by character.
     base_parser: Parser,
 }
 
@@ -100,6 +103,7 @@ impl BlacklistParser {
         }
     }
 
+    /// Parses the entire blacklist.
     fn parse_blacklist(&mut self) -> RootToken {
         let mut lines: Vec<LineToken> = Vec::new();
         loop {
@@ -399,8 +403,11 @@ impl FlagWorker {
 /// Blacklist that holds all of the blacklist entries.
 /// These entries will be looped through a parsed before being used for filtering posts that are blacklisted.
 pub struct Blacklist {
+    /// The blacklist parser which parses the blacklist and tokenizes it.
     blacklist_parser: BlacklistParser,
+    /// All of the blacklist tokens after being parsed.
     blacklist_tokens: RootToken,
+    /// Request sender used for getting user information.
     request_sender: RequestSender,
 }
 
@@ -418,6 +425,7 @@ impl Blacklist {
         self.blacklist_tokens = self.blacklist_parser.parse_blacklist();
     }
 
+    /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
     pub fn cache_users(&mut self) {
         for blacklist_token in &mut self.blacklist_tokens.lines {
             for tag in &mut blacklist_token.tags {
@@ -431,6 +439,7 @@ impl Blacklist {
         }
     }
 
+    /// Checks of the blacklist is empty.
     pub fn is_empty(&self) -> bool {
         self.blacklist_tokens.lines.is_empty()
     }

@@ -15,9 +15,8 @@ pub mod parser;
 pub mod tag;
 
 /// Name of the configuration file.
-pub static CONFIG_NAME: &str = "config.json";
-
-pub static LOGIN_NAME: &str = "login.json";
+pub const CONFIG_NAME: &str = "config.json";
+pub const LOGIN_NAME: &str = "login.json";
 
 /// Config that is used to do general setup.
 #[derive(Serialize, Deserialize, Clone)]

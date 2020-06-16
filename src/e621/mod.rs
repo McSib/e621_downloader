@@ -7,13 +7,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use dialoguer::Confirm;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
 use indicatif::ProgressBar;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
 
 use blacklist::Blacklist;
 use grabber::Grabber;
-use io::Config;
 use io::tag::Group;
+use io::Config;
 use sender::{RequestSender, UserEntry};
 
 pub mod blacklist;
@@ -34,7 +34,9 @@ pub struct WebConnector {
     download_directory: String,
     /// Progress bar that displays the current progress in downloading posts.
     progress_bar: ProgressBar,
+    /// Grabber which is responsible for grabbing posts.
     grabber: Grabber,
+    /// The user's blacklist.
     blacklist: Rc<RefCell<Blacklist>>,
 }
 
@@ -63,6 +65,7 @@ impl WebConnector {
         }
     }
 
+    /// Processes the blacklist and tokenizes for use when grabbing posts.
     pub fn process_blacklist(&mut self, username: &str) {
         let user: UserEntry = self
             .request_sender
@@ -78,8 +81,6 @@ impl WebConnector {
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
     pub fn grab_posts(&mut self, groups: &[Group]) {
-        // let grabber = Grabber::from_tags(groups, self.request_sender.clone());
-        // (grabber.grabbed_posts, grabber.grabbed_single_posts)
         self.grabber.grab_favorites();
         self.grabber.grab_posts_by_tags(groups);
     }
@@ -113,8 +114,8 @@ impl WebConnector {
                     &collection_name,
                     &post.file_name,
                 ]
-                    .iter()
-                    .collect();
+                .iter()
+                .collect();
                 create_dir_all(file_path.parent().unwrap())
                     .expect("Could not create directories for images!");
                 if file_path.exists() {
@@ -159,6 +160,7 @@ impl WebConnector {
         self.progress_bar.finish_and_clear();
     }
 
+    /// Gets the total size (in KB) of every post image to be downloaded.
     fn get_total_file_size(&mut self) -> u64 {
         self.grabber
             .posts
