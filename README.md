@@ -38,24 +38,54 @@ This system is more complex than what I have explained so far, but in a basic se
 
 Hopefully, this explains how and why the limit is there.
 
-### Compiling on GNU/Linux
+## Compiling on GNU/Linux
 
-## Debian 10 & Derivatives
+### Debian 10 & Derivatives
+
+There are two options when compiling on a Debian GNU/Linux system. The first is to use the version of rustc from the official repositories, which runs the risk of being out of date.
+
+#### Method 1: Using Debian's rust packages
+
+**Note: This method may not work in the future as Debian's packaged versions of rustc, cargo, etc are often out of date. While at the time of writing this worked, please try Method 2 before filing an issue**
 
 To successfully build on a Debian 10-based GNU/Linux system, first install rustc and cargo.
 At the time of writing, the versions included with Debian 10 work, which are cargo and rustc version 1.43.0.
 
+1. Install rustc and cargo using apt
+
 `sudo apt install rustc cargo`
 
-Then clone the git repository into your desired location.
+2. Clone the git repository into your desired location.
 
 `git clone https://github.com/McSib/e621_downloader`
 
-After it's finished cloning, simply enter the directory and run the following:
+3. After cloning is complete, simply enter the directory and run the following:
 
-`cargo build`
+`cargo build --release`
 
 This could take quite a while depending on your CPU. This has only been tested on an amd64 CPU (an Intel Core 2 Duo), which took about fourty minutes.
+
+4. The binary is should be located at: `./target/release/e621_downloader`.  If needed, make the binary executable by running `chmod a+x ./e621_downloader` after navigating to ./target/release/
+
+#### Method 2: Using rustup
+
+This method involves using rustup, the tool provided by Rust for installation and updating of rust and cargo for GNU/Linux systems.
+
+**If you already have an up to date rustup installion, skip this step**
+
+1. Go to [Rust's 'Getting Started'](https://www.rust-lang.org/learn/get-started) guide for up-to-date directions on installing rustup.
+
+After the rustup installation is complete, you must run `source $HOME/.cargo/envo` if you choose not to logout/login. This only needs to be done once, as after installation rust will automatically be added to your path.
+
+2. Clone the git repository into your desired location.
+
+`git clone https://github.com/McSib/e621_downloader`
+
+3. After cloning is complete, simply enter the directory and run the following:
+
+`cargo build --release`
+
+4. The binary is should be located at: ./target/release/e621_downloader.  If needed, make the binary executable by running `chmod a+x ./e621_downloader` after navigating to ./target/release/
 
 ### macOS Builds
 
