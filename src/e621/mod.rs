@@ -108,11 +108,12 @@ impl WebConnector {
             for post in &collection.posts {
                 self.progress_bar
                     .set_message(format!("Downloading: {} ", collection_name).as_str());
+                let post_name = self.remove_invalid_chars(&post.name);
                 let file_path: PathBuf = [
                     &self.download_directory,
                     &collection.category,
                     &collection_name,
-                    &post.name,
+                    &post_name,
                 ]
                     .iter()
                     .collect();
