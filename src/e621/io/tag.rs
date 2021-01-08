@@ -8,7 +8,7 @@ use failure::Error;
 
 use crate::e621::io::emergency_exit;
 use crate::e621::io::parser::Parser;
-use crate::e621::sender::{AliasEntry, RequestSender, TagEntry, ToTagType};
+use crate::e621::sender::{RequestSender, TagEntry, ToTagType};
 
 /// Constant of the tag file's name.
 pub const TAG_NAME: &str = "tags.txt";
