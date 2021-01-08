@@ -7,13 +7,13 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use dialoguer::Confirm;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
 use indicatif::ProgressBar;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
 
 use blacklist::Blacklist;
 use grabber::Grabber;
-use io::Config;
 use io::tag::Group;
+use io::Config;
 use sender::{RequestSender, UserEntry};
 
 pub mod blacklist;
@@ -104,18 +104,18 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
-            let collection_name = self.remove_invalid_chars(&collection.name);
             for post in &collection.posts {
                 self.progress_bar
-                    .set_message(format!("Downloading: {} ", collection_name).as_str());
+                    .set_message(&format!("Downloading: {} ", collection.name));
                 let file_path: PathBuf = [
                     &self.download_directory,
                     &collection.category,
-                    &collection_name,
+                    &collection.name,
                     &post.name,
                 ]
-                    .iter()
-                    .collect();
+                .iter()
+                .map(|e| self.remove_invalid_chars(e))
+                .collect();
                 create_dir_all(file_path.parent().unwrap())
                     .expect("Could not create directories for images!");
                 if file_path.exists() {

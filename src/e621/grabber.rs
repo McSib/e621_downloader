@@ -44,7 +44,7 @@ impl GrabbedPost {
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
-            name: format!("{}{:04}.{}", name, current_page, post.file.ext),
+            name: format!("{}{:0<4}.{}", name, current_page, post.file.ext),
             file_size: post.file.size,
         }
     }

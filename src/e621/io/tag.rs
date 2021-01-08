@@ -1,6 +1,6 @@
 extern crate failure;
 
-use std::fs::{File, read_to_string};
+use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::Path;
 
@@ -17,8 +17,8 @@ const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 /// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
 trait UnwrapOrFail<T> {
     fn unwrap_or_fail<F>(self, closure: F) -> T
-        where
-            F: FnOnce();
+    where
+        F: FnOnce();
 }
 
 impl<T> UnwrapOrFail<T> for Option<T> {
@@ -27,8 +27,8 @@ impl<T> UnwrapOrFail<T> for Option<T> {
     /// # Panics
     /// Will panic with `unreachable!()` if the closure does not panic itself.
     fn unwrap_or_fail<F>(self, closure: F) -> T
-        where
-            F: FnOnce(),
+    where
+        F: FnOnce(),
     {
         match self {
             Some(e) => e,
@@ -136,7 +136,7 @@ pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Erro
         },
         request_sender: request_sender.clone(),
     }
-        .parse_groups()?)
+    .parse_groups()?)
 }
 
 /// Identifier to help categorize tags.
@@ -345,20 +345,12 @@ fn valid_tag(c: char) -> bool {
 
 ///// Validates character for id.
 fn valid_id(c: char) -> bool {
-    match c {
-        '0'..='9' => true,
-        _ => false,
-    }
+    matches!(c, '0'..='9')
 }
 
 /// Validates character for group
 fn valid_group(c: char) -> bool {
-    match c {
-        'A'..='Z' => true,
-        'a'..='z' => true,
-        '-' => true,
-        _ => false,
-    }
+    matches!(c, 'A'..='Z' | 'a'..='z' | '-')
 }
 
 /// Validates character for comment.
