@@ -10,12 +10,13 @@ use std::time::Duration;
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::USER_AGENT;
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_value, Value};
 
-use crate::e621::io::{emergency_exit, Login};
+use self::reqwest::Error;
 use crate::e621::io::tag::TagType;
+use crate::e621::io::{emergency_exit, Login};
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -112,10 +113,9 @@ impl ToTagType for TagEntry {
     /// This can only be `TagType::General` or `TagType::Artist`.
     fn to_tag_type(&self) -> TagType {
         match self.category {
-            // `0`: General; `3`: Copyright; `5`: Species;
-            0 | 3 | 5 => TagType::General,
-            // `4`: Character;
-            4 => TagType::General,
+            // `0`: General; `3`: Copyright; `5`: Species; `4`: Character; `6`: Invalid;
+            // `7`: Meta; `8`: Lore;
+            0 | 3..=8 => TagType::General,
             // `1`: Artist;
             1 => TagType::Artist,
             _ => unreachable!(),
@@ -675,7 +675,7 @@ impl RequestSender {
     }
 
     /// Gets the response from a sent request and checks to ensure it was successful.
-    pub fn check_result(&self, result: Result<Response, reqwest::Error>) -> Response {
+    pub fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
         match result {
             Ok(response) => response,
             Err(ref error) => {
@@ -687,7 +687,7 @@ impl RequestSender {
 
     /// Sends request to download image.
     pub fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
-        let mut image_response = self.check_result(self.client.get(url).send());
+        let mut image_response = self.check_response(self.client.get(url).send());
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response
             .copy_to(&mut image_bytes)
@@ -703,11 +703,11 @@ impl RequestSender {
 
     /// Gets entry by type `T`, this is used for every request where the url needs to be appended to.
     pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
-        where
-            T: DeserializeOwned,
+    where
+        T: DeserializeOwned,
     {
         let value: Value = self
-            .check_result(
+            .check_response(
                 self.client
                     .get_with_auth(&self.append_url(&self.urls.borrow()[url_type_key], id))
                     .send(),
@@ -724,7 +724,7 @@ impl RequestSender {
 
     /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
-        self.check_result(
+        self.check_response(
             self.client
                 .get_with_auth(&self.urls.borrow()["posts"])
                 .query(&[
@@ -734,14 +734,14 @@ impl RequestSender {
                 ])
                 .send(),
         )
-            .json()
-            .expect("Json was unable to deserialize to Vec<PostEntry>!")
+        .json()
+        .expect("Json was unable to deserialize to Vec<PostEntry>!")
     }
 
     /// Gets tags by their name.
     pub fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
         let result: Value = self
-            .check_result(
+            .check_response(
                 self.client
                     .get(&self.urls.borrow()["tag_bulk"])
                     .query(&[("search[name]", tag)])
@@ -758,15 +758,20 @@ impl RequestSender {
     }
 
     /// Queries aliases and returns response.
-    pub fn query_aliases(&self, tag: &str) -> Vec<AliasEntry> {
-        self.check_result(
-            self.client
-                .get(&self.urls.borrow()["alias"])
-                .query(&[("search[antecedent_name]", tag)])
-                .send(),
-        )
-            .json()
-            .expect("Json was unable to deserialize to Vec<AliasEntry>!")
+    pub fn query_aliases(&self, tag: &str) -> Option<Vec<AliasEntry>> {
+        let result = self
+            .check_response(
+                self.client
+                    .get(&self.urls.borrow()["alias"])
+                    .query(&[("search[antecedent_name]", tag)])
+                    .send(),
+            )
+            .json::<Vec<AliasEntry>>();
+
+        match result {
+            Ok(e) => Some(e),
+            Err(_) => None,
+        }
     }
 }
 

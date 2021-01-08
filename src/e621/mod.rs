@@ -1,4 +1,3 @@
-extern crate dialoguer;
 extern crate indicatif;
 
 use std::cell::RefCell;
@@ -6,7 +5,6 @@ use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use dialoguer::Confirm;
 use indicatif::ProgressBar;
 use indicatif::{ProgressDrawTarget, ProgressStyle};
 
@@ -15,6 +13,7 @@ use grabber::Grabber;
 use io::tag::Group;
 use io::Config;
 use sender::{RequestSender, UserEntry};
+use std::io::{stdin, stdout};
 
 pub mod blacklist;
 pub mod grabber;
@@ -56,13 +55,24 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
-        let confirmation_result = Confirm::new()
-            .with_prompt("Should enter safe mode?")
-            .default(false)
-            .interact();
-        if confirmation_result.unwrap_or_default() {
-            self.request_sender.update_to_safe();
+        println!("Should enter safe mode? [y/N]");
+
+        loop {
+            let mut input = String::new();
+            stdin().read_line(&mut input);
+            match input.as_str().trim() {
+                "y" | "Y" => {
+                    self.request_sender.update_to_safe();
+                    break;
+                }
+                "n" | "N" | "" => break,
+                _ => {}
+            }
         }
+
+        // if confirmation_result.unwrap_or_default() {
+        //     self.request_sender.update_to_safe();
+        // }
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.

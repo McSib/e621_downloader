@@ -180,10 +180,13 @@ impl TagIdentifier {
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
     fn get_tag_from_alias(&self, tag: &str) -> TagEntry {
-        let alias_entries: Vec<AliasEntry> = self.request_sender.query_aliases(tag);
-        let entry = alias_entries
-            .first()
-            .unwrap_or_fail(|| self.exit_tag_failure(&tag));
+        let entry = match self.request_sender.query_aliases(tag) {
+            None => {
+                self.exit_tag_failure(tag);
+                unreachable!()
+            }
+            Some(e) => e.first().unwrap().clone(),
+        };
         // Is there possibly a way to make this better?
         self.request_sender
             .get_tags_by_name(entry.consequent_name.as_str())
@@ -195,9 +198,8 @@ impl TagIdentifier {
     /// Emergency exits if a tag isn't identified.
     fn exit_tag_failure(&self, tag: &str) {
         println!("Error: JSON Return for tag is empty!");
-        println!("Info: The tag is either invalid or the tag is an alias.");
-        println!("Info: Please use the proper tag for the program to work correctly.");
-        emergency_exit(format!("The server was unable to find tag: {}!", tag).as_str());
+        println!("Info: The tag may be a typo, be sure to double check and ensure that the tag is correct.");
+        emergency_exit(format!("The server API call was unable to find tag: {}!", tag).as_str());
     }
 
     /// Processes the tag type and creates the appropriate tag for it.
