@@ -126,7 +126,7 @@ checksum = "b3a71ab494c0b5b860bdc8407ae08978052417070c2ced38573a9157ad75b8ac"
 
 [[package]]
 name = "e621_downloader"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "base64-url",
  "failure",
