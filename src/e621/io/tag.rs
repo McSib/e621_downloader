@@ -7,7 +7,7 @@ use std::path::Path;
 use failure::Error;
 
 use crate::e621::io::emergency_exit;
-use crate::e621::io::parser::Parser;
+use crate::e621::io::parser::BaseParser;
 use crate::e621::sender::{RequestSender, TagEntry, ToTagType};
 
 /// Constant of the tag file's name.
@@ -130,7 +130,7 @@ pub fn create_tag_file() -> Result<(), Error> {
 /// Creates instance of the parser and parses groups and tags.
 pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
     Ok(TagParser {
-        parser: Parser {
+        parser: BaseParser {
             pos: 0,
             input: read_to_string(TAG_NAME).expect("Unable to read tag file!"),
         },
@@ -229,7 +229,7 @@ impl TagIdentifier {
 /// Parser that reads a tag file and parses the tags.
 struct TagParser {
     /// Low-level parser for parsing raw data.
-    parser: Parser,
+    parser: BaseParser,
     /// Request sender for any needed API calls.
     request_sender: RequestSender,
 }
