@@ -1,5 +1,7 @@
 use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::{PostEntry, RequestSender, UserEntry};
+use crate::e621::sender::entries::{PostEntry, UserEntry};
+use crate::e621::sender::RequestSender;
+use failure::ResultExt;
 
 /// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
@@ -73,6 +75,7 @@ struct BlacklistParser {
 
 impl BlacklistParser {
     fn new(blacklist: String) -> Self {
+        trace!("Initializing blacklist parser...");
         BlacklistParser {
             base_parser: BaseParser {
                 pos: 0,
@@ -83,6 +86,7 @@ impl BlacklistParser {
 
     /// Parses the entire blacklist.
     fn parse_blacklist(&mut self) -> RootToken {
+        trace!("Parsing blacklist...");
         let mut lines: Vec<LineToken> = Vec::new();
         loop {
             self.base_parser.consume_whitespace();
@@ -92,6 +96,8 @@ impl BlacklistParser {
 
             lines.push(self.parse_line());
         }
+
+        trace!("Parsed blacklist...");
 
         RootToken { lines }
     }
@@ -301,7 +307,14 @@ impl FlagWorker {
                     continue;
                 }
                 TagType::User(_) => {
-                    let user_id = tag.name.parse::<i64>().expect("Failed to parse ID!");
+                    let user_id = tag
+                        .name
+                        .parse::<i64>()
+                        .with_context(|e| {
+                            error!("Failed to parse blacklisted user id: {}!", tag.name);
+                            format!("{}", e)
+                        })
+                        .unwrap();
                     self.flag_user(user_id, post.uploader_id, tag.negated);
                     continue;
                 }
@@ -363,13 +376,11 @@ impl Blacklist {
     pub fn cache_users(&mut self) {
         for blacklist_token in &mut self.blacklist_tokens.lines {
             for tag in &mut blacklist_token.tags {
-                if let TagType::User(user) = &tag.tag_type {
-                    if let Some(username) = &user {
-                        let user: UserEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(username, "user");
-                        tag.name = format!("{}", user.id);
-                    }
+                if let TagType::User(Some(username)) = &tag.tag_type {
+                    let user: UserEntry = self
+                        .request_sender
+                        .get_entry_from_appended_id(username, "user");
+                    tag.name = format!("{}", user.id);
                 }
             }
         }
@@ -393,10 +404,19 @@ impl Blacklist {
                     filtered += 1;
                 }
 
+                // This inverses the flag to make sure it retains what isn't flagged and disposes of
+                // what is flagged.
                 !flag_worker.is_flagged()
             });
         }
 
-        println!("Filtered {} posts with blacklist...", filtered)
+        if filtered > 0 {
+            info!(
+                "Filtered {} posts with blacklist...",
+                console::style(filtered).cyan().bold()
+            );
+        } else {
+            trace!("No posts filtered...");
+        }
     }
 }

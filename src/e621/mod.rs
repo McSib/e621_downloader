@@ -1,19 +1,19 @@
-extern crate indicatif;
-
 use std::cell::RefCell;
 use std::fs::{create_dir_all, write};
-use std::io::stdin;
 use std::path::PathBuf;
 use std::rc::Rc;
 
 use indicatif::ProgressBar;
 use indicatif::{ProgressDrawTarget, ProgressStyle};
 
+use crate::e621::sender::entries::UserEntry;
 use blacklist::Blacklist;
+use dialoguer::Confirm;
+use failure::ResultExt;
 use grabber::Grabber;
 use io::tag::Group;
 use io::Config;
-use sender::{RequestSender, UserEntry};
+use sender::RequestSender;
 
 pub mod blacklist;
 pub mod grabber;
@@ -55,24 +55,20 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
-        println!("Should enter safe mode? [y/N]");
-
-        loop {
-            let mut input = String::new();
-            stdin().read_line(&mut input).expect("Unable to read line!");
-            match input.as_str().trim() {
-                "y" | "Y" => {
-                    self.request_sender.update_to_safe();
-                    break;
-                }
-                "n" | "N" | "" => break,
-                _ => {}
-            }
+        let confirm_prompt = Confirm::new()
+            .with_prompt("Should enter safe mode?")
+            .show_default(true)
+            .default(false)
+            .interact()
+            .with_context(|e| {
+                error!("Failed to setup confirmation prompt!");
+                trace!("Terminal unable to set up confirmation prompt...");
+                format!("{}", e)
+            })
+            .unwrap();
+        if confirm_prompt {
+            self.request_sender.update_to_safe();
         }
-
-        // if confirmation_result.unwrap_or_default() {
-        //     self.request_sender.update_to_safe();
-        // }
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.
@@ -90,14 +86,21 @@ impl WebConnector {
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
-    pub fn grab_posts(&mut self, groups: &[Group]) {
+    pub fn grab_all(&mut self, groups: &[Group]) {
+        trace!("Grabbing posts...");
         self.grabber.grab_favorites();
         self.grabber.grab_posts_by_tags(groups);
     }
 
     /// Saves image to download directory.
     fn save_image(&self, file_path: &str, bytes: &[u8]) {
-        write(file_path, bytes).expect("Failed to save image!");
+        write(file_path, bytes)
+            .with_context(|e| {
+                error!("Failed to save image!");
+                trace!("A downloaded image was unable to be saved...");
+                format!("{}", e)
+            })
+            .unwrap();
     }
 
     /// Removes invalid characters from directory name.
@@ -126,7 +129,16 @@ impl WebConnector {
                 .iter()
                 .collect();
                 create_dir_all(file_path.parent().unwrap())
-                    .expect("Could not create directories for images!");
+                    .with_context(|e| {
+                        error!("Could not create directories for images!");
+                        trace!("Directory path unable to be created...");
+                        trace!(
+                            "Path: \"{}\"",
+                            file_path.parent().unwrap().to_str().unwrap()
+                        );
+                        format!("{}", e)
+                    })
+                    .unwrap();
                 if file_path.exists() {
                     self.progress_bar
                         .set_message("Duplicate found: skipping... ");
@@ -169,7 +181,7 @@ impl WebConnector {
     }
 
     /// Gets the total size (in KB) of every post image to be downloaded.
-    fn get_total_file_size(&mut self) -> u64 {
+    fn get_total_file_size(&self) -> u64 {
         self.grabber
             .posts
             .iter()

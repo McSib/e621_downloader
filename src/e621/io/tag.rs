@@ -1,14 +1,13 @@
-extern crate failure;
-
 use std::fs::{read_to_string, File};
 use std::io::Write;
 use std::path::Path;
 
-use failure::Error;
+use failure::{Error, ResultExt};
 
 use crate::e621::io::emergency_exit;
 use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::{RequestSender, TagEntry, ToTagType};
+use crate::e621::sender::entries::TagEntry;
+use crate::e621::sender::RequestSender;
 
 /// Constant of the tag file's name.
 pub const TAG_NAME: &str = "tags.txt";
@@ -115,8 +114,10 @@ impl Group {
 pub fn create_tag_file() -> Result<(), Error> {
     let tag_path = Path::new(TAG_NAME);
     if !tag_path.exists() {
+        info!("Tag file does not exist, crating tag file...");
         let mut file = File::create(tag_path)?;
         file.write_all(TAG_FILE_EXAMPLE.as_bytes())?;
+        trace!("Tag file created...");
 
         emergency_exit(
             "The tag file is created, the application will close so you can include \
@@ -129,14 +130,20 @@ pub fn create_tag_file() -> Result<(), Error> {
 
 /// Creates instance of the parser and parses groups and tags.
 pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
-    Ok(TagParser {
+    TagParser {
         parser: BaseParser {
             pos: 0,
-            input: read_to_string(TAG_NAME).expect("Unable to read tag file!"),
+            input: read_to_string(TAG_NAME)
+                .with_context(|e| {
+                    error!("Unable to read tag file!");
+                    trace!("Possible I/O block when trying to read tag file...");
+                    format!("{}", e)
+                })
+                .unwrap(),
         },
         request_sender: request_sender.clone(),
     }
-    .parse_groups()?)
+    .parse_groups()
 }
 
 /// Identifier to help categorize tags.
