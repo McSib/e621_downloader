@@ -139,7 +139,16 @@ impl Grabber {
                             .request_sender
                             .get_entry_from_appended_id(&tag.name, "pool");
                         let name = &entry.name;
-                        let posts = self.special_search(&format!("pool:{}", entry.id));
+                        let mut posts = self.special_search(&format!("pool:{}", entry.id));
+
+                        // Sorts the pool to the original order given by entry.
+                        for (i, id) in entry.post_ids.iter().enumerate() {
+                            if posts[i].id != *id {
+                                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
+                                posts.swap(i, correct_index);
+                            }
+                        }
+
                         self.posts.push(PostCollection::new(
                             name,
                             "Pools",
