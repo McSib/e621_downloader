@@ -227,9 +227,9 @@ pub struct Tags {
 }
 
 impl Tags {
-    /// Combines all of the tags into a single array.
+    /// Consumes and combines all of the tags into a single array.
     pub fn combine_tags(self) -> Vec<String> {
-        let vecs = &mut [
+        vec![
             self.general,
             self.species,
             self.character,
@@ -238,11 +238,10 @@ impl Tags {
             self.invalid,
             self.lore,
             self.meta,
-        ];
-        let mut tags: Vec<String> = Vec::with_capacity(vecs.iter().map(|e| e.len()).sum());
-        vecs.iter_mut().for_each(|e| tags.append(e));
-
-        tags
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 

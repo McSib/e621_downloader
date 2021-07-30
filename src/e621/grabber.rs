@@ -21,31 +21,22 @@ pub struct GrabbedPost {
 impl GrabbedPost {
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
-        let mut temp_vec = Vec::with_capacity(vec.len());
-        for post in vec {
-            temp_vec.push(GrabbedPost::from(post));
-        }
-        temp_vec
+        vec.into_iter().map(GrabbedPost::from).collect()
     }
 
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s for pools.
     pub fn entry_to_pool_vec(vec: Vec<PostEntry>, pool_name: &str) -> Vec<GrabbedPost> {
-        let mut temp_vec = Vec::with_capacity(vec.len());
-        for (i, post) in vec.iter().enumerate() {
-            temp_vec.push(GrabbedPost::from_entry_to_pool(
-                post,
-                pool_name,
-                (i + 1) as u16,
-            ));
-        }
-        temp_vec
+        vec.iter()
+            .enumerate()
+            .map(|(i, e)| GrabbedPost::from_entry_to_pool(e, pool_name, (i + 1) as u16))
+            .collect()
     }
 
     /// Converts `PostEntry` to `Self`.
     pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
-            name: format!("{} Page_{:04}.{}", name, current_page, post.file.ext),
+            name: format!("{} Page_{:05}.{}", name, current_page, post.file.ext),
             file_size: post.file.size,
         }
     }
@@ -251,8 +242,7 @@ impl Grabber {
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
         loop {
-            let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page).posts;
+            let mut searched_posts = self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }

@@ -14,9 +14,7 @@ impl Program {
     }
 
     pub fn run(&self) -> Result<(), Error> {
-        let out = Term::stdout();
-        out.set_title("e621 downloader");
-
+        Term::stdout().set_title("e621 downloader");
         trace!("Starting downloader...");
 
         // Check the config file and ensures that it is created.

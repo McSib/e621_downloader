@@ -253,18 +253,13 @@ impl FlagWorker {
 
     /// Sets margin for how many flags need to be raised before the post is either blacklisted or considered safe.
     fn set_flag_margin(&mut self, tags: &[TagToken]) {
-        let mut negated_length: i16 = 0;
-        let mut length: i16 = 0;
         tags.iter().for_each(|e| {
             if e.negated {
-                negated_length += 1;
+                self.negated_margin += 1;
             } else {
-                length += 1;
+                self.margin += 1;
             }
         });
-
-        self.margin = length;
-        self.negated_margin = negated_length;
     }
 
     /// Flags post based on blacklisted rating.

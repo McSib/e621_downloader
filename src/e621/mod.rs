@@ -78,8 +78,9 @@ impl WebConnector {
             .get_entry_from_appended_id(username, "user");
         if let Some(blacklist_tags) = user.blacklisted_tags {
             if !blacklist_tags.is_empty() {
-                self.blacklist.borrow_mut().parse_blacklist(blacklist_tags);
-                self.blacklist.borrow_mut().cache_users();
+                let mut blacklist = self.blacklist.borrow_mut();
+                blacklist.parse_blacklist(blacklist_tags);
+                blacklist.cache_users();
                 self.grabber.set_blacklist(self.blacklist.clone());
             }
         }

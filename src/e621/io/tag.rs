@@ -1,5 +1,4 @@
-use std::fs::{read_to_string, File};
-use std::io::Write;
+use std::fs::{read_to_string, write};
 use std::path::Path;
 
 use failure::{Error, ResultExt};
@@ -112,11 +111,9 @@ impl Group {
 
 /// Creates tag file if it doesn't exist.
 pub fn create_tag_file() -> Result<(), Error> {
-    let tag_path = Path::new(TAG_NAME);
-    if !tag_path.exists() {
+    if !Path::new(TAG_NAME).exists() {
         info!("Tag file does not exist, crating tag file...");
-        let mut file = File::create(tag_path)?;
-        file.write_all(TAG_FILE_EXAMPLE.as_bytes())?;
+        write(TAG_NAME, TAG_FILE_EXAMPLE)?;
         trace!("Tag file created...");
 
         emergency_exit(
@@ -165,38 +162,35 @@ impl TagIdentifier {
     }
 
     /// Search for tag on e621.
-    fn search_for_tag(&self, tag_str: &str) -> Tag {
-        let tags: Vec<&str> = tag_str
+    fn search_for_tag(&self, tags: &str) -> Tag {
+        // Splits string into multiple tags before filtering syntax ones away before processing each one
+        // into a tag struct.
+        let map = tags
             .split(' ')
             .filter(|elem| !elem.contains(':') && !elem.starts_with('-'))
-            .collect();
-        let mut temp_tag = Tag::default();
-        for tag in tags {
-            temp_tag = match self.request_sender.get_tags_by_name(tag).first() {
-                Some(entry) => self.create_tag(tag_str, entry),
-                None => self.create_tag(tag_str, &self.get_tag_from_alias(tag)),
-            };
+            .map(|e| match self.request_sender.get_tags_by_name(e).first() {
+                Some(entry) => self.create_tag(tags, entry),
+                None => self.create_tag(tags, &self.get_tag_from_alias(e)),
+            });
 
-            if temp_tag.search_type == TagCategory::Special {
-                break;
-            }
-        }
-
-        temp_tag
+        // Tries to return any tag in the map with category special, return the last element otherwise.
+        map.clone()
+            .find(|tag| tag.search_type == TagCategory::Special)
+            .unwrap_or_else(|| map.last().unwrap())
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
     fn get_tag_from_alias(&self, tag: &str) -> TagEntry {
         let entry = match self.request_sender.query_aliases(tag) {
+            Some(e) => e.first().unwrap().clone(),
             None => {
                 self.exit_tag_failure(tag);
                 unreachable!()
             }
-            Some(e) => e.first().unwrap().clone(),
         };
         // Is there possibly a way to make this better?
         self.request_sender
-            .get_tags_by_name(entry.consequent_name.as_str())
+            .get_tags_by_name(&entry.consequent_name)
             .first()
             .unwrap()
             .clone()
@@ -214,8 +208,8 @@ impl TagIdentifier {
         let tag_type = tag_entry.to_tag_type();
         let category = match tag_type {
             TagType::General => {
-                // Checks if the tag type is Character
-                if tag_entry.category == 4 {
+                const CHARACTER_CATEGORY: u8 = 4;
+                if tag_entry.category == CHARACTER_CATEGORY {
                     if tag_entry.post_count > 1500 {
                         TagCategory::General
                     } else {
