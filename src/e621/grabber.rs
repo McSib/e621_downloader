@@ -148,9 +148,6 @@ impl Grabber {
 
                         // Sorts the pool to the original order given by entry.
                         for (i, id) in entry.post_ids.iter().enumerate() {
-                            // Have to check if there is a post with the same id in the posts vec
-                            // just in case the post was possibly filtered out by the blacklist or
-                            // seen as an invalid post.
                             if posts[i].id != *id {
                                 let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
                                 posts.swap(i, correct_index);
