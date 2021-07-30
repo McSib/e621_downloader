@@ -362,9 +362,10 @@ impl Blacklist {
         }
     }
 
-    pub fn parse_blacklist(&mut self, user_blacklist: String) {
+    pub fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
         self.blacklist_parser = BlacklistParser::new(user_blacklist);
         self.blacklist_tokens = self.blacklist_parser.parse_blacklist();
+        self
     }
 
     /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
@@ -387,7 +388,13 @@ impl Blacklist {
     }
 
     /// Filters through a set of posts, only retaining posts that aren't blacklisted.
-    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) {
+    ///
+    /// # Arguments
+    ///
+    /// * `posts`: Posts to filter through.
+    ///
+    /// returns: u16 of posts that were positively filtered
+    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
         let mut filtered: u16 = 0;
         let mut flag_worker = FlagWorker::default();
         for blacklist_line in &self.blacklist_tokens.lines {
@@ -406,12 +413,11 @@ impl Blacklist {
         }
 
         if filtered > 0 {
-            info!(
-                "Filtered {} posts with blacklist...",
-                console::style(filtered).cyan().bold()
-            );
+            trace!("Filtered {} posts with blacklist...", filtered);
         } else {
             trace!("No posts filtered...");
         }
+
+        filtered
     }
 }

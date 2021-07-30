@@ -78,10 +78,12 @@ impl WebConnector {
             .get_entry_from_appended_id(username, "user");
         if let Some(blacklist_tags) = user.blacklisted_tags {
             if !blacklist_tags.is_empty() {
-                let mut blacklist = self.blacklist.borrow_mut();
-                blacklist.parse_blacklist(blacklist_tags);
-                blacklist.cache_users();
-                self.grabber.set_blacklist(self.blacklist.clone());
+                let blacklist = self.blacklist.clone();
+                blacklist
+                    .borrow_mut()
+                    .parse_blacklist(blacklist_tags)
+                    .cache_users();
+                self.grabber.set_blacklist(blacklist);
             }
         }
     }
@@ -160,12 +162,12 @@ impl WebConnector {
     fn initialize_progress_bar(&mut self, len: u64) {
         self.progress_bar.set_length(len);
         self.progress_bar.set_style(
-			ProgressStyle::default_bar()
-				.template(
-					"{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
-				)
-				.progress_chars("=>-"),
-		);
+            ProgressStyle::default_bar()
+                .template(
+                    "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
+                )
+                .progress_chars("=>-"),
+        );
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.reset();

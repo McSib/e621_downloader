@@ -135,14 +135,22 @@ impl Grabber {
             for tag in &group.tags {
                 match tag.tag_type {
                     TagType::Pool => {
-                        let entry: PoolEntry = self
+                        let mut entry: PoolEntry = self
                             .request_sender
                             .get_entry_from_appended_id(&tag.name, "pool");
                         let name = &entry.name;
                         let mut posts = self.special_search(&format!("pool:{}", entry.id));
 
+                        // Updates entry post ids in case any posts were filtered in the search.
+                        entry
+                            .post_ids
+                            .retain(|id| posts.iter().any(|post| post.id == *id));
+
                         // Sorts the pool to the original order given by entry.
                         for (i, id) in entry.post_ids.iter().enumerate() {
+                            // Have to check if there is a post with the same id in the posts vec
+                            // just in case the post was possibly filtered out by the blacklist or
+                            // seen as an invalid post.
                             if posts[i].id != *id {
                                 let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
                                 posts.swap(i, correct_index);
@@ -229,6 +237,8 @@ impl Grabber {
     fn general_search(&self, searching_tag: &str) -> Vec<PostEntry> {
         let limit: u16 = 5;
         let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
+        let mut filtered = 0;
+        let mut invalid_posts = 0;
         for page in 1..limit {
             let mut searched_posts: Vec<PostEntry> =
                 self.request_sender.bulk_search(searching_tag, page).posts;
@@ -236,11 +246,25 @@ impl Grabber {
                 break;
             }
 
-            self.filter_posts_with_blacklist(&mut searched_posts);
-            self.remove_invalid_posts(&mut searched_posts);
+            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
+        }
+
+        if filtered > 0 {
+            info!(
+                "Filtered {} total blacklisted posts from search...",
+                console::style(filtered).cyan().italic()
+            );
+        }
+
+        if invalid_posts > 0 {
+            info!(
+                "Filtered {} total invalid posts from search...",
+                console::style(invalid_posts).cyan().italic()
+            );
         }
 
         posts
@@ -250,34 +274,52 @@ impl Grabber {
     fn special_search(&self, searching_tag: &str) -> Vec<PostEntry> {
         let mut page: u16 = 1;
         let mut posts: Vec<PostEntry> = vec![];
+        let mut filtered = 0;
+        let mut invalid_posts = 0;
         loop {
             let mut searched_posts = self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }
 
-            self.filter_posts_with_blacklist(&mut searched_posts);
-            self.remove_invalid_posts(&mut searched_posts);
+            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
             page += 1;
         }
 
+        if filtered > 0 {
+            info!(
+                "Filtered {} total blacklisted posts from search...",
+                console::style(filtered).cyan().italic()
+            );
+        }
+
+        if invalid_posts > 0 {
+            info!(
+                "Filtered {} total invalid posts from search...",
+                console::style(invalid_posts).cyan().italic()
+            );
+        }
+
         posts
     }
 
     /// Scans through array of posts and removes any that violets the blacklist.
-    fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) {
+    fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) -> u16 {
         if self.request_sender.is_authenticated() {
             if let Some(ref blacklist) = self.blacklist {
-                blacklist.borrow_mut().filter_posts(posts);
+                return blacklist.borrow_mut().filter_posts(posts);
             }
         }
+
+        0
     }
 
     /// Removes invalid posts, this is dependant on if the file url is null or if the post was deleted.
-    fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) {
+    fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
         // Sometimes, even if a post is available, the url for it isn't;
         // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
@@ -296,15 +338,14 @@ impl Grabber {
                 trace!(
                     "A post was filtered for being invalid (due to the user not being logged in)"
                 );
-                info!("A post was filtered by e621...");
+                trace!("A post was filtered by e621...");
             }
             Ordering::Greater => {
                 trace!("{} posts were filtered for being invalid (due to the user not being logged in)", invalid_posts);
-                info!(
-                    "{} posts had to be filtered by e621/e926...",
-                    console::style(invalid_posts).cyan().italic(),
-                );
+                trace!("{} posts had to be filtered by e621/e926...", invalid_posts,);
             }
         }
+
+        invalid_posts
     }
 }
