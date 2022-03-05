@@ -10,7 +10,7 @@ struct RootToken {
 }
 
 /// Parsed line token that contains all collected [`TagToken`]s on single input line.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct LineToken {
     tags: Vec<TagToken>,
 }
@@ -18,12 +18,6 @@ struct LineToken {
 impl LineToken {
     fn new(tags: Vec<TagToken>) -> Self {
         LineToken { tags }
-    }
-}
-
-impl Default for LineToken {
-    fn default() -> Self {
-        LineToken { tags: Vec::new() }
     }
 }
 
@@ -401,7 +395,7 @@ impl Blacklist {
             posts.retain(|e| {
                 flag_worker.reset_worker();
                 flag_worker.set_flag_margin(&blacklist_line.tags);
-                flag_worker.check_post(e, &blacklist_line);
+                flag_worker.check_post(e, blacklist_line);
                 if flag_worker.is_flagged() {
                     filtered += 1;
                 }

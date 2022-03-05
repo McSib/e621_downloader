@@ -341,8 +341,6 @@ pub struct UserEntry {
     pub forum_post_count: i64,
     /// Count of comments posted by the user.
     pub comment_count: i64,
-    /// Count of appeals done by the user.
-    pub appeal_count: i64,
     /// Count of flags done by the user.
     pub flag_count: i64,
     /// The amount of positive feedback given by the user.
