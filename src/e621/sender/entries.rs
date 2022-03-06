@@ -1,5 +1,6 @@
-use crate::e621::io::tag::TagType;
 use serde::{Deserialize, Serialize};
+
+use crate::e621::io::tag::TagType;
 
 /// GET return of alias entry for e621/e926.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

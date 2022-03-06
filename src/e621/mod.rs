@@ -3,17 +3,18 @@ use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use indicatif::ProgressBar;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
-
-use crate::e621::sender::entries::UserEntry;
-use blacklist::Blacklist;
 use dialoguer::Confirm;
 use failure::ResultExt;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
+use indicatif::ProgressBar;
+
+use blacklist::Blacklist;
 use grabber::Grabber;
-use io::tag::Group;
 use io::Config;
+use io::tag::Group;
 use sender::RequestSender;
+
+use crate::e621::sender::entries::UserEntry;
 
 pub mod blacklist;
 pub mod grabber;

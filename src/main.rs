@@ -10,7 +10,7 @@ use std::fs::File;
 
 use failure::Error;
 use simplelog::{
-    ColorChoice, CombinedLogger, Config, ConfigBuilder, LevelFilter, TermLogger, TerminalMode,
+    ColorChoice, CombinedLogger, Config, ConfigBuilder, LevelFilter, TerminalMode, TermLogger,
     WriteLogger,
 };
 
