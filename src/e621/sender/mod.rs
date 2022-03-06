@@ -51,6 +51,11 @@ struct SenderClient {
 impl SenderClient {
     /// Creates root client for the `SenderClient`.
     fn new(auth: String) -> Self {
+        trace!(
+            "SenderClient initializing with USER_AGENT_VALUE \"{}\"",
+            USER_AGENT_VALUE
+        );
+
         SenderClient {
             client: Rc::new(SenderClient::build_client()),
             auth: Rc::new(auth),
