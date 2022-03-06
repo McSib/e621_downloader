@@ -55,6 +55,7 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
+        trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
             .with_prompt("Should enter safe mode?")
             .show_default(true)
@@ -66,6 +67,8 @@ impl WebConnector {
                 format!("{}", e)
             })
             .unwrap();
+
+        trace!("Safe mode decision: {}", confirm_prompt);
         if confirm_prompt {
             self.request_sender.update_to_safe();
         }
@@ -104,6 +107,7 @@ impl WebConnector {
                 format!("{}", e)
             })
             .unwrap();
+        trace!("Saved {}...", file_path);
     }
 
     /// Removes invalid characters from directory name.
@@ -169,6 +173,8 @@ impl WebConnector {
                 self.save_image(file_path.to_str().unwrap(), &bytes);
                 self.progress_bar.inc(post.file_size as u64);
             }
+
+            trace!("Collection {} is finished downloading...", collection.name);
         }
     }
 
@@ -192,6 +198,7 @@ impl WebConnector {
     pub fn download_posts(&mut self) {
         // Initializes the progress bar for downloading.
         let length = self.get_total_file_size();
+        trace!("Total file size for all images grabbed is {}KB", length);
         self.initialize_progress_bar(length);
         self.download_collection();
         self.progress_bar.finish_and_clear();

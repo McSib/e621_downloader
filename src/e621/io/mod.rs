@@ -24,7 +24,7 @@ pub struct Config {
 
 impl Config {
     /// Checks config and ensure it isn't missing.
-    fn config_exists() -> bool {
+    pub fn config_exists() -> bool {
         if !Path::new(CONFIG_NAME).exists() {
             trace!("config.json: does not exist!");
             return false;
@@ -34,20 +34,9 @@ impl Config {
     }
 
     /// Creates config file.
-    fn create_config() -> Result<(), Error> {
+    pub fn create_config() -> Result<(), Error> {
         let json = to_string_pretty(&Config::default())?;
         write(Path::new(CONFIG_NAME), json)?;
-
-        Ok(())
-    }
-
-    /// Checks if config exist and, if not, creates config template.
-    pub fn check_config() -> Result<(), Error> {
-        if !Config::config_exists() {
-            info!("Creating config file...");
-            Config::create_config()?;
-            trace!("Config file created!")
-        }
 
         Ok(())
     }
