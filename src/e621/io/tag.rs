@@ -1,5 +1,4 @@
-use std::fs::{read_to_string, write};
-use std::path::Path;
+use std::fs::read_to_string;
 
 use failure::{Error, ResultExt};
 
@@ -10,7 +9,7 @@ use crate::e621::sender::RequestSender;
 
 /// Constant of the tag file's name.
 pub const TAG_NAME: &str = "tags.txt";
-const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
+pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
 trait UnwrapOrFail<T> {
@@ -107,22 +106,6 @@ impl Group {
             tags: Vec::new(),
         }
     }
-}
-
-/// Creates tag file if it doesn't exist.
-pub fn create_tag_file() -> Result<(), Error> {
-    if !Path::new(TAG_NAME).exists() {
-        info!("Tag file does not exist, crating tag file...");
-        write(TAG_NAME, TAG_FILE_EXAMPLE)?;
-        trace!("Tag file created...");
-
-        emergency_exit(
-            "The tag file is created, the application will close so you can include \
-             the artists, sets, pools, and individual posts you wish to download.",
-        );
-    }
-
-    Ok(())
 }
 
 /// Creates instance of the parser and parses groups and tags.

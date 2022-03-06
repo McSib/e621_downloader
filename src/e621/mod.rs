@@ -3,17 +3,18 @@ use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use indicatif::ProgressBar;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
-
-use crate::e621::sender::entries::UserEntry;
-use blacklist::Blacklist;
 use dialoguer::Confirm;
 use failure::ResultExt;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
+use indicatif::ProgressBar;
+
+use blacklist::Blacklist;
 use grabber::Grabber;
-use io::tag::Group;
 use io::Config;
+use io::tag::Group;
 use sender::RequestSender;
+
+use crate::e621::sender::entries::UserEntry;
 
 pub mod blacklist;
 pub mod grabber;
@@ -55,6 +56,7 @@ impl WebConnector {
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
     pub fn should_enter_safe_mode(&mut self) {
+        trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
             .with_prompt("Should enter safe mode?")
             .show_default(true)
@@ -66,6 +68,8 @@ impl WebConnector {
                 format!("{}", e)
             })
             .unwrap();
+
+        trace!("Safe mode decision: {}", confirm_prompt);
         if confirm_prompt {
             self.request_sender.update_to_safe();
         }
@@ -104,6 +108,7 @@ impl WebConnector {
                 format!("{}", e)
             })
             .unwrap();
+        trace!("Saved {}...", file_path);
     }
 
     /// Removes invalid characters from directory name.
@@ -120,13 +125,27 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
+            let static_path: PathBuf = [
+                &self.download_directory,
+                &collection.category,
+                &self.remove_invalid_chars(&collection.name),
+            ]
+            .iter()
+            .collect();
+            trace!("Printing Collection Info:");
+            trace!("Collection Name:            \"{}\"", collection.name);
+            trace!("Collection Category:        \"{}\"", collection.category);
+            trace!("Collection Post Length:     \"{}\"", collection.posts.len());
+            trace!(
+                "Static file path for this collection: \"{}\"",
+                static_path.to_str().unwrap()
+            );
+
             for post in &collection.posts {
                 self.progress_bar
                     .set_message(&format!("Downloading: {} ", collection.name));
                 let file_path: PathBuf = [
-                    &self.download_directory,
-                    &collection.category,
-                    &self.remove_invalid_chars(&collection.name),
+                    &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
                 ]
                 .iter()
@@ -155,6 +174,8 @@ impl WebConnector {
                 self.save_image(file_path.to_str().unwrap(), &bytes);
                 self.progress_bar.inc(post.file_size as u64);
             }
+
+            trace!("Collection {} is finished downloading...", collection.name);
         }
     }
 
@@ -178,6 +199,7 @@ impl WebConnector {
     pub fn download_posts(&mut self) {
         // Initializes the progress bar for downloading.
         let length = self.get_total_file_size();
+        trace!("Total file size for all images grabbed is {}KB", length);
         self.initialize_progress_bar(length);
         self.download_collection();
         self.progress_bar.finish_and_clear();

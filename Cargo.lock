@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "e621_downloader"
-version = "1.7.0"
+version = "1.7.0-hotfix.1"
 dependencies = [
  "base64-url",
  "console",

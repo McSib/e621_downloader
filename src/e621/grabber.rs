@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
 use crate::e621::io::Login;
+use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
 use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::sender::RequestSender;
 
