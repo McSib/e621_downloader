@@ -120,13 +120,27 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
+            let static_path: PathBuf = [
+                &self.download_directory,
+                &collection.category,
+                &self.remove_invalid_chars(&collection.name),
+            ]
+            .iter()
+            .collect();
+            trace!("Printing Collection Info:");
+            trace!("Collection Name:            \"{}\"", collection.name);
+            trace!("Collection Category:        \"{}\"", collection.category);
+            trace!("Collection Post Length:     \"{}\"", collection.posts.len());
+            trace!(
+                "Static file path for this collection: \"{}\"",
+                static_path.to_str().unwrap()
+            );
+
             for post in &collection.posts {
                 self.progress_bar
                     .set_message(&format!("Downloading: {} ", collection.name));
                 let file_path: PathBuf = [
-                    &self.download_directory,
-                    &collection.category,
-                    &self.remove_invalid_chars(&collection.name),
+                    &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
                 ]
                 .iter()
