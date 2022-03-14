@@ -5,13 +5,13 @@ use std::rc::Rc;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
 use indicatif::ProgressBar;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
 
 use blacklist::Blacklist;
 use grabber::Grabber;
-use io::Config;
 use io::tag::Group;
+use io::Config;
 use sender::RequestSender;
 
 use crate::e621::sender::entries::UserEntry;

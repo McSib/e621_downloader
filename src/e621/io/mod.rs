@@ -20,6 +20,8 @@ pub struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
     pub download_directory: String,
+    #[serde(rename = "fileNamingConvention")]
+    pub naming_convention: String,
 }
 
 impl Config {
@@ -43,7 +45,21 @@ impl Config {
 
     /// Loads and returns `config` for quick management and settings.
     pub fn get_config() -> Result<Config, Error> {
-        let config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
+        let mut config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
+        config.naming_convention = config.naming_convention.to_lowercase();
+        let convention = ["md5", "id"];
+        if !convention
+            .iter()
+            .any(|e| *e == config.naming_convention.as_str())
+        {
+            error!(
+                "There is no naming convention {}!",
+                config.naming_convention
+            );
+            info!("The naming convention can only be [\"md5\", \"id\"]");
+            emergency_exit("Naming convention is incorrect!");
+        }
+
         Ok(config)
     }
 }
@@ -53,6 +69,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             download_directory: String::from("downloads/"),
+            naming_convention: String::from("md5"),
         }
     }
 }
