@@ -125,6 +125,7 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
+            let short_collection_name = self.shorten_collection_name(&collection.name);
             let static_path: PathBuf = [
                 &self.download_directory,
                 &collection.category,
@@ -132,6 +133,7 @@ impl WebConnector {
             ]
             .iter()
             .collect();
+
             trace!("Printing Collection Info:");
             trace!("Collection Name:            \"{}\"", collection.name);
             trace!("Collection Category:        \"{}\"", collection.category);
@@ -143,7 +145,7 @@ impl WebConnector {
 
             for post in &collection.posts {
                 self.progress_bar
-                    .set_message(&format!("Downloading: {} ", collection.name));
+                    .set_message(&format!("Downloading: {} ", short_collection_name));
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
@@ -212,5 +214,10 @@ impl WebConnector {
             .iter()
             .map(|e| e.posts.iter().map(|f| f.file_size as u64).sum::<u64>())
             .sum()
+    }
+    fn shorten_collection_name(&self, name: &str) -> String {
+        let mut short_name = name[0..=25].to_string();
+        short_name.push_str("...");
+        short_name
     }
 }
