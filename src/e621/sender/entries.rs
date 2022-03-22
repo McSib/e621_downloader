@@ -14,7 +14,7 @@ pub struct AliasEntry {
     /// ID of the creator of the alias.
     pub creator_id: i64,
     /// The date the alias was created.
-    pub created_at: String,
+    pub created_at: Option<String>,
     /// Forum post id tied to the request for the alias to be approved.
     pub forum_post_id: Option<i64>,
     /// The date for when the alias was updated.
