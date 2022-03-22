@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
@@ -145,7 +146,7 @@ impl WebConnector {
 
             for post in &collection.posts {
                 self.progress_bar
-                    .set_message(&format!("Downloading: {} ", short_collection_name));
+                    .set_message(format!("Downloading: {} ", short_collection_name));
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
@@ -189,12 +190,14 @@ impl WebConnector {
                 .template(
                     "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
                 )
+                .unwrap()
                 .progress_chars("=>-"),
         );
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.reset();
-        self.progress_bar.enable_steady_tick(100);
+        self.progress_bar
+            .enable_steady_tick(Duration::from_millis(100));
     }
 
     /// Downloads tuple of general posts and single posts.
