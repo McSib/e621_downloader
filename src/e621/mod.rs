@@ -216,8 +216,12 @@ impl WebConnector {
             .sum()
     }
     fn shorten_collection_name(&self, name: &str) -> String {
-        let mut short_name = name[0..=25].to_string();
-        short_name.push_str("...");
-        short_name
+        if name.len() >= 25 {
+            let mut short_name = name[0..25].to_string();
+            short_name.push_str("...");
+            short_name
+        } else {
+            name.to_string()
+        }
     }
 }

@@ -1,7 +1,6 @@
 use std::any::type_name;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{format, Error};
 use std::rc::Rc;
 use std::time::Duration;
 
