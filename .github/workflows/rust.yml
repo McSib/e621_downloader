@@ -20,7 +20,7 @@ jobs:
       with:
         toolchain: nightly
     - name: Build
-      run: cargo build --verbose
+      run: cargo build
     - name: Run tests
       run: cargo test --verbose
 
@@ -34,13 +34,21 @@ jobs:
       with:
         toolchain: nightly
     - name: Build
-      uses: actions-rs/cargo@v1.0.1
-      with:
-        command: build
-        toolchain: nightly
+      run: cargo build
     - name: Run tests
-      uses: actions-rs/cargo@v1.0.1
+      run: cargo test --verbose
+
+  mac_build:
+    name: Mac Build
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup Rust Toolchain
+      uses: actions-rs/toolchain@v1.0.6
       with:
-        command: test
         toolchain: nightly
+    - name: Build
+      run: cargo build
+    - name: Run tests
+      run: cargo test --verbose
     
