@@ -1,4 +1,20 @@
 # E621 Downloader
+![Release](https://img.shields.io/github/release/McSib/e621_downloader.svg)
+![Commits Since](https://img.shields.io/github/commits-since/McSib/e621_downloader/1.7.0-hotfix.1.svg)
+![Stars](https://img.shields.io/github/stars/McSib/e621_downloader.svg)
+![Watchers](https://img.shields.io/github/watchers/McSib/e621_downloader.svg)
+![Forks](https://img.shields.io/github/forks/McSib/e621_downloader.svg)
+
+![Maintained?](https://img.shields.io/badge/Maintained%3F-yes-green.svg)
+![Lisence](https://img.shields.io/github/license/McSib/e621_downloader.svg)
+![Downloads](https://img.shields.io/github/downloads/McSib/e621_downloader/total.svg)
+
+![Issues Open](https://img.shields.io/github/issues/McSib/e621_downloader.svg)
+![Issues Closed](https://img.shields.io/github/issues-closed/McSib/e621_downloader.svg)
+![PR Open](https://img.shields.io/github/issues-pr/McSib/e621_downloader.svg)
+![PR Closed](https://img.shields.io/github/issues-pr-closed/McSib/e621_downloader.svg)
+
+[![Rust](https://github.com/McSib/e621_downloader/actions/workflows/rust.yml/badge.svg?branch=active)](https://github.com/McSib/e621_downloader/actions/workflows/rust.yml)
 
 E621 Downloader is a program made entirely in Rust, a low-level language with similar performance to C, with the intention of being a cross platform application made for easy downloading and archiving of images from tags.
 
