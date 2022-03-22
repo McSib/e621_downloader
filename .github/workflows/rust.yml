@@ -16,28 +16,47 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: nightly
+    - uses: actions-rs/cargo@v1.0.1
+      with:
+        toolchain: nightly
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
 
-#   windows_build:
+  windows_build:
   
-#     runs-on: windows-latest
+    runs-on: windows-latest
 
-#     steps:
-#     - uses: actions/checkout@v2
-#     - name: Build
-#       run: cargo build --verbose
-#     - name: Run tests
-#       run: cargo test --verbose
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: nightly
+    - uses: actions-rs/cargo@v1.0.1
+      with:
+        toolchain: nightly
+    
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
+      run: cargo test --verbose
       
-#   mac_build:
+  mac_build:
   
-#     runs-on: macos-latest
+    runs-on: macos-latest
 
-#     steps:
-#     - uses: actions/checkout@v2
-#     - name: Build
-#       run: cargo build --verbose
-#     - name: Run tests
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1.0.6
+      with:
+        toolchain: nightly
+    - uses: actions-rs/cargo@v1.0.1
+      with:
+        toolchain: nightly
+    - name: Build
+      run: cargo build --verbose
+    - name: Run tests
