@@ -1,6 +1,6 @@
 # E621 Downloader
 ![Release](https://img.shields.io/github/release/McSib/e621_downloader.svg)
-![Commits Since](https://img.shields.io/github/commits-since/McSib/e621_downloader/1.7.0-hotfix.1.svg)
+![Commits Since](https://img.shields.io/github/commits-since/McSib/e621_downloader/latest.svg)
 ![Stars](https://img.shields.io/github/stars/McSib/e621_downloader.svg)
 ![Watchers](https://img.shields.io/github/watchers/McSib/e621_downloader.svg)
 ![Forks](https://img.shields.io/github/forks/McSib/e621_downloader.svg)
