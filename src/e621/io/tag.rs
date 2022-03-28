@@ -11,32 +11,6 @@ use crate::e621::sender::RequestSender;
 pub const TAG_NAME: &str = "tags.txt";
 pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
-/// Returns `T` if it isn't an error. If it is, it will run a closure that is expected to panic.
-trait UnwrapOrFail<T> {
-    fn unwrap_or_fail<F>(self, closure: F) -> T
-    where
-        F: FnOnce();
-}
-
-impl<T> UnwrapOrFail<T> for Option<T> {
-    /// Attempts to unwrap and return `T`. If `None`, it will run a closure that is expected to panic.
-    ///
-    /// # Panics
-    /// Will panic with `unreachable!()` if the closure does not panic itself.
-    fn unwrap_or_fail<F>(self, closure: F) -> T
-    where
-        F: FnOnce(),
-    {
-        match self {
-            Some(e) => e,
-            None => {
-                closure();
-                unreachable!()
-            }
-        }
-    }
-}
-
 /// A tag that can be either general or special.
 #[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub enum TagCategory {
