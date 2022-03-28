@@ -72,10 +72,7 @@ impl BlacklistParser {
     fn new(blacklist: String) -> Self {
         trace!("Initializing blacklist parser...");
         BlacklistParser {
-            base_parser: BaseParser {
-                pos: 0,
-                input: blacklist,
-            },
+            base_parser: BaseParser::new(blacklist),
         }
     }
 
@@ -162,7 +159,11 @@ impl BlacklistParser {
             "user" => {
                 token.tag_type = TagType::User(Some(self.base_parser.consume_while(valid_user)));
             }
-            _ => {}
+            _ => {
+                self.base_parser.report_error(
+                    format!("Unknown special tag identifier: {}", token.name).as_str(),
+                );
+            }
         };
     }
 

@@ -232,7 +232,7 @@ impl Grabber {
                                 .italic()
                         );
                     }
-                    TagType::None => unreachable!(),
+                    TagType::Unknown => unreachable!(),
                 };
             }
         }

@@ -56,7 +56,7 @@ pub enum TagType {
     General,
     Artist,
     Post,
-    None,
+    Unknown,
 }
 
 /// A tag that contains its name, search type, and tag type.
@@ -85,7 +85,7 @@ impl Default for Tag {
         Tag {
             name: String::new(),
             search_type: TagCategory::None,
-            tag_type: TagType::None,
+            tag_type: TagType::Unknown,
         }
     }
 }
@@ -111,16 +111,15 @@ impl Group {
 /// Creates instance of the parser and parses groups and tags.
 pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
     TagParser {
-        parser: BaseParser {
-            pos: 0,
-            input: read_to_string(TAG_NAME)
+        parser: BaseParser::new(
+            read_to_string(TAG_NAME)
                 .with_context(|e| {
                     error!("Unable to read tag file!");
                     trace!("Possible I/O block when trying to read tag file...");
                     format!("{}", e)
                 })
                 .unwrap(),
-        },
+        ),
         request_sender: request_sender.clone(),
     }
     .parse_groups()
@@ -235,7 +234,7 @@ impl TagParser {
             if self.parser.starts_with("[") {
                 groups.push(self.parse_group());
             } else {
-                bail!(format_err!("Tags can't be outside of groups!"));
+                self.parser.report_error("Tags must be in groups!");
             }
         }
 
@@ -290,7 +289,10 @@ impl TagParser {
                     "pools" => TagType::Pool,
                     "sets" => TagType::Set,
                     "single-post" => TagType::Post,
-                    _ => unreachable!(),
+                    _ => {
+                        self.parser.report_error("Unknown tag type!");
+                        TagType::Unknown
+                    }
                 };
 
                 Tag::new(&tag, TagCategory::Special, tag_type)
