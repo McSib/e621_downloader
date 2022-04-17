@@ -23,7 +23,7 @@ pub enum TagCategory {
 }
 
 /// The type a tag can be.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TagType {
     Pool,
     Set,
@@ -34,7 +34,7 @@ pub enum TagType {
 }
 
 /// A tag that contains its name, search type, and tag type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Tag {
     /// The name of the tag.
     pub name: String,
@@ -119,43 +119,61 @@ impl TagIdentifier {
 
     /// Search for tag on e621.
     fn search_for_tag(&self, tags: &str) -> Tag {
-        // Splits string into multiple tags before filtering syntax ones away before processing each one
-        // into a tag struct.
-        let map = tags
+        // Splits the tags and cycles through each one, checking if they are valid and searchable tags
+        // If the tag isn't searchable, the tag will default and consider itself invalid. Which will
+        // then be filtered through the last step.
+        let mut map = tags
             .split(' ')
-            .filter(|elem| !elem.contains(':') && !elem.starts_with('-'))
-            .map(|e| match self.request_sender.get_tags_by_name(e).first() {
-                Some(entry) => self.create_tag(tags, entry),
-                None => self.create_tag(tags, &self.get_tag_from_alias(e)),
-            });
+            .map(|e| {
+                let temp = e.trim_start_matches('-');
+                match self.request_sender.get_tags_by_name(temp).first() {
+                    Some(entry) => self.create_tag(tags, entry),
+                    None => {
+                        if let Some(alias_tag) = self.get_tag_from_alias(temp) {
+                            self.create_tag(tags, &alias_tag)
+                        } else if temp.contains(':') {
+                            Tag::default()
+                        } else {
+                            self.exit_tag_failure(temp);
+                            unreachable!();
+                        }
+                    }
+                }
+            })
+            .filter(|e| *e != Tag::default());
 
         // Tries to return any tag in the map with category special, return the last element otherwise.
-        map.clone()
-            .find(|tag| tag.search_type == TagCategory::Special)
-            .unwrap_or_else(|| map.last().unwrap())
+        // If returning the last element fails, assume the tag is syntax only and default.
+        map.find(|e| e.search_type == TagCategory::Special)
+            .unwrap_or_else(|| {
+                map.last()
+                    .unwrap_or_else(|| Tag::new(tags, TagCategory::General, TagType::General))
+            })
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
-    fn get_tag_from_alias(&self, tag: &str) -> TagEntry {
+    fn get_tag_from_alias(&self, tag: &str) -> Option<TagEntry> {
         let entry = match self.request_sender.query_aliases(tag) {
             Some(e) => e.first().unwrap().clone(),
             None => {
-                self.exit_tag_failure(tag);
-                unreachable!()
+                return None;
             }
         };
+
         // Is there possibly a way to make this better?
-        self.request_sender
-            .get_tags_by_name(&entry.consequent_name)
-            .first()
-            .unwrap()
-            .clone()
+        Some(
+            self.request_sender
+                .get_tags_by_name(&entry.consequent_name)
+                .first()
+                .unwrap()
+                .clone(),
+        )
     }
 
     /// Emergency exits if a tag isn't identified.
     fn exit_tag_failure(&self, tag: &str) {
-        println!("Error: JSON Return for tag is empty!");
-        println!("Info: The tag may be a typo, be sure to double check and ensure that the tag is correct.");
+        error!("{} is invalid!", tag);
+        info!("The tag may be a typo, be sure to double check and ensure that the tag is correct.");
         emergency_exit(format!("The server API call was unable to find tag: {}!", tag).as_str());
     }
 
