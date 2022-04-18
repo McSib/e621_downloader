@@ -2,7 +2,7 @@
 name = "e621_downloader"
 version = "1.7.1"
 authors = ["McSib <mcsibsart@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 base64-url = "1.4.13"
