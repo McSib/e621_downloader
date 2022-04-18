@@ -2,16 +2,17 @@ use std::cell::RefCell;
 use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
 use indicatif::ProgressBar;
+use indicatif::{ProgressDrawTarget, ProgressStyle};
 
 use blacklist::Blacklist;
 use grabber::Grabber;
-use io::Config;
 use io::tag::Group;
+use io::Config;
 use sender::RequestSender;
 
 use crate::e621::sender::entries::UserEntry;
@@ -125,6 +126,7 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
+            let short_collection_name = self.shorten_collection_name(&collection.name);
             let static_path: PathBuf = [
                 &self.download_directory,
                 &collection.category,
@@ -132,6 +134,7 @@ impl WebConnector {
             ]
             .iter()
             .collect();
+
             trace!("Printing Collection Info:");
             trace!("Collection Name:            \"{}\"", collection.name);
             trace!("Collection Category:        \"{}\"", collection.category);
@@ -143,7 +146,7 @@ impl WebConnector {
 
             for post in &collection.posts {
                 self.progress_bar
-                    .set_message(&format!("Downloading: {} ", collection.name));
+                    .set_message(format!("Downloading: {} ", short_collection_name));
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
@@ -187,12 +190,14 @@ impl WebConnector {
                 .template(
                     "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
                 )
+                .unwrap()
                 .progress_chars("=>-"),
         );
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.reset();
-        self.progress_bar.enable_steady_tick(100);
+        self.progress_bar
+            .enable_steady_tick(Duration::from_millis(100));
     }
 
     /// Downloads tuple of general posts and single posts.
@@ -212,5 +217,14 @@ impl WebConnector {
             .iter()
             .map(|e| e.posts.iter().map(|f| f.file_size as u64).sum::<u64>())
             .sum()
+    }
+    fn shorten_collection_name(&self, name: &str) -> String {
+        if name.len() >= 25 {
+            let mut short_name = name[0..25].to_string();
+            short_name.push_str("...");
+            short_name
+        } else {
+            name.to_string()
+        }
     }
 }

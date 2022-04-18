@@ -10,7 +10,7 @@ use std::fs::File;
 
 use failure::Error;
 use simplelog::{
-    ColorChoice, CombinedLogger, Config, ConfigBuilder, LevelFilter, TerminalMode, TermLogger,
+    ColorChoice, CombinedLogger, Config, ConfigBuilder, LevelFilter, TermLogger, TerminalMode,
     WriteLogger,
 };
 
@@ -19,6 +19,28 @@ use crate::program::Program;
 mod e621;
 mod program;
 
+/// Logs important information about the system being used.
+/// This is useful for debugging purposes.
+/// This function is called automatically by the `main` function.
+///
+/// # Example
+/// ```
+/// use std::env::consts::{ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS};
+///
+/// log_system_information();
+/// ```
+///
+/// # Output
+/// ```text
+/// OS: linux
+/// ARCH: x86_64
+/// FAMILY: unix
+/// DLL_EXTENSION: .so
+/// DLL_PREFIX: lib
+/// DLL_SUFFIX: .so
+/// EXE_EXTENSION: .so
+/// EXE_SUFFIX: .so
+/// ```
 fn log_system_information() {
     trace!("Printing system information out into log for debug purposes...");
     trace!("ARCH:           \"{}\"", ARCH);

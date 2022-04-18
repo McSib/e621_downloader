@@ -344,14 +344,23 @@ impl RequestSender {
             .check_response(
                 self.client
                     .get(&self.urls.borrow()["alias"])
-                    .query(&[("search[antecedent_name]", tag)])
+                    .query(&[
+                        ("commit", "Search"),
+                        ("search[name_matches]", tag),
+                        ("search[order]", "status"),
+                    ])
                     .send(),
             )
             .json::<Vec<AliasEntry>>();
 
         match result {
             Ok(e) => Some(e),
-            Err(_) => None,
+            Err(e) => {
+                trace!("No alias was found for {}...", tag);
+                trace!("Printing trace message for why None was returned...");
+                trace!("{}", e.to_string());
+                None
+            }
         }
     }
 }

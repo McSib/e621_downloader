@@ -1,12 +1,12 @@
 [package]
 name = "e621_downloader"
-version = "1.7.0-hotfix.1"
+version = "1.7.1"
 authors = ["McSib <mcsibsart@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 base64-url = "1.4.13"
-indicatif = "0.15.0"
+indicatif = "0.17.0-rc.6"
 dialoguer = "0.10.0"
 console = "0.15.0"
 log = "0.4.14"

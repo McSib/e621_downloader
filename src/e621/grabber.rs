@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::Login;
 use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
+use crate::e621::io::{emergency_exit, Config, Login};
 use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::sender::RequestSender;
 
@@ -21,7 +21,10 @@ pub struct GrabbedPost {
 impl GrabbedPost {
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
-        vec.into_iter().map(GrabbedPost::from).collect()
+        let config = Config::get_config().unwrap();
+        vec.into_iter()
+            .map(|e| GrabbedPost::from(e, config.naming_convention.as_str()))
+            .collect()
     }
 
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s for pools.
@@ -40,15 +43,28 @@ impl GrabbedPost {
             file_size: post.file.size,
         }
     }
-}
 
-impl From<PostEntry> for GrabbedPost {
     /// Converts `PostEntry` to `Self`.
-    fn from(post: PostEntry) -> Self {
-        GrabbedPost {
-            url: post.file.url.clone().unwrap(),
-            name: format!("{}.{}", post.file.md5, post.file.ext),
-            file_size: post.file.size,
+    fn from(post: PostEntry, name_convention: &str) -> Self {
+        match name_convention {
+            "md5" => GrabbedPost {
+                url: post.file.url.clone().unwrap(),
+                name: format!("{}.{}", post.file.md5, post.file.ext),
+                file_size: post.file.size,
+            },
+            "id" => GrabbedPost {
+                url: post.file.url.clone().unwrap(),
+                name: format!("{}.{}", post.id, post.file.ext),
+                file_size: post.file.size,
+            },
+            _ => {
+                emergency_exit("Incorrect naming convention!");
+                GrabbedPost {
+                    url: String::new(),
+                    name: String::new(),
+                    file_size: 0,
+                }
+            }
         }
     }
 }
@@ -131,6 +147,7 @@ impl Grabber {
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
     pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
+        let config = Config::get_config().unwrap();
         for group in groups {
             for tag in &group.tags {
                 match tag.tag_type {
@@ -194,7 +211,7 @@ impl Grabber {
                             .first_mut()
                             .unwrap()
                             .posts
-                            .push(GrabbedPost::from(entry));
+                            .push(GrabbedPost::from(entry, &config.naming_convention));
 
                         info!(
                             "Post with ID {} grabbed!",
@@ -215,7 +232,7 @@ impl Grabber {
                                 .italic()
                         );
                     }
-                    TagType::None => unreachable!(),
+                    TagType::Unknown => unreachable!(),
                 };
             }
         }
