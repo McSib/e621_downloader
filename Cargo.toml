@@ -5,7 +5,7 @@ authors = ["McSib <mcsibsart@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-# These are added to bypass security vulnerabilities.
+# These are added to fix security vulnerabilities.
 regex = "1.5.6"
 smallvec = "1.8.0"
 tokio = "1.18.2"
