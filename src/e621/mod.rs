@@ -127,13 +127,41 @@ impl WebConnector {
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
             let short_collection_name = self.shorten_collection_name(&collection.name);
-            let static_path: PathBuf = [
+            let mut static_path: PathBuf = [
                 &self.download_directory,
                 &collection.category,
                 &self.remove_invalid_chars(&collection.name),
             ]
             .iter()
             .collect();
+
+            // This is put here to attempt to shorten the length of the path if it passes window's
+            // max path length.
+            #[cfg(target_os = "windows")]
+            const MAX_PATH: usize = 260; // Defined in Windows documentation.
+
+            #[cfg(target_os = "windows")]
+            let path_len = static_path.as_path().as_os_str().len();
+
+            #[cfg(target_os = "windows")]
+            if path_len >= MAX_PATH {
+                let collection_name = &collection.name;
+                let split = collection_name.split_at(collection_name.len() / 2).0;
+
+                static_path = [
+                    &self.download_directory,
+                    &collection.category,
+                    &self.remove_invalid_chars(split),
+                ]
+                .iter()
+                .collect();
+
+                if path_len >= MAX_PATH {
+                    error!("Path is too long and crosses the 256 char limit.\
+                       Please relocate the program to a directory closer to the root drive directory.");
+                    trace!("Path length: {}", path_len);
+                }
+            }
 
             trace!("Printing Collection Info:");
             trace!("Collection Name:            \"{}\"", collection.name);
@@ -147,38 +175,12 @@ impl WebConnector {
             for post in &collection.posts {
                 self.progress_bar
                     .set_message(format!("Downloading: {} ", short_collection_name));
-                let mut file_path: PathBuf = [
+                let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(&post.name),
                 ]
                 .iter()
                 .collect();
-
-                // This is put here to attempt to shorten the length of the path if it passes window's
-                // max path length.
-                #[cfg(target_os = "windows")]
-                const MAX_PATH: usize = 260; // Defined in Windows documentation.
-
-                #[cfg(target_os = "windows")]
-                let path_len = file_path.as_path().as_os_str().len();
-
-                #[cfg(target_os = "windows")]
-                if path_len >= MAX_PATH {
-                    let split = post.name.split_at(post.name.len() / 2).0;
-
-                    file_path = [
-                        &static_path.to_str().unwrap().to_string(),
-                        &self.remove_invalid_chars(split),
-                    ]
-                    .iter()
-                    .collect();
-
-                    if path_len >= MAX_PATH {
-                        error!("Path is too long and crosses the 256 char limit.\
-                       Please relocate the program to a directory closer to the root drive directory.");
-                        trace!("Path length: {}", path_len);
-                    }
-                }
 
                 create_dir_all(file_path.parent().unwrap())
                     .with_context(|e| {
