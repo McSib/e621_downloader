@@ -5,6 +5,7 @@ authors = ["McSib <mcsibsart@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+tokio = "1.18.2"
 base64-url = "1.4.13"
 indicatif = "0.17.0-rc.10"
 dialoguer = "0.10.1"
