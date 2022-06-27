@@ -32,6 +32,18 @@ pub struct GrabbedPost {
 }
 
 impl GrabbedPost {
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn file_size(&self) -> i64 {
+        self.file_size
+    }
+
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
         let config = Config::get_config().unwrap();
@@ -80,18 +92,6 @@ impl GrabbedPost {
             }
         }
     }
-
-    pub fn url(&self) -> &str {
-        &self.url
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn file_size(&self) -> i64 {
-        self.file_size
-    }
 }
 
 /// A set of posts with category and name.
@@ -113,11 +113,6 @@ impl PostCollection {
         }
     }
 
-    /// Converts `SetEntry` to `Self`.
-    pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
-        PostCollection::new(&set.name, "Sets", posts)
-    }
-
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -128,6 +123,11 @@ impl PostCollection {
 
     pub fn posts(&self) -> &Vec<GrabbedPost> {
         &self.posts
+    }
+
+    /// Converts `SetEntry` to `Self`.
+    pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
+        PostCollection::new(&set.name, "Sets", posts)
     }
 }
 

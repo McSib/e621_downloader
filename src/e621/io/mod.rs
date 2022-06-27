@@ -34,6 +34,14 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn download_directory(&self) -> &str {
+        &self.download_directory
+    }
+
+    pub fn naming_convention(&self) -> &str {
+        &self.naming_convention
+    }
+
     /// Checks config and ensure it isn't missing.
     pub fn config_exists() -> bool {
         if !Path::new(CONFIG_NAME).exists() {
@@ -71,14 +79,6 @@ impl Config {
 
         Ok(config)
     }
-
-    pub fn download_directory(&self) -> &str {
-        &self.download_directory
-    }
-
-    pub fn naming_convention(&self) -> &str {
-        &self.naming_convention
-    }
 }
 
 impl Default for Config {
@@ -107,6 +107,18 @@ pub struct Login {
 }
 
 impl Login {
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    pub fn download_favorites(&self) -> bool {
+        self.download_favorites
+    }
+
     /// Loads the login file or creates one if it doesn't exist.
     pub fn load() -> Result<Self, Error> {
         let mut login = Login::default();
@@ -144,18 +156,6 @@ impl Login {
         );
 
         Ok(())
-    }
-
-    pub fn username(&self) -> &str {
-        &self.username
-    }
-
-    pub fn api_key(&self) -> &str {
-        &self.api_key
-    }
-
-    pub fn download_favorites(&self) -> bool {
-        self.download_favorites
     }
 }
 

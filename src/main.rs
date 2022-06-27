@@ -37,9 +37,7 @@ mod program;
 /// This function is called automatically by the `main` function.
 ///
 /// # Example
-/// ```
-/// use std::env::consts::{ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS};
-///
+/// ```rust
 /// log_system_information();
 /// ```
 ///
