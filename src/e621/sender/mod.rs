@@ -280,6 +280,8 @@ impl RequestSender {
 
     /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
+        debug!("Downloading page {} of tag {}", page, searching_tag);
+
         self.check_response(
             self.client
                 .get_with_auth(&self.urls.borrow()["posts"])
