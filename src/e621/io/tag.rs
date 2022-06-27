@@ -1,18 +1,27 @@
 use std::fs::read_to_string;
 
-use failure::{Error, ResultExt};
+use failure::{
+    Error,
+    ResultExt,
+};
 
-use crate::e621::io::emergency_exit;
-use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::entries::TagEntry;
-use crate::e621::sender::RequestSender;
+use crate::e621::{
+    io::{
+        emergency_exit,
+        parser::BaseParser,
+    },
+    sender::{
+        entries::TagEntry,
+        RequestSender,
+    },
+};
 
 /// Constant of the tag file's name.
 pub const TAG_NAME: &str = "tags.txt";
 pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
-#[derive(Debug, Clone, PartialOrd, PartialEq)]
+#[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
 pub enum TagCategory {
     /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
     General,
@@ -23,7 +32,7 @@ pub enum TagCategory {
 }
 
 /// The type a tag can be.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TagType {
     Pool,
     Set,
@@ -34,7 +43,7 @@ pub enum TagType {
 }
 
 /// A tag that contains its name, search type, and tag type.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tag {
     /// The name of the tag.
     name: String,

@@ -3,9 +3,22 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{Group, Tag, TagCategory, TagType};
-use crate::e621::io::{emergency_exit, Config, Login};
-use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
+use crate::e621::io::tag::{
+    Group,
+    Tag,
+    TagCategory,
+    TagType,
+};
+use crate::e621::io::{
+    emergency_exit,
+    Config,
+    Login,
+};
+use crate::e621::sender::entries::{
+    PoolEntry,
+    PostEntry,
+    SetEntry,
+};
 use crate::e621::sender::RequestSender;
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
@@ -160,7 +173,8 @@ impl Grabber {
     pub fn grab_favorites(&mut self) {
         let login = Login::load().unwrap_or_else(|e| {
 			error!("Unable to load `login.json`. Error: {}", e);
-			warn!("The program will use default values, but it is highly recommended to check your login.json file to ensure that everything is correct.");
+			warn!("The program will use default values, but it is highly recommended to check your login.json file to \
+			       ensure that everything is correct.");
 			Login::default()
 		});
         if !login.username().is_empty() && login.download_favorites() {

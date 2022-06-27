@@ -5,13 +5,31 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use failure::ResultExt;
-use reqwest::blocking::{Client, RequestBuilder, Response};
-use reqwest::header::{AUTHORIZATION, USER_AGENT};
+use reqwest::blocking::{
+    Client,
+    RequestBuilder,
+    Response,
+};
+use reqwest::header::{
+    AUTHORIZATION,
+    USER_AGENT,
+};
 use serde::de::DeserializeOwned;
-use serde_json::{from_value, Value};
+use serde_json::{
+    from_value,
+    Value,
+};
 
-use crate::e621::io::{emergency_exit, Login};
-use crate::e621::sender::entries::{AliasEntry, BulkPostEntry, PostEntry, TagEntry};
+use crate::e621::io::{
+    emergency_exit,
+    Login,
+};
+use crate::e621::sender::entries::{
+    AliasEntry,
+    BulkPostEntry,
+    PostEntry,
+    TagEntry,
+};
 
 pub mod entries;
 

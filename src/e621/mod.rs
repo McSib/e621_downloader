@@ -1,15 +1,20 @@
 use std::cell::RefCell;
-use std::fs::{create_dir_all, write};
+use std::fs::{
+    create_dir_all,
+    write,
+};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use blacklist::Blacklist;
 use dialoguer::Confirm;
 use failure::ResultExt;
-use indicatif::ProgressBar;
-use indicatif::{ProgressDrawTarget, ProgressStyle};
-
-use blacklist::Blacklist;
 use grabber::Grabber;
+use indicatif::{
+    ProgressBar,
+    ProgressDrawTarget,
+    ProgressStyle,
+};
 use io::tag::Group;
 use io::Config;
 use sender::RequestSender;

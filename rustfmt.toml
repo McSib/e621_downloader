@@ -1,0 +1,15 @@
+edition = "2021"
+#brace_style = "AlwaysNextLine"
+#control_brace_style = "AlwaysNextLine"
+#enum_discrim_align_thresold = 50
+#struct_field_align_thresold = 50
+#format_code_in_doc_comments = true
+#format_strings = true
+imports_layout = "Vertical"
+imports_granularity = "Module"
+merge_imports = true
+#indent_style = "Visual"
+reorder_impl_items = true
+group_imports = "StdExternalCrate"
+#struct_lit_single_line = false
+#use_field_init_shorthand = true
