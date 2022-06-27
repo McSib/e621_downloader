@@ -6,7 +6,7 @@ use serde::{
 use crate::e621::io::tag::TagType;
 
 /// GET return of alias entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AliasEntry {
     /// Alias ID.
     pub id: i64,
@@ -43,7 +43,7 @@ pub struct AliasEntry {
 }
 
 /// GET return of tag entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TagEntry {
     /// Id of the tag.
     pub id: i64,
@@ -90,13 +90,13 @@ impl TagEntry {
 }
 
 /// Wrapper struct that holds the return of bulk searches.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BulkPostEntry {
     pub posts: Vec<PostEntry>,
 }
 
 /// GET return of post entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PostEntry {
     /// The ID number of the post.
     pub id: i64,
@@ -162,7 +162,7 @@ pub struct PostEntry {
     pub is_favorited: bool,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct File {
     /// The width of the post.
     pub width: i64,
@@ -178,7 +178,7 @@ pub struct File {
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Preview {
     /// The width of the post preview.
     pub width: i64,
@@ -188,7 +188,7 @@ pub struct Preview {
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sample {
     ///  If the post has a sample/thumbnail or not.
     pub has: Option<bool>,
@@ -200,7 +200,7 @@ pub struct Sample {
     pub url: Option<String>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Score {
     /// The number of times voted up.
     pub up: i64,
@@ -210,7 +210,7 @@ pub struct Score {
     pub total: i64,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tags {
     /// An array of all the `general` tags on the post.
     pub general: Vec<String>,
@@ -249,7 +249,7 @@ impl Tags {
     }
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Flags {
     /// If the post is pending approval.
     pub pending: bool,
@@ -265,7 +265,7 @@ pub struct Flags {
     pub deleted: bool,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Relationships {
     /// The ID of the post’s parent, if it has one.
     pub parent_id: Option<i64>,
@@ -277,7 +277,7 @@ pub struct Relationships {
 }
 
 /// GET return of set entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SetEntry {
     /// The ID of the set.
     pub id: i64,
@@ -304,7 +304,7 @@ pub struct SetEntry {
 }
 
 /// GET return of pool entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PoolEntry {
     /// The ID of the pool.
     pub id: i64,
@@ -333,7 +333,7 @@ pub struct PoolEntry {
 }
 
 /// GET return of user entry for e621/e926.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UserEntry {
     /// The amount of wiki changes made by the user.
     pub wiki_page_version_count: i64,
