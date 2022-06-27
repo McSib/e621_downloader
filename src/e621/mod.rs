@@ -126,7 +126,7 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in &self.grabber.posts {
-            let short_collection_name = self.shorten_collection_name(&collection.name);
+            let short_collection_name = self.shorten_collection_name(&collection.name, "...");
             let mut static_path: PathBuf = [
                 &self.download_directory,
                 &collection.category,
@@ -145,13 +145,11 @@ impl WebConnector {
 
             #[cfg(target_os = "windows")]
             if path_len >= MAX_PATH {
-                let collection_name = &collection.name;
-                let split = collection_name.split_at(collection_name.len() / 2).0;
-
                 static_path = [
                     &self.download_directory,
                     &collection.category,
-                    &self.remove_invalid_chars(split),
+                    &self
+                        .remove_invalid_chars(&self.shorten_collection_name(&collection.name, "_")),
                 ]
                 .iter()
                 .collect();
@@ -247,10 +245,11 @@ impl WebConnector {
             .map(|e| e.posts.iter().map(|f| f.file_size as u64).sum::<u64>())
             .sum()
     }
-    fn shorten_collection_name(&self, name: &str) -> String {
+
+    fn shorten_collection_name(&self, name: &str, deliminator: &str) -> String {
         if name.len() >= 25 {
             let mut short_name = name[0..25].to_string();
-            short_name.push_str("...");
+            short_name.push_str(deliminator);
             short_name
         } else {
             name.to_string()
