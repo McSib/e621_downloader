@@ -102,15 +102,18 @@ pub struct Grabber {
     request_sender: RequestSender,
     /// Blacklist used to throwaway posts that contain tags the user may not want.
     blacklist: Option<Rc<RefCell<Blacklist>>>,
+    /// Is grabber in safe mode or not
+    safe_mode: bool,
 }
 
 impl Grabber {
     /// Creates new instance of `Self`.
-    pub fn new(request_sender: RequestSender) -> Self {
+    pub fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
         Grabber {
             posts: vec![PostCollection::new("Single Posts", "", Vec::new())],
             request_sender,
             blacklist: None,
+            safe_mode,
         }
     }
 
@@ -119,6 +122,10 @@ impl Grabber {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
         }
+    }
+
+    pub fn set_safe_mode(&mut self, mode: bool) {
+        self.safe_mode = mode;
     }
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
@@ -188,6 +195,7 @@ impl Grabber {
                         let entry: SetEntry = self
                             .request_sender
                             .get_entry_from_appended_id(&tag.name, "set");
+
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
                         self.posts.push(PostCollection::from_set(
@@ -203,20 +211,40 @@ impl Grabber {
                         );
                     }
                     TagType::Post => {
+                        let mut add_post = |entry: PostEntry, id: i64| {
+                            self.posts
+                                .first_mut()
+                                .unwrap()
+                                .posts
+                                .push(GrabbedPost::from(entry, &config.naming_convention));
+
+                            info!(
+                                "Post with ID {} grabbed!",
+                                console::style(format!("\"{}\"", id)).color256(39).italic()
+                            );
+                        };
+
                         let entry: PostEntry = self
                             .request_sender
                             .get_entry_from_appended_id(&tag.name, "single");
                         let id = entry.id;
-                        self.posts
-                            .first_mut()
-                            .unwrap()
-                            .posts
-                            .push(GrabbedPost::from(entry, &config.naming_convention));
 
-                        info!(
-                            "Post with ID {} grabbed!",
-                            console::style(format!("\"{}\"", id)).color256(39).italic()
-                        );
+                        if self.safe_mode {
+                            match entry.rating.as_str() {
+                                "s" => {
+                                    add_post(entry, id);
+                                }
+                                _ => {
+                                    info!(
+                                        "Skipping Post: {}",
+                                        console::style(format!("\"{}\"", id)).color256(39).italic()
+                                    );
+                                    info!("Post was found to be explicit or questionable...")
+                                }
+                            }
+                        } else {
+                            add_post(entry, id);
+                        }
                     }
                     TagType::General | TagType::Artist => {
                         let posts = self.get_posts_from_tag(tag);

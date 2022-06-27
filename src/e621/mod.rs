@@ -2,7 +2,6 @@ use std::cell::RefCell;
 use std::fs::{create_dir_all, write};
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::time::Duration;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
@@ -49,7 +48,7 @@ impl WebConnector {
             request_sender: request_sender.clone(),
             download_directory: config.download_directory,
             progress_bar: ProgressBar::hidden(),
-            grabber: Grabber::new(request_sender.clone()),
+            grabber: Grabber::new(request_sender.clone(), false),
             blacklist: Rc::new(RefCell::new(Blacklist::new(request_sender.clone()))),
         }
     }
@@ -73,6 +72,7 @@ impl WebConnector {
         trace!("Safe mode decision: {}", confirm_prompt);
         if confirm_prompt {
             self.request_sender.update_to_safe();
+            self.grabber.set_safe_mode(true);
         }
     }
 
@@ -217,14 +217,12 @@ impl WebConnector {
                 .template(
                     "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
                 )
-                .unwrap()
                 .progress_chars("=>-"),
         );
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.reset();
-        self.progress_bar
-            .enable_steady_tick(Duration::from_millis(100));
+        self.progress_bar.enable_steady_tick(100);
     }
 
     /// Downloads tuple of general posts and single posts.

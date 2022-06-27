@@ -11,7 +11,7 @@ smallvec = "1.8.0"
 tokio = "1.18.2"
 
 base64-url = "1.4.13"
-indicatif = "0.17.0-rc.10"
+indicatif = "0.16.2" # This is version locked until their performance issues are fixed.
 dialoguer = "0.10.1"
 console = "0.15.0"
 log = "0.4.17"
