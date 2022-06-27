@@ -12,15 +12,15 @@ use crate::e621::io::emergency_exit;
 #[derive(Default)]
 pub struct BaseParser {
     /// Current cursor position in the array of characters.
-    pub pos: usize,
+    pos: usize,
     /// Input used for parsing.
-    pub input: String,
+    input: String,
     /// The current column being parsed.
-    pub current_column: usize,
+    current_column: usize,
     /// The total number of characters in the input.
-    pub total_len: usize,
+    total_len: usize,
     /// The total number of columns in the input.
-    pub total_columns: usize,
+    total_columns: usize,
 }
 
 impl BaseParser {

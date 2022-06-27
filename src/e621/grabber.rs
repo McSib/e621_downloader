@@ -11,11 +11,11 @@ use crate::e621::sender::RequestSender;
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
     /// The url that leads to the file to download.
-    pub url: String,
+    url: String,
     /// The name of the file to download.
-    pub name: String,
+    name: String,
     /// The size of the file to download.
-    pub file_size: i64,
+    file_size: i64,
 }
 
 impl GrabbedPost {
@@ -23,7 +23,7 @@ impl GrabbedPost {
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
         let config = Config::get_config().unwrap();
         vec.into_iter()
-            .map(|e| GrabbedPost::from(e, config.naming_convention.as_str()))
+            .map(|e| GrabbedPost::from(e, config.naming_convention()))
             .collect()
     }
 
@@ -67,16 +67,28 @@ impl GrabbedPost {
             }
         }
     }
+
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn file_size(&self) -> i64 {
+        self.file_size
+    }
 }
 
 /// A set of posts with category and name.
 pub struct PostCollection {
     /// The name of the set.
-    pub name: String,
+    name: String,
     /// The category of the set.
-    pub category: String,
+    category: String,
     /// The posts in the set.
-    pub posts: Vec<GrabbedPost>,
+    posts: Vec<GrabbedPost>,
 }
 
 impl PostCollection {
@@ -92,12 +104,24 @@ impl PostCollection {
     pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
         PostCollection::new(&set.name, "Sets", posts)
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn category(&self) -> &str {
+        &self.category
+    }
+
+    pub fn posts(&self) -> &Vec<GrabbedPost> {
+        &self.posts
+    }
 }
 
 /// Grabs all posts under a set of searching tags.
 pub struct Grabber {
     /// All grabbed posts.
-    pub posts: Vec<PostCollection>,
+    posts: Vec<PostCollection>,
     /// `RequestSender` for sending API calls.
     request_sender: RequestSender,
     /// Blacklist used to throwaway posts that contain tags the user may not want.
@@ -115,6 +139,10 @@ impl Grabber {
             blacklist: None,
             safe_mode,
         }
+    }
+
+    pub fn posts(&self) -> &Vec<PostCollection> {
+        &self.posts
     }
 
     /// Sets the blacklist.
@@ -135,8 +163,8 @@ impl Grabber {
 			warn!("The program will use default values, but it is highly recommended to check your login.json file to ensure that everything is correct.");
 			Login::default()
 		});
-        if !login.username.is_empty() && login.download_favorites {
-            let tag_str = format!("fav:{}", login.username);
+        if !login.username().is_empty() && login.download_favorites() {
+            let tag_str = format!("fav:{}", login.username());
             let posts = self.special_search(tag_str.as_str());
             self.posts.push(PostCollection::new(
                 &tag_str,
@@ -156,12 +184,12 @@ impl Grabber {
     pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
         let config = Config::get_config().unwrap();
         for group in groups {
-            for tag in &group.tags {
-                match tag.tag_type {
+            for tag in group.tags() {
+                match tag.tag_type() {
                     TagType::Pool => {
                         let mut entry: PoolEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.name, "pool");
+                            .get_entry_from_appended_id(tag.name(), "pool");
                         let name = &entry.name;
                         let mut posts = self.special_search(&format!("pool:{}", entry.id));
 
@@ -194,7 +222,7 @@ impl Grabber {
                     TagType::Set => {
                         let entry: SetEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.name, "set");
+                            .get_entry_from_appended_id(tag.name(), "set");
 
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
@@ -216,7 +244,7 @@ impl Grabber {
                                 .first_mut()
                                 .unwrap()
                                 .posts
-                                .push(GrabbedPost::from(entry, &config.naming_convention));
+                                .push(GrabbedPost::from(entry, config.naming_convention()));
 
                             info!(
                                 "Post with ID {} grabbed!",
@@ -226,7 +254,7 @@ impl Grabber {
 
                         let entry: PostEntry = self
                             .request_sender
-                            .get_entry_from_appended_id(&tag.name, "single");
+                            .get_entry_from_appended_id(tag.name(), "single");
                         let id = entry.id;
 
                         if self.safe_mode {
@@ -249,13 +277,13 @@ impl Grabber {
                     TagType::General | TagType::Artist => {
                         let posts = self.get_posts_from_tag(tag);
                         self.posts.push(PostCollection::new(
-                            &tag.name,
+                            tag.name(),
                             "General Searches",
                             GrabbedPost::entry_to_vec(posts),
                         ));
                         info!(
                             "{} grabbed!",
-                            console::style(format!("\"{}\"", tag.name))
+                            console::style(format!("\"{}\"", tag.name()))
                                 .color256(39)
                                 .italic()
                         );
@@ -268,9 +296,9 @@ impl Grabber {
 
     /// Grabs posts from general tag.
     fn get_posts_from_tag(&self, tag: &Tag) -> Vec<PostEntry> {
-        match tag.search_type {
-            TagCategory::General => self.general_search(&tag.name),
-            TagCategory::Special => self.special_search(&tag.name),
+        match tag.search_type() {
+            TagCategory::General => self.general_search(tag.name()),
+            TagCategory::Special => self.special_search(tag.name()),
             TagCategory::None => unreachable!(),
         }
     }

@@ -19,9 +19,9 @@ pub const LOGIN_NAME: &str = "login.json";
 pub struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
-    pub download_directory: String,
+    download_directory: String,
     #[serde(rename = "fileNamingConvention")]
-    pub naming_convention: String,
+    naming_convention: String,
 }
 
 impl Config {
@@ -62,6 +62,14 @@ impl Config {
 
         Ok(config)
     }
+
+    pub fn download_directory(&self) -> &str {
+        &self.download_directory
+    }
+
+    pub fn naming_convention(&self) -> &str {
+        &self.naming_convention
+    }
 }
 
 impl Default for Config {
@@ -80,13 +88,13 @@ impl Default for Config {
 pub struct Login {
     /// Username of user.
     #[serde(rename = "Username")]
-    pub username: String,
+    username: String,
     /// The password hash (also known as the API key) for the user.
     #[serde(rename = "APIKey")]
-    pub api_key: String,
+    api_key: String,
     /// Whether or not the user wishes to download their favorites.
     #[serde(rename = "DownloadFavorites")]
-    pub download_favorites: bool,
+    download_favorites: bool,
 }
 
 impl Login {
@@ -127,6 +135,18 @@ impl Login {
         );
 
         Ok(())
+    }
+
+    pub fn username(&self) -> &str {
+        &self.username
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    pub fn download_favorites(&self) -> bool {
+        self.download_favorites
     }
 }
 

@@ -59,9 +59,9 @@ impl Program {
         // Creates connector and requester to prepare for downloading posts.
         let login = Login::load().unwrap();
         trace!("Login information loaded...");
-        trace!("Login Username: {}", login.username);
-        trace!("Login API Key: {}", "*".repeat(login.api_key.len()));
-        trace!("Login Download Favorites: {}", login.download_favorites);
+        trace!("Login Username: {}", login.username());
+        trace!("Login API Key: {}", "*".repeat(login.api_key().len()));
+        trace!("Login Download Favorites: {}", login.download_favorites());
 
         let request_sender = RequestSender::new(&login);
         let mut connector = WebConnector::new(&request_sender);
@@ -74,7 +74,7 @@ impl Program {
         // Collects all grabbed posts and moves it to connector to start downloading.
         if !login.is_empty() {
             trace!("Parsing user blacklist...");
-            connector.process_blacklist(&login.username);
+            connector.process_blacklist(login.username());
         } else {
             trace!("Skipping blacklist as user is not logged in...");
         }

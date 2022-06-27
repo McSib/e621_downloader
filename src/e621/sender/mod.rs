@@ -112,7 +112,7 @@ impl RequestSender {
         let auth = if login.is_empty() {
             String::new()
         } else {
-            base64_url::encode(format!("{}:{}", login.username, login.api_key).as_str())
+            base64_url::encode(format!("{}:{}", login.username(), login.api_key()).as_str())
         };
 
         RequestSender {

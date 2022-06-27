@@ -46,7 +46,7 @@ impl WebConnector {
         let config = Config::get_config().unwrap_or_default();
         WebConnector {
             request_sender: request_sender.clone(),
-            download_directory: config.download_directory,
+            download_directory: config.download_directory().to_string(),
             progress_bar: ProgressBar::hidden(),
             grabber: Grabber::new(request_sender.clone(), false),
             blacklist: Rc::new(RefCell::new(Blacklist::new(request_sender.clone()))),
@@ -125,12 +125,12 @@ impl WebConnector {
 
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
-        for collection in &self.grabber.posts {
-            let short_collection_name = self.shorten_collection_name(&collection.name, "...");
+        for collection in self.grabber.posts().iter() {
+            let short_collection_name = self.shorten_collection_name(collection.name(), "...");
             let mut static_path: PathBuf = [
                 &self.download_directory,
-                &collection.category,
-                &self.remove_invalid_chars(&collection.name),
+                collection.category(),
+                &self.remove_invalid_chars(collection.name()),
             ]
             .iter()
             .collect();
@@ -147,9 +147,10 @@ impl WebConnector {
             if path_len >= MAX_PATH {
                 static_path = [
                     &self.download_directory,
-                    &collection.category,
-                    &self
-                        .remove_invalid_chars(&self.shorten_collection_name(&collection.name, "_")),
+                    collection.category(),
+                    &self.remove_invalid_chars(
+                        &self.shorten_collection_name(collection.name(), "_"),
+                    ),
                 ]
                 .iter()
                 .collect();
@@ -162,20 +163,23 @@ impl WebConnector {
             }
 
             trace!("Printing Collection Info:");
-            trace!("Collection Name:            \"{}\"", collection.name);
-            trace!("Collection Category:        \"{}\"", collection.category);
-            trace!("Collection Post Length:     \"{}\"", collection.posts.len());
+            trace!("Collection Name:            \"{}\"", collection.name());
+            trace!("Collection Category:        \"{}\"", collection.category());
+            trace!(
+                "Collection Post Length:     \"{}\"",
+                collection.posts().len()
+            );
             trace!(
                 "Static file path for this collection: \"{}\"",
                 static_path.to_str().unwrap()
             );
 
-            for post in &collection.posts {
+            for post in collection.posts() {
                 self.progress_bar
                     .set_message(format!("Downloading: {} ", short_collection_name));
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
-                    &self.remove_invalid_chars(&post.name),
+                    &self.remove_invalid_chars(post.name()),
                 ]
                 .iter()
                 .collect();
@@ -194,18 +198,21 @@ impl WebConnector {
                 if file_path.exists() {
                     self.progress_bar
                         .set_message("Duplicate found: skipping... ");
-                    self.progress_bar.inc(post.file_size as u64);
+                    self.progress_bar.inc(post.file_size() as u64);
                     continue;
                 }
 
                 let bytes = self
                     .request_sender
-                    .download_image(&post.url, post.file_size);
+                    .download_image(post.url(), post.file_size());
                 self.save_image(file_path.to_str().unwrap(), &bytes);
-                self.progress_bar.inc(post.file_size as u64);
+                self.progress_bar.inc(post.file_size() as u64);
             }
 
-            trace!("Collection {} is finished downloading...", collection.name);
+            trace!(
+                "Collection {} is finished downloading...",
+                collection.name()
+            );
         }
     }
 
@@ -238,9 +245,9 @@ impl WebConnector {
     /// Gets the total size (in KB) of every post image to be downloaded.
     fn get_total_file_size(&self) -> u64 {
         self.grabber
-            .posts
+            .posts()
             .iter()
-            .map(|e| e.posts.iter().map(|f| f.file_size as u64).sum::<u64>())
+            .map(|e| e.posts().iter().map(|f| f.file_size() as u64).sum::<u64>())
             .sum()
     }
 

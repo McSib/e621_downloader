@@ -37,11 +37,11 @@ pub enum TagType {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tag {
     /// The name of the tag.
-    pub name: String,
+    name: String,
     /// The search type of the tag.
-    pub search_type: TagCategory,
+    search_type: TagCategory,
     /// The tag type of the tag.
-    pub tag_type: TagType,
+    tag_type: TagType,
 }
 
 impl Tag {
@@ -51,6 +51,18 @@ impl Tag {
             search_type: category,
             tag_type,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn search_type(&self) -> &TagCategory {
+        &self.search_type
+    }
+
+    pub fn tag_type(&self) -> &TagType {
+        &self.tag_type
     }
 }
 
@@ -68,9 +80,9 @@ impl Default for Tag {
 #[derive(Debug, Clone)]
 pub struct Group {
     /// The name of group.
-    pub name: String,
+    name: String,
     /// A `Vec` containing all the tags parsed.
-    pub tags: Vec<Tag>,
+    tags: Vec<Tag>,
 }
 
 impl Group {
@@ -79,6 +91,14 @@ impl Group {
             name,
             tags: Vec::new(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn tags(&self) -> &Vec<Tag> {
+        &self.tags
     }
 }
 
@@ -262,7 +282,7 @@ impl TagParser {
                 break;
             }
 
-            tags.push(self.parse_tag(&group.name));
+            tags.push(self.parse_tag(group.name()));
         }
 
         group.tags = tags;
