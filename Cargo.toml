@@ -5,11 +5,15 @@ authors = ["McSib <mcsibsart@gmail.com>"]
 edition = "2021"
 
 [dependencies]
+
 # These are added to fix security vulnerabilities.
 regex = "1.5.6"
 smallvec = "1.8.0"
 tokio = "1.18.2"
 
+crossterm = "0.23.2"
+terminal-menu = { path = "terminal-menu-rs" }
+#inquire = "0.2.1"
 base64-url = "1.4.13"
 indicatif = "0.16.2" # This is version locked until their performance issues are fixed.
 dialoguer = "0.10.1"

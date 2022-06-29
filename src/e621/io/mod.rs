@@ -42,6 +42,19 @@ impl Config {
         &self.naming_convention
     }
 
+    pub fn set_download_directory(&mut self, download_directory: String) {
+        self.download_directory = download_directory;
+    }
+
+    pub fn set_naming_convention(&mut self, naming_convention: String) {
+        self.naming_convention = naming_convention;
+    }
+
+    pub fn save_config(&self) {
+        let json = to_string_pretty(self).unwrap();
+        write(Path::new(CONFIG_NAME), json).unwrap();
+    }
+
     /// Checks config and ensure it isn't missing.
     pub fn config_exists() -> bool {
         if !Path::new(CONFIG_NAME).exists() {
@@ -117,6 +130,23 @@ impl Login {
 
     pub fn download_favorites(&self) -> bool {
         self.download_favorites
+    }
+
+    pub fn set_username(&mut self, username: String) {
+        self.username = username;
+    }
+
+    pub fn set_api_key(&mut self, api_key: String) {
+        self.api_key = api_key;
+    }
+
+    pub fn set_download_favorites(&mut self, download_favorites: bool) {
+        self.download_favorites = download_favorites;
+    }
+
+    pub fn save_login(&self) {
+        let json = to_string_pretty(self).unwrap();
+        write(LOGIN_NAME, json).unwrap();
     }
 
     /// Loads the login file or creates one if it doesn't exist.
