@@ -1,0 +1,20 @@
+[package]
+name = "terminal-menu"
+version = "2.0.4"
+authors = ["Samuel Kriikkula <samuel@kriikkula.com>"]
+edition = "2018"
+description = "Display simple menus on the terminal"
+license = "MIT"
+repository = "https://gitlab.com/xamn/terminal-menu-rs"
+readme = "README.md"
+keywords = ["terminal", "menu"]
+categories = ["command-line-utilities", "command-line-interface"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[badges]
+gitlab = { repository = "xamn/terminal-menu-rs" }
+
+[dependencies]
+crossterm = "0.23.*"
+lazy_static = "1.4.0"
