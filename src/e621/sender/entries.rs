@@ -3,8 +3,6 @@ use serde::{
     Serialize,
 };
 
-use crate::e621::io::tag::TagType;
-
 /// GET return of alias entry for e621/e926.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AliasEntry {
@@ -72,21 +70,6 @@ pub struct TagEntry {
     pub created_at: String,
     /// The date the tag was updated.
     pub updated_at: String,
-}
-
-impl TagEntry {
-    /// Constrains the `TagType` enum to a tags type specifically.
-    /// This can only be `TagType::General` or `TagType::Artist`.
-    pub fn to_tag_type(&self) -> TagType {
-        match self.category {
-            // `0`: General; `3`: Copyright; `5`: Species; `4`: Character; `6`: Invalid;
-            // `7`: Meta; `8`: Lore;
-            0 | 3..=8 => TagType::General,
-            // `1`: Artist;
-            1 => TagType::Artist,
-            _ => unreachable!(),
-        }
-    }
 }
 
 /// Wrapper struct that holds the return of bulk searches.

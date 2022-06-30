@@ -15,11 +15,12 @@ use indicatif::{
     ProgressDrawTarget,
     ProgressStyle,
 };
-use io::tag::Group;
 use io::Config;
 use sender::RequestSender;
 
 use crate::e621::sender::entries::UserEntry;
+
+use self::io::tag::UserTags;
 
 pub mod blacklist;
 pub mod grabber;
@@ -99,10 +100,10 @@ impl WebConnector {
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
-    pub fn grab_all(&mut self, groups: &[Group]) {
+    pub fn grab_all(&mut self, user_tags: &UserTags) {
         trace!("Grabbing posts...");
         self.grabber.grab_favorites();
-        self.grabber.grab_posts_by_tags(groups);
+        self.grabber.grab_posts_by_tags(user_tags);
     }
 
     /// Saves image to download directory.

@@ -1,177 +1,215 @@
-use std::fs::read_to_string;
+use std::fs::{
+    read_to_string,
+    write,
+};
 
 use failure::{
     Error,
     ResultExt,
 };
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use serde_json::{
+    from_str,
+    to_string_pretty,
+};
 
 use crate::e621::io::emergency_exit;
-use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::entries::TagEntry;
+use crate::e621::sender::entries::{
+    PoolEntry,
+    PostEntry,
+    SetEntry,
+    TagEntry,
+};
 use crate::e621::sender::RequestSender;
 
+// TODO: Implement a special character section for character tags
+
 /// Constant of the tag file's name.
-pub const TAG_NAME: &str = "tags.txt";
-pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
+pub const TAG_NAME: &str = "tags.json";
+pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.json");
 
-/// A tag that can be either general or special.
-#[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub enum TagCategory {
-    /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
-    General,
-    /// A special tag that is searched differently from general tags (artist and characters).
-    Special,
-    /// This is used only if the type of tag is `2` or its greater than `5`.
-    None,
-}
-
-/// The type a tag can be.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TagType {
-    Pool,
+pub enum IdTagSearchType {
+    Single,
     Set,
-    General,
-    Artist,
-    Post,
-    Unknown,
+    Pool,
 }
 
-/// A tag that contains its name, search type, and tag type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tag {
-    /// The name of the tag.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct StringTag {
     name: String,
-    /// The search type of the tag.
-    search_type: TagCategory,
-    /// The tag type of the tag.
-    tag_type: TagType,
+    validated: bool,
 }
 
-impl Tag {
-    fn new(tag: &str, category: TagCategory, tag_type: TagType) -> Self {
-        Tag {
-            name: String::from(tag),
-            search_type: category,
-            tag_type,
-        }
-    }
-
+impl StringTag {
     pub fn name(&self) -> &str {
         &self.name
     }
+}
 
-    pub fn search_type(&self) -> &TagCategory {
-        &self.search_type
-    }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct IdTag {
+    id: u32,
+    validated: bool,
+}
 
-    pub fn tag_type(&self) -> &TagType {
-        &self.tag_type
+impl IdTag {
+    pub fn id(&self) -> u32 {
+        self.id
     }
 }
 
-impl Default for Tag {
-    fn default() -> Self {
-        Tag {
-            name: String::new(),
-            search_type: TagCategory::None,
-            tag_type: TagType::Unknown,
-        }
-    }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UserTags {
+    artists: Vec<StringTag>,
+    pools: Vec<IdTag>,
+    sets: Vec<IdTag>,
+    single_posts: Vec<IdTag>,
+    general: Vec<StringTag>,
 }
 
-/// Group object generated from parsed code.
-#[derive(Debug, Clone)]
-pub struct Group {
-    /// The name of group.
-    name: String,
-    /// A `Vec` containing all the tags parsed.
-    tags: Vec<Tag>,
-}
-
-impl Group {
-    pub fn new(name: String) -> Self {
-        Group {
-            name,
-            tags: Vec::new(),
-        }
+impl UserTags {
+    pub fn artists(&self) -> &Vec<StringTag> {
+        &self.artists
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn pools(&self) -> &Vec<IdTag> {
+        &self.pools
     }
 
-    pub fn tags(&self) -> &Vec<Tag> {
-        &self.tags
+    pub fn sets(&self) -> &Vec<IdTag> {
+        &self.sets
+    }
+
+    pub fn single_posts(&self) -> &Vec<IdTag> {
+        &self.single_posts
+    }
+
+    pub fn general(&self) -> &Vec<StringTag> {
+        &self.general
     }
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
-    TagParser {
-        parser: BaseParser::new(
-            read_to_string(TAG_NAME)
-                .with_context(|e| {
-                    error!("Unable to read tag file!");
-                    trace!("Possible I/O block when trying to read tag file...");
-                    format!("{}", e)
-                })
-                .unwrap(),
-        ),
-        request_sender: request_sender.clone(),
-    }
-    .parse_groups()
+pub fn parse_tag_file(request_sender: &RequestSender) -> Result<UserTags, Error> {
+    let tag_validator = TagValidator::new(&request_sender);
+    let mut user_tags: UserTags = from_str(
+        &read_to_string(TAG_NAME)
+            .with_context(|e| {
+                error!("Unable to read tag file!");
+                trace!("Possible I/O block when trying to read tag file...");
+                format!("{}", e)
+            })
+            .unwrap(),
+    )
+    .unwrap();
+
+    tag_validator.validate_user_tags(&mut user_tags);
+    let json = to_string_pretty(&user_tags).unwrap();
+    write(TAG_NAME, &json).unwrap();
+
+    Ok(user_tags)
 }
 
-/// Identifier to help categorize tags.
-pub struct TagIdentifier {
-    /// Request sender for making any needed API calls.
+pub struct TagValidator {
     request_sender: RequestSender,
 }
 
-impl TagIdentifier {
-    /// Creates new identifier.
-    fn new(request_sender: RequestSender) -> Self {
-        TagIdentifier { request_sender }
+impl TagValidator {
+    pub fn new(request_sender: &RequestSender) -> Self {
+        TagValidator {
+            request_sender: request_sender.clone(),
+        }
     }
 
-    /// Identifies tag and returns `Tag`.
-    fn id_tag(tags: &str, request_sender: RequestSender) -> Tag {
-        let identifier = TagIdentifier::new(request_sender);
-        identifier.search_for_tag(tags)
+    pub fn validate_user_tags(&self, user_tags: &mut UserTags) {
+        self.validate_string_tags(&mut user_tags.artists);
+        self.validate_id_tags(&mut user_tags.single_posts, IdTagSearchType::Single);
+        self.validate_id_tags(&mut user_tags.sets, IdTagSearchType::Set);
+        self.validate_id_tags(&mut user_tags.pools, IdTagSearchType::Pool);
+        self.validate_string_tags(&mut user_tags.general);
     }
 
-    /// Search for tag on e621.
-    fn search_for_tag(&self, tags: &str) -> Tag {
-        // Splits the tags and cycles through each one, checking if they are valid and searchable tags
-        // If the tag isn't searchable, the tag will default and consider itself invalid. Which will
-        // then be filtered through the last step.
-        let mut map = tags
-            .split(' ')
-            .map(|e| {
-                let temp = e.trim_start_matches('-');
-                match self.request_sender.get_tags_by_name(temp).first() {
-                    Some(entry) => self.create_tag(tags, entry),
-                    None => {
-                        if let Some(alias_tag) = self.get_tag_from_alias(temp) {
-                            self.create_tag(tags, &alias_tag)
-                        } else if temp.contains(':') {
-                            Tag::default()
-                        } else {
-                            self.exit_tag_failure(temp);
-                            unreachable!();
+    pub fn validate_string_tags(&self, tags: &mut Vec<StringTag>) {
+        for tag in tags {
+            if !tag.validated {
+                self.search_for_tag(tag);
+
+                if !tag.validated {
+                    emergency_exit(&format!(
+                        "Tag {} is not valid! Please ensure the tag is typed in correctly.",
+                        tag.name
+                    ));
+                }
+            }
+        }
+    }
+
+    pub fn validate_id_tags(&self, tags: &mut Vec<IdTag>, id_type: IdTagSearchType) {
+        for tag in tags {
+            if !tag.validated {
+                match id_type {
+                    IdTagSearchType::Single => {
+                        let is_post = self.request_sender.is_entry_from_appended_id::<PostEntry>(
+                            &format!("{}", tag.id),
+                            "single",
+                        );
+
+                        if is_post {
+                            tag.validated = true;
+                        }
+                    }
+                    IdTagSearchType::Set => {
+                        let is_set = self
+                            .request_sender
+                            .is_entry_from_appended_id::<SetEntry>(&format!("{}", tag.id), "set");
+
+                        if is_set {
+                            tag.validated = true;
+                        }
+                    }
+                    IdTagSearchType::Pool => {
+                        let is_pool = self
+                            .request_sender
+                            .is_entry_from_appended_id::<PoolEntry>(&format!("{}", tag.id), "pool");
+
+                        if is_pool {
+                            tag.validated = true;
                         }
                     }
                 }
-            })
-            .filter(|e| *e != Tag::default());
 
-        // Tries to return any tag in the map with category special, return the last element otherwise.
-        // If returning the last element fails, assume the tag is syntax only and default.
-        map.find(|e| e.search_type == TagCategory::Special)
-            .unwrap_or_else(|| {
-                map.last()
-                    .unwrap_or_else(|| Tag::new(tags, TagCategory::General, TagType::General))
-            })
+                if !tag.validated {
+                    emergency_exit(&format!(
+                        "Tag {} is not valid! Please ensure the tag is typed in correctly.",
+                        tag.id
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Search for tag on e621.
+    fn search_for_tag(&self, tag_search_term: &mut StringTag) {
+        for tag in tag_search_term.name.clone().split(' ') {
+            let temp = tag.trim_start_matches('-');
+            match self.request_sender.get_tags_by_name(temp).first() {
+                Some(_) => tag_search_term.validated = true,
+                None => {
+                    if let Some(alias_tag) = self.get_tag_from_alias(temp) {
+                        tag_search_term.name = alias_tag.name;
+                        tag_search_term.validated = true;
+                    } else if temp.contains(':') {
+                        tag_search_term.validated = true;
+                    } else {
+                        self.exit_tag_failure(temp);
+                        unreachable!();
+                    }
+                }
+            }
+        }
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
@@ -198,168 +236,5 @@ impl TagIdentifier {
         error!("{} is invalid!", tag);
         info!("The tag may be a typo, be sure to double check and ensure that the tag is correct.");
         emergency_exit(format!("The server API call was unable to find tag: {}!", tag).as_str());
-    }
-
-    /// Processes the tag type and creates the appropriate tag for it.
-    fn create_tag(&self, tags: &str, tag_entry: &TagEntry) -> Tag {
-        let tag_type = tag_entry.to_tag_type();
-        let category = match tag_type {
-            TagType::General => {
-                const CHARACTER_CATEGORY: u8 = 4;
-                if tag_entry.category == CHARACTER_CATEGORY {
-                    if tag_entry.post_count > 1500 {
-                        TagCategory::General
-                    } else {
-                        TagCategory::Special
-                    }
-                } else {
-                    TagCategory::General
-                }
-            }
-            TagType::Artist => TagCategory::Special,
-            _ => unreachable!(),
-        };
-
-        Tag::new(tags, category, tag_type)
-    }
-}
-
-/// Parser that reads a tag file and parses the tags.
-struct TagParser {
-    /// Low-level parser for parsing raw data.
-    parser: BaseParser,
-    /// Request sender for any needed API calls.
-    request_sender: RequestSender,
-}
-
-impl TagParser {
-    /// Parses each group with all tags tied to them before returning a vector with all groups in it.
-    pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
-        let mut groups: Vec<Group> = Vec::new();
-        loop {
-            self.parser.consume_whitespace();
-            if self.parser.eof() {
-                break;
-            }
-
-            if self.check_and_parse_comment() {
-                continue;
-            }
-
-            if self.parser.starts_with("[") {
-                groups.push(self.parse_group());
-            } else {
-                self.parser.report_error("Tags must be in groups!");
-            }
-        }
-
-        Ok(groups)
-    }
-
-    /// Parses a group and all tags tied to it before returning the result.
-    fn parse_group(&mut self) -> Group {
-        assert_eq!(self.parser.consume_char(), '[');
-        let group_name = self.parser.consume_while(valid_group);
-        assert_eq!(self.parser.consume_char(), ']');
-
-        let mut group = Group::new(group_name);
-        self.parse_tags(&mut group);
-
-        group
-    }
-
-    /// Parses all tags for a group and stores it.
-    fn parse_tags(&mut self, group: &mut Group) {
-        let mut tags: Vec<Tag> = Vec::new();
-        loop {
-            self.parser.consume_whitespace();
-            if self.check_and_parse_comment() {
-                continue;
-            }
-
-            if self.parser.starts_with("[") {
-                break;
-            }
-
-            if self.parser.eof() {
-                break;
-            }
-
-            tags.push(self.parse_tag(group.name()));
-        }
-
-        group.tags = tags;
-    }
-
-    /// Parses a single tag and identifies it before returning the result.
-    fn parse_tag(&mut self, group_name: &str) -> Tag {
-        match group_name {
-            "artists" | "general" => {
-                let tag = self.parser.consume_while(valid_tag);
-                TagIdentifier::id_tag(&tag, self.request_sender.clone())
-            }
-            e => {
-                let tag = self.parser.consume_while(valid_id);
-                let tag_type = match e {
-                    "pools" => TagType::Pool,
-                    "sets" => TagType::Set,
-                    "single-post" => TagType::Post,
-                    _ => {
-                        self.parser.report_error("Unknown tag type!");
-                        TagType::Unknown
-                    }
-                };
-
-                Tag::new(&tag, TagCategory::Special, tag_type)
-            }
-        }
-    }
-
-    /// Checks if next character is comment identifier and parses it if it is.
-    fn check_and_parse_comment(&mut self) -> bool {
-        if self.parser.starts_with("#") {
-            self.parse_comment();
-            return true;
-        }
-
-        false
-    }
-
-    /// Skips over comment.
-    fn parse_comment(&mut self) {
-        self.parser.consume_while(valid_comment);
-    }
-}
-
-/// Validates character for tag.
-fn valid_tag(c: char) -> bool {
-    match c {
-        ' '..='\"' | '$'..='~' => true,
-        // This will check for any special characters in the validator.
-        _ => {
-            if c != '#' {
-                return c.is_alphanumeric();
-            }
-
-            false
-        }
-    }
-}
-
-///// Validates character for id.
-fn valid_id(c: char) -> bool {
-    matches!(c, '0'..='9')
-}
-
-/// Validates character for group
-fn valid_group(c: char) -> bool {
-    matches!(c, 'A'..='Z' | 'a'..='z' | '-')
-}
-
-/// Validates character for comment.
-fn valid_comment(c: char) -> bool {
-    match c {
-        ' '..='~' => true,
-        _ => c.is_alphanumeric(),
     }
 }

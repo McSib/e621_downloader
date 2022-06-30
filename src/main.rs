@@ -30,12 +30,10 @@ use terminal_menu::{
     back_button,
     button,
     label,
-    list,
     list_with_default_value,
     menu,
     mut_menu,
     run,
-    scroll,
     scroll_with_default_value,
     string,
     submenu,
@@ -47,7 +45,6 @@ use crate::program::Program;
 
 mod e621;
 mod program;
-mod ui;
 
 /// Logs important information about the system being used.
 /// This is useful for debugging purposes.
@@ -101,42 +98,6 @@ fn main() -> Result<(), Error> {
 
     log_system_information();
 
-    // let program = Program::new();
-    // program.run()
-
-    // let mut menu = Menu::new(
-    //     "e621_downloader",
-    //     vec![
-    //         Label("Run Downloader"),
-    //         SubMenu(Menu::new(
-    //             "Settings",
-    //             vec![
-    //                 SubMenu(Menu::new(
-    //                     "Config Settings",
-    //                     vec![
-    //                         Label("Download Directory"),
-    //                         Label("Naming Convention"),
-    //                         BackButton("Back"),
-    //                     ],
-    //                 )),
-    //                 SubMenu(Menu::new(
-    //                     "Login Settings",
-    //                     vec![
-    //                         Label("Username"),
-    //                         Label("API Key"),
-    //                         Label("Download Favorites"),
-    //                         BackButton("Back"),
-    //                     ],
-    //                 )),
-    //                 BackButton("Back"),
-    //             ],
-    //         )),
-    //         BackButton("Exit"),
-    //     ],
-    // );
-
-    // menu.run();
-
     if !e621::io::Config::config_exists() {
         e621::io::Config::create_config().unwrap();
     }
@@ -147,6 +108,7 @@ fn main() -> Result<(), Error> {
     let menu = menu(vec![
         label("e621_downloader"),
         button("Run Downloader"),
+        button("Edit Tags"),
         submenu(
             "Settings",
             vec![
@@ -193,6 +155,11 @@ fn main() -> Result<(), Error> {
     update_config(&mut config, &menu);
     update_login(&mut login, &menu);
 
+    let edit_tags = mut_menu(&menu).selected_item_name() == "Edit Tags";
+    if edit_tags {
+        edit_tags_menu();
+    }
+
     let start = mut_menu(&menu).selected_item_name() == "Run Downloader";
     if start {
         let program = Program::new();
@@ -231,4 +198,41 @@ fn update_login(login: &mut Login, menu: &TerminalMenu) {
     });
 
     login.save_login();
+}
+
+fn edit_tags_menu() {
+    // Editing tags will be different from what it used to be.
+    // There will be five categories: Artist, pools, sets, single posts, and general.
+    // There will be a menu with six buttons, five of which will be for the five categories. The last button will be for the back button.
+    // Whenever the user clicks on a button, the menu will close and then a new menu will open, listing all tags for the category that was clicked on,
+    // with an option to add a new tag or to go back. If the user adds a new tag, it will validate that the tag is not already in the list and that the
+    // tag exists on e621. If the tag is valid, it will be added to the list. If the tag is not valid, it will not be added to the list.
+    // It will also tell the user if the tag is invalid or already in the list.
+    // let mut tag_menu = menu(
+    //     vec![
+    //         label("Edit Tags:"),
+    //         button("Artist"),
+    //         button("Pools"),
+    //         button("Sets"),
+    //         button("Single Posts"),
+    //         button("General"),
+    //         back_button("Back"),
+    //     ],
+    // );
+
+    // run(&tag_menu);
+
+    // let mut mut_menu = mut_menu(&tag_menu);
+    // TODO: Implement a way to edit tags.
+    // if mut_menu.selected_item_name() == "Artist" {
+    //     edit_tags_artist();
+    // } else if mut_menu.selected_item_name() == "Pools" {
+    //     edit_tags_pools();
+    // } else if mut_menu.selected_item_name() == "Sets" {
+    //     edit_tags_sets();
+    // } else if mut_menu.selected_item_name() == "Single Posts" {
+    //     edit_tags_single_posts();
+    // } else if mut_menu.selected_item_name() == "General" {
+    //     edit_tags_general();
+    // }
 }

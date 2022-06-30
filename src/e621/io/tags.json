@@ -1,0 +1,27 @@
+{
+    "artists": [
+        {
+            "name": "braeburned",
+            "validated": false
+        }],
+    "pools": [
+        {
+            "id": 1106,
+            "validated": false
+        }],
+    "sets": [
+        {
+            "id": 28495,
+            "validated": false
+        }],
+    "single_posts": [
+        {
+            "id": 1662487,
+            "validated": false
+        }],
+    "general": [
+        {
+            "name": "lutrine order:score",
+            "validated": false
+        }]
+}

@@ -296,6 +296,61 @@ impl RequestSender {
         }
     }
 
+    pub fn is_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> bool
+    where
+        T: DeserializeOwned,
+    {
+        let value: Value = self
+            .check_response(
+                self.client
+                    .get_with_auth(&self.append_url(&self.urls.borrow()[url_type_key], id))
+                    .send(),
+            )
+            .json()
+            .with_context(|e| {
+                error!(
+                    "Json was unable to deserialize to \"{}\"!",
+                    type_name::<Value>()
+                );
+                trace!("url_type_key: {}", url_type_key);
+                trace!("id: {}", id);
+                format!("{}", e)
+            })
+            .unwrap();
+        match url_type_key {
+            "single" => {
+                let type_value = from_value::<T>(value.get("post").unwrap().clone())
+                .with_context(|e| {
+                    error!(
+                        "Could not convert single post to type \"{}\"!",
+                        type_name::<T>()
+                    );
+                    trace!(
+                        "Unexpected error occurred when trying to perform conversion from value to entry type above."
+                    );
+                    format!("{}", e)
+                });
+
+                type_value.is_ok()
+            },
+            _ => {
+                let type_value = from_value::<T>(value)
+                .with_context(|e| {
+                    error!(
+                        "Could not convert entry to type \"{}\"!",
+                        type_name::<T>()
+                    );
+                    trace!(
+                        "Unexpected error occurred when trying to perform conversion from value to entry type above."
+                    );
+                    format!("{}", e)
+                });
+
+                type_value.is_ok()
+            },
+        }
+    }
+
     /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
         debug!("Downloading page {} of tag {}", page, searching_tag);

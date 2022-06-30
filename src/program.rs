@@ -77,7 +77,7 @@ impl Program {
 
         // Parses tag file.
         trace!("Parsing tag file...");
-        let groups = parse_tag_file(&request_sender)?;
+        let user_tags = parse_tag_file(&request_sender)?;
 
         // Collects all grabbed posts and moves it to connector to start downloading.
         if !login.is_empty() {
@@ -87,7 +87,7 @@ impl Program {
             trace!("Skipping blacklist as user is not logged in...");
         }
 
-        connector.grab_all(&groups);
+        connector.grab_all(&user_tags);
         connector.download_posts();
 
         info!("Finished downloading posts!");
