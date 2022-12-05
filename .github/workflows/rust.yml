@@ -19,6 +19,8 @@ jobs:
       uses: actions-rs/toolchain@v1.0.6
       with:
         toolchain: nightly
+    - name: Configure OpenSSL
+      run: sudo apt-get install libssl-dev
     - name: Build
       run: cargo build
     - name: Run tests
