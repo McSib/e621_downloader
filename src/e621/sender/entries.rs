@@ -322,8 +322,6 @@ pub struct PoolEntry {
     pub is_active: bool,
     /// Can be `series` or `collection`.
     pub category: String,
-    /// If the pool has been deleted.
-    pub is_deleted: bool,
     /// An array group of posts in the pool.
     pub post_ids: Vec<i64>,
     /// The name of the user that created the pool.
