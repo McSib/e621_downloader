@@ -5,6 +5,7 @@ use std::fs::{
 };
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::Duration;
 
 use blacklist::Blacklist;
 use dialoguer::Confirm;
@@ -229,12 +230,13 @@ impl WebConnector {
                 .template(
                     "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
                 )
+                .unwrap()
                 .progress_chars("=>-"),
         );
         self.progress_bar
             .set_draw_target(ProgressDrawTarget::stderr());
         self.progress_bar.reset();
-        self.progress_bar.enable_steady_tick(100);
+        self.progress_bar.enable_steady_tick(Duration::from_millis(100));
     }
 
     /// Downloads tuple of general posts and single posts.
