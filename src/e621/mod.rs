@@ -222,19 +222,16 @@ impl WebConnector {
 
     /// Initializes the progress bar for downloading process.
     fn initialize_progress_bar(&mut self, len: u64) {
-        self.progress_bar.set_length(len);
-        self.progress_bar.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
-                )
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        self.progress_bar
-            .set_draw_target(ProgressDrawTarget::stderr());
-        self.progress_bar.reset();
-        self.progress_bar.enable_steady_tick(Duration::from_millis(100));
+        self.progress_bar = ProgressBarBuilder::new(len)
+            .style(
+                ProgressStyleBuilder::default()
+                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}")
+                    .progress_chars("=>-")
+                    .progress_style)
+            .draw_target(ProgressDrawTarget::stderr())
+            .reset()
+            .steady_tick(Duration::from_millis(100))
+            .build();
     }
 
     /// Downloads tuple of general posts and single posts.
