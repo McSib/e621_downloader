@@ -214,12 +214,12 @@ fn valid_user(c: char) -> bool {
 
 /// Validates character for rating.
 fn valid_rating(c: char) -> bool {
-    matches!(c, 'A'..='Z' | 'a'..='z')
+    c.is_ascii_alphabetic()
 }
 
 /// Validates character for id.
 fn valid_id(c: char) -> bool {
-    matches!(c, '0'..='9')
+    c.is_ascii_digit()
 }
 
 /// The flag worker flags and removes any grabbed post that matches with all of the tags in a `LineToken`.
@@ -307,7 +307,7 @@ impl FlagWorker {
                         .parse::<i64>()
                         .with_context(|e| {
                             error!("Failed to parse blacklisted user id: {}!", tag.name);
-                            format!("{}", e)
+                            format!("{e}")
                         })
                         .unwrap();
                     self.flag_user(user_id, post.uploader_id, tag.negated);
@@ -413,7 +413,7 @@ impl Blacklist {
         }
 
         if filtered > 0 {
-            trace!("Filtered {} posts with blacklist...", filtered);
+            trace!("Filtered {filtered} posts with blacklist...");
         } else {
             trace!("No posts filtered...");
         }

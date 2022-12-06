@@ -179,7 +179,7 @@ impl Grabber {
             ));
             info!(
                 "{} grabbed!",
-                console::style(format!("\"{}\"", tag_str))
+                console::style(format!("\"{tag_str}\""))
                     .color256(39)
                     .italic()
             );
@@ -220,9 +220,7 @@ impl Grabber {
 
                         info!(
                             "{} grabbed!",
-                            console::style(format!("\"{}\"", name))
-                                .color256(39)
-                                .italic()
+                            console::style(format!("\"{name}\"")).color256(39).italic()
                         );
                     }
                     TagType::Set => {
@@ -254,7 +252,7 @@ impl Grabber {
 
                             info!(
                                 "Post with ID {} grabbed!",
-                                console::style(format!("\"{}\"", id)).color256(39).italic()
+                                console::style(format!("\"{id}\"")).color256(39).italic()
                             );
                         };
 
@@ -271,7 +269,7 @@ impl Grabber {
                                 _ => {
                                     info!(
                                         "Skipping Post: {}",
-                                        console::style(format!("\"{}\"", id)).color256(39).italic()
+                                        console::style(format!("\"{id}\"")).color256(39).italic()
                                     );
                                     info!("Post was found to be explicit or questionable...")
                                 }
@@ -400,7 +398,7 @@ impl Grabber {
         // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
         posts.retain(|e| {
-            if !e.flags.deleted && e.file.url != None {
+            if !e.flags.deleted && e.file.url.is_some() {
                 true
             } else {
                 invalid_posts += 1;

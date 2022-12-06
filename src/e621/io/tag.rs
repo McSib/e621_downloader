@@ -110,7 +110,7 @@ pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Erro
                 .with_context(|e| {
                     error!("Unable to read tag file!");
                     trace!("Possible I/O block when trying to read tag file...");
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
         ),
@@ -192,9 +192,9 @@ impl TagIdentifier {
 
     /// Emergency exits if a tag isn't identified.
     fn exit_tag_failure(&self, tag: &str) {
-        error!("{} is invalid!", tag);
+        error!("{tag} is invalid!");
         info!("The tag may be a typo, be sure to double check and ensure that the tag is correct.");
-        emergency_exit(format!("The server API call was unable to find tag: {}!", tag).as_str());
+        emergency_exit(format!("The server API call was unable to find tag: {tag}!").as_str());
     }
 
     /// Processes the tag type and creates the appropriate tag for it.
@@ -345,7 +345,7 @@ fn valid_tag(c: char) -> bool {
 
 ///// Validates character for id.
 fn valid_id(c: char) -> bool {
-    matches!(c, '0'..='9')
+    c.is_ascii_digit()
 }
 
 /// Validates character for group

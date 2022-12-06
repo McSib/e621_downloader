@@ -69,11 +69,11 @@ impl WebConnector {
             .with_context(|e| {
                 error!("Failed to setup confirmation prompt!");
                 trace!("Terminal unable to set up confirmation prompt...");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
 
-        trace!("Safe mode decision: {}", confirm_prompt);
+        trace!("Safe mode decision: {confirm_prompt}");
         if confirm_prompt {
             self.request_sender.update_to_safe();
             self.grabber.set_safe_mode(true);
@@ -110,10 +110,10 @@ impl WebConnector {
             .with_context(|e| {
                 error!("Failed to save image!");
                 trace!("A downloaded image was unable to be saved...");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
-        trace!("Saved {}...", file_path);
+        trace!("Saved {file_path}...");
     }
 
     /// Removes invalid characters from directory name.
@@ -246,7 +246,7 @@ impl WebConnector {
     pub fn download_posts(&mut self) {
         // Initializes the progress bar for downloading.
         let length = self.get_total_file_size();
-        trace!("Total file size for all images grabbed is {}KB", length);
+        trace!("Total file size for all images grabbed is {length}KB");
         self.initialize_progress_bar(length);
         self.download_collection();
         self.progress_bar.finish_and_clear();

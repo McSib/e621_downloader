@@ -94,8 +94,8 @@ impl BaseParser {
     /// After this, it will also attach the current character number and column number to the message.
     pub fn report_error(&self, msg: &str) {
         error!(
-            "Error parsing file at character {} (column {}): {}",
-            self.pos, self.current_column, msg
+            "Error parsing file at character {} (column {}): {msg}",
+            self.pos, self.current_column
         );
         trace!(
             "Total characters: {}, total columns: {}",

@@ -51,10 +51,7 @@ struct SenderClient {
 impl SenderClient {
     /// Creates root client for the `SenderClient`.
     fn new(auth: String) -> Self {
-        trace!(
-            "SenderClient initializing with USER_AGENT_VALUE \"{}\"",
-            USER_AGENT_VALUE
-        );
+        trace!("SenderClient initializing with USER_AGENT_VALUE \"{USER_AGENT_VALUE}\"");
 
         SenderClient {
             client: Rc::new(SenderClient::build_client()),
@@ -153,36 +150,39 @@ impl RequestSender {
     fn output_error(&self, error: &reqwest::Error) {
         error!(
             "Error occurred from sent request. \
-             Error: {}",
-            error
+             Error: {error}",
         );
         trace!("Url where error occurred: {:#?}", error.url());
 
         if let Some(status) = error.status() {
             let code = status.as_u16();
-            trace!("The response code from the server was: {}", code);
+            trace!("The response code from the server was: {code}");
 
+            const SERVER_INTERNAL: u16 = 500;
+            const SERVER_RATE_LIMIT: u16 = 503;
+            const CLIENT_FORBIDDEN: u16 = 403;
+            const CLIENT_THROTTLED: u16 = 421;
             match code {
-                500 => {
+                SERVER_INTERNAL => {
                     error!(
                         "There was an error that happened internally in the servers, \
                          please try using the downloader later until the issue is solved."
                     );
                 }
-                503 => {
+                SERVER_RATE_LIMIT => {
                     error!(
                         "Server could not handle the request, or the downloader has \
                          exceeded the rate-limit. Contact the developer immediately about this \
                          issue."
                     );
                 }
-                403 => {
+                CLIENT_FORBIDDEN => {
                     error!(
                         "The client was forbidden from accessing the api, contact the \
                          developer immediately if this error occurs."
                     );
                 }
-                421 => {
+                CLIENT_THROTTLED => {
                     error!(
                         "The user is throttled, thus the request is unsuccessful. \
                          Contact the developer immediately if this error occurs."
@@ -216,7 +216,7 @@ impl RequestSender {
             .copy_to(&mut image_bytes)
             .with_context(|e| {
                 error!("Failed to download image!");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
 
@@ -225,7 +225,7 @@ impl RequestSender {
 
     /// Appends base url with id/name before ending with `.json`.
     pub fn append_url(&self, url: &str, append: &str) -> String {
-        format!("{}{}.json", url, append)
+        format!("{url}{append}.json")
     }
 
     /// Gets entry by type `T`, this is used for every request where the url needs to be appended to.
@@ -245,9 +245,9 @@ impl RequestSender {
                     "Json was unable to deserialize to \"{}\"!",
                     type_name::<Value>()
                 );
-                trace!("url_type_key: {}", url_type_key);
-                trace!("id: {}", id);
-                format!("{}", e)
+                trace!("url_type_key: {url_type_key}");
+                trace!("id: {id}");
+                format!("{e}")
             })
             .unwrap();
         match url_type_key {
@@ -260,7 +260,7 @@ impl RequestSender {
                     trace!(
                         "Unexpected error occurred when trying to perform conversion from value to entry type above."
                     );
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
             _ => from_value(value)
@@ -272,7 +272,7 @@ impl RequestSender {
                     trace!(
                         "Unexpected error occurred when trying to perform conversion from value to entry type above."
                     );
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
         }
@@ -280,15 +280,15 @@ impl RequestSender {
 
     /// Performs a bulk search for posts using tags to filter the response.
     pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
-        debug!("Downloading page {} of tag {}", page, searching_tag);
+        debug!("Downloading page {page} of tag {searching_tag}");
 
         self.check_response(
             self.client
                 .get_with_auth(&self.urls.borrow()["posts"])
                 .query(&[
                     ("tags", searching_tag),
-                    ("page", &format!("{}", page)),
-                    ("limit", &format!("{}", 320)),
+                    ("page", &format!("{page}")),
+                    ("limit", &320.to_string()),
                 ])
                 .send(),
         )
@@ -299,7 +299,7 @@ impl RequestSender {
                 type_name::<Vec<PostEntry>>()
             );
             trace!("Failed to perform bulk search...");
-            format!("{}", e)
+            format!("{e}")
         })
         .unwrap()
     }
@@ -320,8 +320,8 @@ impl RequestSender {
                     type_name::<Value>()
                 );
                 trace!("url_type_key: tag_bulk");
-                trace!("tag: {}", tag);
-                format!("{}", e)
+                trace!("tag: {tag}");
+                format!("{e}")
             })
             .unwrap();
         if result.is_object() {
@@ -334,7 +334,7 @@ impl RequestSender {
                         type_name::<Vec<TagEntry>>()
                     );
                     trace!("Failed to perform bulk search...");
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap()
         }
@@ -358,7 +358,7 @@ impl RequestSender {
         match result {
             Ok(e) => Some(e),
             Err(e) => {
-                trace!("No alias was found for {}...", tag);
+                trace!("No alias was found for {tag}...");
                 trace!("Printing trace message for why None was returned...");
                 trace!("{}", e.to_string());
                 None
