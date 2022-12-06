@@ -23,6 +23,8 @@ jobs:
       run: sudo apt-get install libssl-dev
     - name: Install PKG Config
       run: sudo apt-get install pkg-config
+    - name: Export PKG for OpenSSL
+      run: export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
     - name: Build
       run: cargo build
     - name: Run tests
