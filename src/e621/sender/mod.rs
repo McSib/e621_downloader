@@ -1,34 +1,16 @@
-use std::any::type_name;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{any::type_name, cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use failure::ResultExt;
-use reqwest::blocking::{
-    Client,
-    RequestBuilder,
-    Response,
-};
-use reqwest::header::{
-    AUTHORIZATION,
-    USER_AGENT,
+use reqwest::{
+    blocking::{Client, RequestBuilder, Response},
+    header::{AUTHORIZATION, USER_AGENT},
 };
 use serde::de::DeserializeOwned;
-use serde_json::{
-    from_value,
-    Value,
-};
+use serde_json::{from_value, Value};
 
-use crate::e621::io::{
-    emergency_exit,
-    Login,
-};
-use crate::e621::sender::entries::{
-    AliasEntry,
-    BulkPostEntry,
-    PostEntry,
-    TagEntry,
+use crate::e621::{
+    io::{emergency_exit, Login},
+    sender::entries::{AliasEntry, BulkPostEntry, PostEntry, TagEntry},
 };
 
 pub mod entries;

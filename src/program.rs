@@ -1,22 +1,17 @@
-use std::env::current_dir;
-use std::fs::write;
-use std::path::Path;
+use std::{env::current_dir, fs::write, path::Path};
 
 use console::Term;
 use failure::Error;
 
-use crate::e621::io::tag::{
-    parse_tag_file,
-    TAG_FILE_EXAMPLE,
-    TAG_NAME,
+use crate::e621::{
+    io::{
+        emergency_exit,
+        tag::{parse_tag_file, TAG_FILE_EXAMPLE, TAG_NAME},
+        Config, Login,
+    },
+    sender::RequestSender,
+    WebConnector,
 };
-use crate::e621::io::{
-    emergency_exit,
-    Config,
-    Login,
-};
-use crate::e621::sender::RequestSender;
-use crate::e621::WebConnector;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");

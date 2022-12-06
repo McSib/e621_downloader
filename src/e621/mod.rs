@@ -1,31 +1,29 @@
-use std::cell::RefCell;
-use std::fs::{
-    create_dir_all,
-    write,
+use std::{
+    cell::RefCell,
+    fs::{create_dir_all, write},
+    path::PathBuf,
+    rc::Rc,
+    time::Duration,
 };
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::time::Duration;
 
-use blacklist::Blacklist;
 use dialoguer::Confirm;
 use failure::ResultExt;
+use indicatif::{ProgressBar, ProgressDrawTarget};
+
+use blacklist::Blacklist;
 use grabber::Grabber;
-use indicatif::{
-    ProgressBar,
-    ProgressDrawTarget,
-    ProgressStyle,
-};
-use io::tag::Group;
-use io::Config;
+use io::{tag::Group, Config};
 use sender::RequestSender;
 
 use crate::e621::sender::entries::UserEntry;
+
+use self::tui::{ProgressBarBuilder, ProgressStyleBuilder};
 
 pub mod blacklist;
 pub mod grabber;
 pub mod io;
 pub mod sender;
+pub mod tui;
 
 /// The `WebConnector` is the mother of all requests sent.
 /// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.

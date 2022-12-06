@@ -1,25 +1,17 @@
-use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::rc::Rc;
+use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
-use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{
-    Group,
-    Tag,
-    TagCategory,
-    TagType,
+use crate::e621::{
+    blacklist::Blacklist,
+    io::{
+        emergency_exit,
+        tag::{Group, Tag, TagCategory, TagType},
+        Config, Login,
+    },
+    sender::{
+        entries::{PoolEntry, PostEntry, SetEntry},
+        RequestSender,
+    },
 };
-use crate::e621::io::{
-    emergency_exit,
-    Config,
-    Login,
-};
-use crate::e621::sender::entries::{
-    PoolEntry,
-    PostEntry,
-    SetEntry,
-};
-use crate::e621::sender::RequestSender;
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {

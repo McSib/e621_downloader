@@ -1,11 +1,12 @@
 use failure::ResultExt;
 
-use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::entries::{
-    PostEntry,
-    UserEntry,
+use crate::e621::{
+    io::parser::BaseParser,
+    sender::{
+        entries::{PostEntry, UserEntry},
+        RequestSender,
+    },
 };
-use crate::e621::sender::RequestSender;
 
 /// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
