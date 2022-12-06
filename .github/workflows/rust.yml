@@ -21,6 +21,8 @@ jobs:
         toolchain: nightly
     - name: Configure OpenSSL
       run: sudo apt-get install libssl-dev
+    - name: Install PKG Config
+      run: sudo apt-get install pkg-config
     - name: Build
       run: cargo build
     - name: Run tests
