@@ -130,57 +130,66 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in self.grabber.posts().iter() {
-            let short_collection_name = self.shorten_collection_name(collection.name(), "...");
+            let collection_name = collection.name();
+            let collection_category = collection.category();
+            let collection_posts = collection.posts();
+            let collection_count = collection_posts.len();
+            let short_collection_name = self.shorten_collection_name(collection_name, "...");
+
+            #[cfg(unix)]
+            let static_path: PathBuf = [
+                &self.download_directory,
+                collection.category(),
+                &self.remove_invalid_chars(collection_name),
+            ]
+            .iter()
+            .collect();
+
+            #[cfg(windows)]
             let mut static_path: PathBuf = [
                 &self.download_directory,
                 collection.category(),
-                &self.remove_invalid_chars(collection.name()),
+                &self.remove_invalid_chars(collection_name),
             ]
             .iter()
             .collect();
 
             // This is put here to attempt to shorten the length of the path if it passes window's
             // max path length.
-            #[cfg(target_os = "windows")]
+            #[cfg(windows)]
             const MAX_PATH: usize = 260; // Defined in Windows documentation.
 
-            #[cfg(target_os = "windows")]
-            let path_len = static_path.as_path().as_os_str().len();
+            #[cfg(windows)]
+            let start_path_len = static_path.as_os_str().len();
 
-            #[cfg(target_os = "windows")]
-            if path_len >= MAX_PATH {
+            #[cfg(windows)]
+            if start_path_len >= MAX_PATH {
                 static_path = [
                     &self.download_directory,
-                    collection.category(),
-                    &self.remove_invalid_chars(
-                        &self.shorten_collection_name(collection.name(), "_"),
-                    ),
+                    collection_category,
+                    &self.remove_invalid_chars(&short_collection_name),
                 ]
                 .iter()
                 .collect();
 
-                if path_len >= MAX_PATH {
-                    error!("Path is too long and crosses the 256 char limit.\
+                let new_len = static_path.as_os_str().len();
+                if new_len >= MAX_PATH {
+                    error!("Path is too long and crosses the {MAX_PATH} char limit.\
                        Please relocate the program to a directory closer to the root drive directory.");
-                    trace!("Path length: {}", path_len);
+                    trace!("Path length: {new_len}");
                 }
             }
 
             trace!("Printing Collection Info:");
-            trace!("Collection Name:            \"{}\"", collection.name());
-            trace!("Collection Category:        \"{}\"", collection.category());
-            trace!(
-                "Collection Post Length:     \"{}\"",
-                collection.posts().len()
-            );
+            trace!("Collection Name:            \"{collection_name}\"");
+            trace!("Collection Category:        \"{collection_category}\"");
+            trace!("Collection Post Length:     \"{collection_count}\"");
             trace!(
                 "Static file path for this collection: \"{}\"",
                 static_path.to_str().unwrap()
             );
 
-            for post in collection.posts() {
-                self.progress_bar
-                    .set_message(format!("Downloading: {} ", short_collection_name));
+            for post in collection_posts {
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(post.name()),
@@ -188,23 +197,25 @@ impl WebConnector {
                 .iter()
                 .collect();
 
-                create_dir_all(file_path.parent().unwrap())
-                    .with_context(|e| {
-                        error!("Could not create directories for images!");
-                        trace!("Directory path unable to be created...");
-                        trace!(
-                            "Path: \"{}\"",
-                            file_path.parent().unwrap().to_str().unwrap()
-                        );
-                        format!("{}", e)
-                    })
-                    .unwrap();
                 if file_path.exists() {
                     self.progress_bar
                         .set_message("Duplicate found: skipping... ");
                     self.progress_bar.inc(post.file_size() as u64);
                     continue;
                 }
+
+                self.progress_bar
+                    .set_message(format!("Downloading: {short_collection_name} "));
+
+                let parent_path = file_path.parent().unwrap();
+                create_dir_all(parent_path)
+                    .with_context(|e| {
+                        error!("Could not create directories for images!");
+                        trace!("Directory path unable to be created...");
+                        trace!("Path: \"{}\"", parent_path.to_str().unwrap());
+                        format!("{e}")
+                    })
+                    .unwrap();
 
                 let bytes = self
                     .request_sender
@@ -213,10 +224,7 @@ impl WebConnector {
                 self.progress_bar.inc(post.file_size() as u64);
             }
 
-            trace!(
-                "Collection {} is finished downloading...",
-                collection.name()
-            );
+            trace!("Collection {collection_name} is finished downloading...");
         }
     }
 
