@@ -165,7 +165,7 @@ impl Default for Login {
 
 /// Exits the program after message explaining the error and prompting the user to press `ENTER`.
 pub fn emergency_exit(error: &str) {
-    info!("{}", error);
+    info!("{error}");
     println!("Press ENTER to close the application...");
 
     let mut line = String::new();
