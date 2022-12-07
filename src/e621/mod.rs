@@ -10,6 +10,7 @@ use dialoguer::Confirm;
 use failure::ResultExt;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
+use crate::e621::grabber::Shorten;
 use blacklist::Blacklist;
 use grabber::Grabber;
 use io::{tag::Group, Config};
@@ -134,7 +135,7 @@ impl WebConnector {
             let collection_category = collection.category();
             let collection_posts = collection.posts();
             let collection_count = collection_posts.len();
-            let short_collection_name = self.shorten_collection_name(collection_name, "...");
+            let short_collection_name = collection.shorten("...");
 
             #[cfg(unix)]
             let static_path: PathBuf = [
@@ -167,7 +168,7 @@ impl WebConnector {
                 static_path = [
                     &self.download_directory,
                     collection_category,
-                    &self.remove_invalid_chars(&short_collection_name),
+                    &self.remove_invalid_chars(&collection.shorten('_')),
                 ]
                 .iter()
                 .collect();
@@ -259,15 +260,5 @@ impl WebConnector {
             .iter()
             .map(|e| e.posts().iter().map(|f| f.file_size() as u64).sum::<u64>())
             .sum()
-    }
-
-    fn shorten_collection_name(&self, name: &str, deliminator: &str) -> String {
-        if name.len() >= 25 {
-            let mut short_name = name[0..25].to_string();
-            short_name.push_str(deliminator);
-            short_name
-        } else {
-            name.to_string()
-        }
     }
 }

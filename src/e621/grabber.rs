@@ -86,6 +86,12 @@ impl GrabbedPost {
     }
 }
 
+/// A trait for the shorten function, allows for multiple types to be configured for it.
+pub trait Shorten<T> {
+    /// Shortens a string by replacing a portion of it with a dilimeter of type `T` and then returning the new string.
+    fn shorten(&self, delimiter: T) -> String;
+}
+
 /// A set of posts with category and name.
 pub struct PostCollection {
     /// The name of the set.
@@ -116,9 +122,34 @@ impl PostCollection {
     pub fn posts(&self) -> &Vec<GrabbedPost> {
         &self.posts
     }
+}
 
-    /// Converts `SetEntry` to `Self`.
-    pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
+impl Shorten<&str> for PostCollection {
+    fn shorten(&self, delimiter: &str) -> String {
+        if self.name.len() >= 25 {
+            let mut short_name = self.name[0..25].to_string();
+            short_name.push_str(delimiter);
+            short_name
+        } else {
+            self.name.to_string()
+        }
+    }
+}
+
+impl Shorten<char> for PostCollection {
+    fn shorten(&self, delimiter: char) -> String {
+        if self.name.len() >= 25 {
+            let mut short_name = self.name[0..25].to_string();
+            short_name.push(delimiter);
+            short_name
+        } else {
+            self.name.to_string()
+        }
+    }
+}
+
+impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
+    fn from((set, posts): (&SetEntry, Vec<GrabbedPost>)) -> Self {
         PostCollection::new(&set.name, "Sets", posts)
     }
 }
@@ -230,10 +261,10 @@ impl Grabber {
 
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
-                        self.posts.push(PostCollection::from_set(
+                        self.posts.push(PostCollection::from((
                             &entry,
                             GrabbedPost::entry_to_vec(posts),
-                        ));
+                        )));
 
                         info!(
                             "{} grabbed!",
