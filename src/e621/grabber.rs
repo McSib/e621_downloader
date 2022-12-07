@@ -13,6 +13,10 @@ use crate::e621::{
     },
 };
 
+pub trait ToVec<T> {
+    fn to_vec(value: T) -> Vec<Self>;
+}
+
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
 pub struct GrabbedPost {
     /// The url that leads to the file to download.
@@ -35,24 +39,27 @@ impl GrabbedPost {
     pub fn file_size(&self) -> i64 {
         self.file_size
     }
+}
 
-    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
-    pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
+impl ToVec<Vec<PostEntry>> for GrabbedPost {
+    fn to_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
             .collect()
     }
+}
 
-    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s for pools.
-    pub fn entry_to_pool_vec(vec: Vec<PostEntry>, pool_name: &str) -> Vec<GrabbedPost> {
+impl ToVec<(Vec<PostEntry>, &str)> for GrabbedPost {
+    fn to_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
-            .map(|(i, e)| GrabbedPost::from_entry_to_pool(e, pool_name, (i + 1) as u16))
+            .map(|(i, e)| GrabbedPost::from(e, pool_name, (i + 1) as u16))
             .collect()
     }
+}
 
-    /// Converts `PostEntry` to `Self`.
-    pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
+impl From<(&PostEntry, &str, u16)> for GrabbedPost {
+    fn from((post, name, current_page): (&PostEntry, &str, u16)) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
             name: format!("{} Page_{:05}.{}", name, current_page, post.file.ext),
