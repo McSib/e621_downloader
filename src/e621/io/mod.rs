@@ -62,7 +62,7 @@ impl Config {
     }
 
     /// Loads and returns `config` for quick management and settings.
-    pub fn get_config() -> Result<Self, Error> {
+    fn get_config() -> Result<Self, Error> {
         let mut config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
         config.naming_convention = config.naming_convention.to_lowercase();
         let convention = ["md5", "id"];
