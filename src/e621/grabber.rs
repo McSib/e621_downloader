@@ -14,7 +14,9 @@ use crate::e621::{
 };
 
 pub trait ToVec<T> {
-    fn to_vec(value: T) -> Vec<Self>;
+    fn to_vec(value: T) -> Vec<Self>
+    where
+        Self: Sized;
 }
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
@@ -53,7 +55,7 @@ impl ToVec<(Vec<PostEntry>, &str)> for GrabbedPost {
     fn to_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
-            .map(|(i, e)| GrabbedPost::from(e, pool_name, (i + 1) as u16))
+            .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
             .collect()
     }
 }
@@ -208,7 +210,7 @@ impl Grabber {
             self.posts.push(PostCollection::new(
                 &tag_str,
                 "",
-                GrabbedPost::entry_to_vec(posts),
+                GrabbedPost::to_vec(posts),
             ));
             info!(
                 "{} grabbed!",
@@ -247,7 +249,7 @@ impl Grabber {
                         self.posts.push(PostCollection::new(
                             name,
                             "Pools",
-                            GrabbedPost::entry_to_pool_vec(posts, name),
+                            GrabbedPost::to_vec((posts, name.as_ref())),
                         ));
 
                         info!(
@@ -262,10 +264,8 @@ impl Grabber {
 
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
-                        self.posts.push(PostCollection::from((
-                            &entry,
-                            GrabbedPost::entry_to_vec(posts),
-                        )));
+                        self.posts
+                            .push(PostCollection::from((&entry, GrabbedPost::to_vec(posts))));
 
                         info!(
                             "{} grabbed!",
@@ -318,7 +318,7 @@ impl Grabber {
                         self.posts.push(PostCollection::new(
                             tag.name(),
                             "General Searches",
-                            GrabbedPost::entry_to_vec(posts),
+                            GrabbedPost::to_vec(posts),
                         ));
                         info!(
                             "{} grabbed!",
