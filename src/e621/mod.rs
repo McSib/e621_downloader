@@ -238,7 +238,7 @@ impl WebConnector {
                     .progress_style)
             .draw_target(ProgressDrawTarget::stderr())
             .reset()
-            .steady_tick(Duration::from_millis(100))
+            .steady_tick(Duration::from_millis(1000))
             .build();
     }
 
