@@ -194,12 +194,7 @@ impl Grabber {
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
     pub fn grab_favorites(&mut self) {
-        let login = Login::load().unwrap_or_else(|e| {
-			error!("Unable to load `login.json`. Error: {}", e);
-			warn!("The program will use default values, but it is highly recommended to check your login.json file to \
-			       ensure that everything is correct.");
-			Login::default()
-		});
+        let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
             let tag_str = format!("fav:{}", login.username());
             let posts = self.special_search(tag_str.as_str());

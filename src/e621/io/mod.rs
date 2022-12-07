@@ -107,6 +107,8 @@ pub struct Login {
     download_favorites: bool,
 }
 
+static LOGIN: OnceCell<Login> = OnceCell::new();
+
 impl Login {
     pub fn username(&self) -> &str {
         &self.username
@@ -120,8 +122,17 @@ impl Login {
         self.download_favorites
     }
 
+    pub fn get() -> &'static Self {
+        LOGIN.get_or_init(|| Self::load().unwrap_or_else(|e| {
+            error!("Unable to load `login.json`. Error: {}", e);
+            warn!("The program will use default values, but it is highly recommended to check your login.json file to \
+			       ensure that everything is correct.");
+            Login::default()
+        }))
+    }
+
     /// Loads the login file or creates one if it doesn't exist.
-    pub fn load() -> Result<Self, Error> {
+    fn load() -> Result<Self, Error> {
         let mut login = Login::default();
         let login_path = Path::new(LOGIN_NAME);
         if login_path.exists() {

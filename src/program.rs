@@ -60,7 +60,7 @@ impl Program {
         }
 
         // Creates connector and requester to prepare for downloading posts.
-        let login = Login::load().unwrap();
+        let login = Login::get();
         trace!("Login information loaded...");
         trace!("Login Username: {}", login.username());
         trace!("Login API Key: {}", "*".repeat(login.api_key().len()));
