@@ -48,10 +48,9 @@ pub struct WebConnector {
 impl WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
     pub fn new(request_sender: &RequestSender) -> Self {
-        let config = Config::get_config().unwrap_or_default();
         WebConnector {
             request_sender: request_sender.clone(),
-            download_directory: config.download_directory().to_string(),
+            download_directory: Config::get().download_directory().to_string(),
             progress_bar: ProgressBar::hidden(),
             grabber: Grabber::new(request_sender.clone(), false),
             blacklist: Rc::new(RefCell::new(Blacklist::new(request_sender.clone()))),

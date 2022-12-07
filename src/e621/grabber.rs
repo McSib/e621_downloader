@@ -38,9 +38,8 @@ impl GrabbedPost {
 
     /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
     pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
-        let config = Config::get_config().unwrap();
         vec.into_iter()
-            .map(|e| GrabbedPost::from(e, config.naming_convention()))
+            .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
             .collect()
     }
 
@@ -220,7 +219,6 @@ impl Grabber {
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
     pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
-        let config = Config::get_config().unwrap();
         for group in groups {
             for tag in group.tags() {
                 match tag.tag_type() {
@@ -280,7 +278,10 @@ impl Grabber {
                                 .first_mut()
                                 .unwrap()
                                 .posts
-                                .push(GrabbedPost::from(entry, config.naming_convention()));
+                                .push(GrabbedPost::from((
+                                    entry,
+                                    Config::get().naming_convention(),
+                                )));
 
                             info!(
                                 "Post with ID {} grabbed!",

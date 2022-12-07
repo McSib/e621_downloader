@@ -1,3 +1,4 @@
+use once_cell::sync::OnceCell;
 use std::{
     fs::{read_to_string, write},
     io,
@@ -17,7 +18,7 @@ pub const CONFIG_NAME: &str = "config.json";
 pub const LOGIN_NAME: &str = "login.json";
 
 /// Config that is used to do general setup.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
@@ -25,6 +26,8 @@ pub struct Config {
     #[serde(rename = "fileNamingConvention")]
     naming_convention: String,
 }
+
+static CONFIG: OnceCell<Config> = OnceCell::new();
 
 impl Config {
     pub fn download_directory(&self) -> &str {
@@ -53,8 +56,13 @@ impl Config {
         Ok(())
     }
 
+    /// Get the global instance of the `Config`.
+    pub fn get() -> &'static Self {
+        CONFIG.get_or_init(|| Self::get_config().unwrap())
+    }
+
     /// Loads and returns `config` for quick management and settings.
-    pub fn get_config() -> Result<Config, Error> {
+    pub fn get_config() -> Result<Self, Error> {
         let mut config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
         config.naming_convention = config.naming_convention.to_lowercase();
         let convention = ["md5", "id"];
