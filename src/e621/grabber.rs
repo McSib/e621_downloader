@@ -60,9 +60,10 @@ impl GrabbedPost {
             file_size: post.file.size,
         }
     }
+}
 
-    /// Converts `PostEntry` to `Self`.
-    fn from(post: PostEntry, name_convention: &str) -> Self {
+impl From<(PostEntry, &str)> for GrabbedPost {
+    fn from((post, name_convention): (PostEntry, &str)) -> Self {
         match name_convention {
             "md5" => GrabbedPost {
                 url: post.file.url.clone().unwrap(),
