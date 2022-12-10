@@ -205,13 +205,10 @@ impl Grabber {
     pub fn grab_favorites(&mut self) {
         let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
-            let tag_str = format!("fav:{}", login.username());
-            let posts = self.special_search(tag_str.as_str());
-            self.posts.push(PostCollection::new(
-                &tag_str,
-                "",
-                GrabbedPost::new_vec(posts),
-            ));
+            let tag = format!("fav:{}", login.username());
+            let posts = self.special_search(tag.as_str());
+            self.posts
+                .push(PostCollection::new(&tag, "", GrabbedPost::new_vec(posts)));
             info!(
                 "{} grabbed!",
                 console::style(format!("\"{tag_str}\""))
