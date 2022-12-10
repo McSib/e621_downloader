@@ -66,7 +66,7 @@ impl Program {
         trace!("Login API Key: {}", "*".repeat(login.api_key().len()));
         trace!("Login Download Favorites: {}", login.download_favorites());
 
-        let request_sender = RequestSender::new(&login);
+        let request_sender = RequestSender::new(login);
         let mut connector = WebConnector::new(&request_sender);
         connector.should_enter_safe_mode();
 
