@@ -322,11 +322,19 @@ impl FlagWorker {
             }
         }
 
-        if self.negated_margin != 0 && self.negated_flags == self.negated_margin {
+        if self.is_negated_margin_met() {
             self.flagged = false;
-        } else if self.flags == self.margin {
+        } else if self.is_margin_met() {
             self.flagged = true;
         }
+    }
+
+    fn is_negated_margin_met(&self) -> bool {
+        self.negated_margin != 0 && self.negated_flags == self.negated_margin
+    }
+
+    fn is_margin_met(&self) -> bool {
+        self.flags == self.margin
     }
 
     fn raise_flag(&mut self, negated: bool) {
