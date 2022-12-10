@@ -316,12 +316,7 @@ impl Grabber {
             .retain(|id| posts.iter().any(|post| post.id == *id));
 
         // Sorts the pool to the original order given by entry.
-        for (i, id) in entry.post_ids.iter().enumerate() {
-            if posts[i].id != *id {
-                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
-                posts.swap(i, correct_index);
-            }
-        }
+        Self::sort_pool_by_id(&entry, &mut posts);
 
         self.posts.push(PostCollection::new(
             name,
@@ -333,6 +328,15 @@ impl Grabber {
             "{} grabbed!",
             console::style(format!("\"{name}\"")).color256(39).italic()
         );
+    }
+
+    fn sort_pool_by_id(entry: &PoolEntry, posts: &mut [PostEntry]) {
+        for (i, id) in entry.post_ids.iter().enumerate() {
+            if posts[i].id != *id {
+                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
+                posts.swap(i, correct_index);
+            }
+        }
     }
 
     /// Grabs posts from general tag.
