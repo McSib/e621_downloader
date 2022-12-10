@@ -211,123 +211,128 @@ impl Grabber {
                 .push(PostCollection::new(&tag, "", GrabbedPost::new_vec(posts)));
             info!(
                 "{} grabbed!",
-                console::style(format!("\"{tag_str}\""))
-                    .color256(39)
-                    .italic()
+                console::style(format!("\"{tag}\"")).color256(39).italic()
             );
         }
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
     pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
-        for group in groups {
-            for tag in group.tags() {
-                match tag.tag_type() {
-                    TagType::Pool => {
-                        let mut entry: PoolEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "pool");
-                        let name = &entry.name;
-                        let mut posts = self.special_search(&format!("pool:{}", entry.id));
+        let tags: Vec<&Tag> = groups.iter().flat_map(|e| e.tags()).collect();
+        for tag in tags {
+            self.grab_by_tag_type(tag);
+        }
+    }
 
-                        // Updates entry post ids in case any posts were filtered in the search.
-                        entry
-                            .post_ids
-                            .retain(|id| posts.iter().any(|post| post.id == *id));
+    fn single_post_collection(&mut self) -> &mut PostCollection {
+        self.posts.first_mut().unwrap() // It is guaranteed that the first collection is the single post collection.
+    }
 
-                        // Sorts the pool to the original order given by entry.
-                        for (i, id) in entry.post_ids.iter().enumerate() {
-                            if posts[i].id != *id {
-                                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
-                                posts.swap(i, correct_index);
-                            }
-                        }
+    fn add_single_post(&mut self, entry: PostEntry, id: i64) {
+        let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
+        self.single_post_collection().posts.push(grabbed_post);
+        info!(
+            "Post with ID {} grabbed!",
+            console::style(format!("\"{id}\"")).color256(39).italic()
+        );
+    }
 
-                        self.posts.push(PostCollection::new(
-                            name,
-                            "Pools",
-                            GrabbedPost::new_vec((posts, name.as_ref())),
-                        ));
+    fn grab_by_tag_type(&mut self, tag: &Tag) {
+        match tag.tag_type() {
+            TagType::Pool => self.grab_pool(tag),
+            TagType::Set => self.grab_set(tag),
+            TagType::Post => self.grab_post(tag),
+            TagType::General | TagType::Artist => self.grab_general(tag),
+            TagType::Unknown => unreachable!(),
+        };
+    }
 
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{name}\"")).color256(39).italic()
-                        );
-                    }
-                    TagType::Set => {
-                        let entry: SetEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "set");
+    fn grab_general(&mut self, tag: &Tag) {
+        let posts = self.get_posts_from_tag(tag);
+        self.posts.push(PostCollection::new(
+            tag.name(),
+            "General Searches",
+            GrabbedPost::new_vec(posts),
+        ));
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{}\"", tag.name()))
+                .color256(39)
+                .italic()
+        );
+    }
 
-                        // Grabs posts from IDs in the set entry.
-                        let posts = self.special_search(&format!("set:{}", entry.shortname));
-                        self.posts
-                            .push(PostCollection::from((&entry, GrabbedPost::new_vec(posts))));
+    fn grab_post(&mut self, tag: &Tag) {
+        let entry: PostEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "single");
+        let id = entry.id;
 
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{}\"", entry.name))
-                                .color256(39)
-                                .italic()
-                        );
-                    }
-                    TagType::Post => {
-                        let mut add_post = |entry: PostEntry, id: i64| {
-                            self.posts
-                                .first_mut()
-                                .unwrap()
-                                .posts
-                                .push(GrabbedPost::from((
-                                    entry,
-                                    Config::get().naming_convention(),
-                                )));
+        if self.safe_mode {
+            match entry.rating.as_str() {
+                "s" => {
+                    self.add_single_post(entry, id);
+                }
+                _ => {
+                    info!(
+                        "Skipping Post: {} due to being explicit or questionable",
+                        console::style(format!("\"{id}\"")).color256(39).italic()
+                    );
+                }
+            }
+        } else {
+            self.add_single_post(entry, id);
+        }
+    }
 
-                            info!(
-                                "Post with ID {} grabbed!",
-                                console::style(format!("\"{id}\"")).color256(39).italic()
-                            );
-                        };
+    fn grab_set(&mut self, tag: &Tag) {
+        let entry: SetEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "set");
 
-                        let entry: PostEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "single");
-                        let id = entry.id;
+        // Grabs posts from IDs in the set entry.
+        let posts = self.special_search(&format!("set:{}", entry.shortname));
+        self.posts
+            .push(PostCollection::from((&entry, GrabbedPost::new_vec(posts))));
 
-                        if self.safe_mode {
-                            match entry.rating.as_str() {
-                                "s" => {
-                                    add_post(entry, id);
-                                }
-                                _ => {
-                                    info!(
-                                        "Skipping Post: {}",
-                                        console::style(format!("\"{id}\"")).color256(39).italic()
-                                    );
-                                    info!("Post was found to be explicit or questionable...")
-                                }
-                            }
-                        } else {
-                            add_post(entry, id);
-                        }
-                    }
-                    TagType::General | TagType::Artist => {
-                        let posts = self.get_posts_from_tag(tag);
-                        self.posts.push(PostCollection::new(
-                            tag.name(),
-                            "General Searches",
-                            GrabbedPost::new_vec(posts),
-                        ));
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{}\"", tag.name()))
-                                .color256(39)
-                                .italic()
-                        );
-                    }
-                    TagType::Unknown => unreachable!(),
-                };
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{}\"", entry.name))
+                .color256(39)
+                .italic()
+        );
+    }
+
+    fn grab_pool(&mut self, tag: &Tag) {
+        let mut entry: PoolEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "pool");
+        let name = &entry.name;
+        let mut posts = self.special_search(&format!("pool:{}", entry.id));
+
+        // Updates entry post ids in case any posts were filtered in the search.
+        entry
+            .post_ids
+            .retain(|id| posts.iter().any(|post| post.id == *id));
+
+        // Sorts the pool to the original order given by entry.
+        for (i, id) in entry.post_ids.iter().enumerate() {
+            if posts[i].id != *id {
+                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
+                posts.swap(i, correct_index);
             }
         }
+
+        self.posts.push(PostCollection::new(
+            name,
+            "Pools",
+            GrabbedPost::new_vec((posts, name.as_ref())),
+        ));
+
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{name}\"")).color256(39).italic()
+        );
     }
 
     /// Grabs posts from general tag.
