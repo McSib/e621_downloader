@@ -230,7 +230,8 @@ fn valid_id(c: char) -> bool {
 /// When doing any modifications to the worker, be sure to test the blacklist on client and server-side.
 /// This will ensure that there aren't any unexpected behavior, or issues with the worker that weren't noticed.
 /// A good thing to focus on is how many posts are blacklisted in total.
-/// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted, it's safe to assume there is a problem with how the worker is blacklisting posts.
+/// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted,
+/// it's safe to assume there is a problem with how the worker is blacklisting posts.
 #[derive(Default)]
 struct FlagWorker {
     /// The number of flags raised by the worker
