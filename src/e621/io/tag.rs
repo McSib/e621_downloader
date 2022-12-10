@@ -8,12 +8,12 @@ use crate::e621::{
 };
 
 /// Constant of the tag file's name.
-pub const TAG_NAME: &str = "tags.txt";
-pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
+pub(crate) const TAG_NAME: &str = "tags.txt";
+pub(crate) const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
 #[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub enum TagSearchType {
+pub(crate) enum TagSearchType {
     /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
     General,
     /// A special tag that is searched differently from general tags (artist and characters).
@@ -24,7 +24,7 @@ pub enum TagSearchType {
 
 /// The type a tag can be.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TagType {
+pub(crate) enum TagType {
     Pool,
     Set,
     General,
@@ -35,7 +35,7 @@ pub enum TagType {
 
 /// A tag that contains its name, search type, and tag type.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tag {
+pub(crate) struct Tag {
     /// The name of the tag.
     name: String,
     /// The search type of the tag.
@@ -53,15 +53,15 @@ impl Tag {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn search_type(&self) -> &TagSearchType {
+    pub(crate) fn search_type(&self) -> &TagSearchType {
         &self.search_type
     }
 
-    pub fn tag_type(&self) -> &TagType {
+    pub(crate) fn tag_type(&self) -> &TagType {
         &self.tag_type
     }
 }
@@ -78,7 +78,7 @@ impl Default for Tag {
 
 /// Group object generated from parsed code.
 #[derive(Debug, Clone)]
-pub struct Group {
+pub(crate) struct Group {
     /// The name of group.
     name: String,
     /// A `Vec` containing all the tags parsed.
@@ -86,24 +86,24 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn new(name: String) -> Self {
+    pub(crate) fn new(name: String) -> Self {
         Group {
             name,
             tags: Vec::new(),
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn tags(&self) -> &Vec<Tag> {
+    pub(crate) fn tags(&self) -> &Vec<Tag> {
         &self.tags
     }
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
+pub(crate) fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
     TagParser {
         parser: BaseParser::new(
             read_to_string(TAG_NAME)
@@ -120,7 +120,7 @@ pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Erro
 }
 
 /// Identifier to help categorize tags.
-pub struct TagIdentifier {
+pub(crate) struct TagIdentifier {
     /// Request sender for making any needed API calls.
     request_sender: RequestSender,
 }
@@ -231,7 +231,7 @@ struct TagParser {
 
 impl TagParser {
     /// Parses each group with all tags tied to them before returning a vector with all groups in it.
-    pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
+    pub(crate) fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
         let mut groups: Vec<Group> = Vec::new();
         loop {
             self.parser.consume_whitespace();

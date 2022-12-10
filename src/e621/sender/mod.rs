@@ -13,7 +13,7 @@ use crate::e621::{
     sender::entries::{AliasEntry, BulkPostEntry, PostEntry, TagEntry},
 };
 
-pub mod entries;
+pub(crate) mod entries;
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -70,12 +70,12 @@ impl SenderClient {
 
     /// A wrapping function that acts the exact same as `self.client.get` but will instead attach the user agent header before returning the `RequestBuilder`.
     /// This will ensure that all requests sent have the proper user agent info.
-    pub fn get(&self, url: &str) -> RequestBuilder {
+    pub(crate) fn get(&self, url: &str) -> RequestBuilder {
         self.client.get(url).header(USER_AGENT, USER_AGENT_VALUE)
     }
 
     /// This is the same as `self.get(url)` but will attach the authorization header with username and API hash.
-    pub fn get_with_auth(&self, url: &str) -> RequestBuilder {
+    pub(crate) fn get_with_auth(&self, url: &str) -> RequestBuilder {
         if self.auth.is_empty() {
             self.get(url)
         } else {
@@ -95,7 +95,7 @@ impl Clone for SenderClient {
 }
 
 /// The `RequestSender`, it handles all calls to the API, so every single instance in the program must adhere to the `RequestSender`.
-pub struct RequestSender {
+pub(crate) struct RequestSender {
     /// The client that will be used to send all requests.
     ///
     /// # Important
@@ -105,7 +105,7 @@ pub struct RequestSender {
 }
 
 impl RequestSender {
-    pub fn new(login: &Login) -> Self {
+    pub(crate) fn new(login: &Login) -> Self {
         let auth = if login.is_empty() {
             String::new()
         } else {
@@ -134,12 +134,12 @@ impl RequestSender {
     }
 
     /// If the client authenticated or not.
-    pub fn is_authenticated(&self) -> bool {
+    pub(crate) fn is_authenticated(&self) -> bool {
         !self.client.auth.is_empty()
     }
 
     /// Updates all the urls from e621 to e926.
-    pub fn update_to_safe(&mut self) {
+    pub(crate) fn update_to_safe(&mut self) {
         self.urls
             .borrow_mut()
             .iter_mut()
@@ -198,7 +198,7 @@ impl RequestSender {
     }
 
     /// Gets the response from a sent request and checks to ensure it was successful.
-    pub fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
+    pub(crate) fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
         match result {
             Ok(response) => response,
             Err(ref error) => {
@@ -209,7 +209,7 @@ impl RequestSender {
     }
 
     /// Sends request to download image.
-    pub fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
+    pub(crate) fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
         let mut image_response = self.check_response(self.client.get(url).send());
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response
@@ -224,12 +224,12 @@ impl RequestSender {
     }
 
     /// Appends base url with id/name before ending with `.json`.
-    pub fn append_url(&self, url: &str, append: &str) -> String {
+    pub(crate) fn append_url(&self, url: &str, append: &str) -> String {
         format!("{url}{append}.json")
     }
 
     /// Gets entry by type `T`, this is used for every request where the url needs to be appended to.
-    pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
+    pub(crate) fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
     where
         T: DeserializeOwned,
     {
@@ -279,7 +279,7 @@ impl RequestSender {
     }
 
     /// Performs a bulk search for posts using tags to filter the response.
-    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
+    pub(crate) fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
         debug!("Downloading page {page} of tag {searching_tag}");
 
         self.check_response(
@@ -305,7 +305,7 @@ impl RequestSender {
     }
 
     /// Gets tags by their name.
-    pub fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
+    pub(crate) fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
         let result: Value = self
             .check_response(
                 self.client
@@ -341,7 +341,7 @@ impl RequestSender {
     }
 
     /// Queries aliases and returns response.
-    pub fn query_aliases(&self, tag: &str) -> Option<Vec<AliasEntry>> {
+    pub(crate) fn query_aliases(&self, tag: &str) -> Option<Vec<AliasEntry>> {
         let result = self
             .check_response(
                 self.client

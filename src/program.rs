@@ -17,14 +17,14 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
-pub struct Program {}
+pub(crate) struct Program {}
 
 impl Program {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Program {}
     }
 
-    pub fn run(&self) -> Result<(), Error> {
+    pub(crate) fn run(&self) -> Result<(), Error> {
         Term::stdout().set_title("e621 downloader");
         trace!("Starting e621 downloader...");
         trace!("Program Name: {}", NAME);

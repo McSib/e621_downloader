@@ -20,11 +20,11 @@ use crate::e621::sender::entries::UserEntry;
 
 use self::tui::{ProgressBarBuilder, ProgressStyleBuilder};
 
-pub mod blacklist;
-pub mod grabber;
-pub mod io;
-pub mod sender;
-pub mod tui;
+pub(crate) mod blacklist;
+pub(crate) mod grabber;
+pub(crate) mod io;
+pub(crate) mod sender;
+pub(crate) mod tui;
 
 /// The `WebConnector` is the mother of all requests sent.
 /// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.
@@ -32,7 +32,7 @@ pub mod tui;
 /// # Important
 /// This is a large struct built on bringing the best performance possible without sacrificing any idiomatic code in the process.
 /// When editing this struct, be sure that the changes you bring do not harm the overall performance, and if it does, be sure to give good reason on why the change is needed.
-pub struct E621WebConnector {
+pub(crate) struct E621WebConnector {
     /// The sender used for all API calls.
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts.
@@ -47,7 +47,7 @@ pub struct E621WebConnector {
 
 impl E621WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(request_sender: &RequestSender) -> Self {
+    pub(crate) fn new(request_sender: &RequestSender) -> Self {
         E621WebConnector {
             request_sender: request_sender.clone(),
             download_directory: Config::get().download_directory().to_string(),
@@ -59,7 +59,7 @@ impl E621WebConnector {
 
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
-    pub fn should_enter_safe_mode(&mut self) {
+    pub(crate) fn should_enter_safe_mode(&mut self) {
         trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
             .with_prompt("Should enter safe mode?")
@@ -81,7 +81,7 @@ impl E621WebConnector {
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.
-    pub fn process_blacklist(&mut self, username: &str) {
+    pub(crate) fn process_blacklist(&mut self, username: &str) {
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(username, "user");
@@ -98,7 +98,7 @@ impl E621WebConnector {
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
-    pub fn grab_all(&mut self, groups: &[Group]) {
+    pub(crate) fn grab_all(&mut self, groups: &[Group]) {
         trace!("Grabbing posts...");
         self.grabber.grab_favorites();
         self.grabber.grab_posts_by_tags(groups);
@@ -243,7 +243,7 @@ impl E621WebConnector {
     }
 
     /// Downloads tuple of general posts and single posts.
-    pub fn download_posts(&mut self) {
+    pub(crate) fn download_posts(&mut self) {
         // Initializes the progress bar for downloading.
         let length = self.get_total_file_size();
         trace!("Total file size for all images grabbed is {length}KB");

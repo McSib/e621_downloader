@@ -346,7 +346,7 @@ impl FlagWorker {
 
 /// Blacklist that holds all of the blacklist entries.
 /// These entries will be looped through a parsed before being used for filtering posts that are blacklisted.
-pub struct Blacklist {
+pub(crate) struct Blacklist {
     /// The blacklist parser which parses the blacklist and tokenizes it.
     blacklist_parser: BlacklistParser,
     /// All of the blacklist tokens after being parsed.
@@ -356,7 +356,7 @@ pub struct Blacklist {
 }
 
 impl Blacklist {
-    pub fn new(request_sender: RequestSender) -> Self {
+    pub(crate) fn new(request_sender: RequestSender) -> Self {
         Blacklist {
             blacklist_parser: BlacklistParser::default(),
             blacklist_tokens: RootToken::default(),
@@ -364,14 +364,14 @@ impl Blacklist {
         }
     }
 
-    pub fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
+    pub(crate) fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
         self.blacklist_parser = BlacklistParser::new(user_blacklist);
         self.blacklist_tokens = self.blacklist_parser.parse_blacklist();
         self
     }
 
     /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
-    pub fn cache_users(&mut self) {
+    pub(crate) fn cache_users(&mut self) {
         let tags: Vec<&mut TagToken> = self
             .blacklist_tokens
             .lines
@@ -389,7 +389,7 @@ impl Blacklist {
     }
 
     /// Checks of the blacklist is empty.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.blacklist_tokens.lines.is_empty()
     }
 
@@ -400,7 +400,7 @@ impl Blacklist {
     /// * `posts`: Posts to filter through.
     ///
     /// returns: u16 of posts that were positively filtered
-    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
+    pub(crate) fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
         let mut filtered: u16 = 0;
         for blacklist_line in &self.blacklist_tokens.lines {
             posts.retain(|e| {

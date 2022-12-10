@@ -13,14 +13,14 @@ use crate::e621::{
     },
 };
 
-pub trait NewVec<T> {
+pub(crate) trait NewVec<T> {
     fn new_vec(value: T) -> Vec<Self>
     where
         Self: Sized;
 }
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
-pub struct GrabbedPost {
+pub(crate) struct GrabbedPost {
     /// The url that leads to the file to download.
     url: String,
     /// The name of the file to download.
@@ -30,15 +30,15 @@ pub struct GrabbedPost {
 }
 
 impl GrabbedPost {
-    pub fn url(&self) -> &str {
+    pub(crate) fn url(&self) -> &str {
         &self.url
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn file_size(&self) -> i64 {
+    pub(crate) fn file_size(&self) -> i64 {
         self.file_size
     }
 }
@@ -96,13 +96,13 @@ impl From<(PostEntry, &str)> for GrabbedPost {
 }
 
 /// A trait for the shorten function, allows for multiple types to be configured for it.
-pub trait Shorten<T> {
+pub(crate) trait Shorten<T> {
     /// Shortens a string by replacing a portion of it with a dilimeter of type `T` and then returning the new string.
     fn shorten(&self, delimiter: T) -> String;
 }
 
 /// A set of posts with category and name.
-pub struct PostCollection {
+pub(crate) struct PostCollection {
     /// The name of the set.
     name: String,
     /// The category of the set.
@@ -112,7 +112,7 @@ pub struct PostCollection {
 }
 
 impl PostCollection {
-    pub fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
+    pub(crate) fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
         PostCollection {
             name: name.to_string(),
             category: category.to_string(),
@@ -120,15 +120,15 @@ impl PostCollection {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn category(&self) -> &str {
+    pub(crate) fn category(&self) -> &str {
         &self.category
     }
 
-    pub fn posts(&self) -> &Vec<GrabbedPost> {
+    pub(crate) fn posts(&self) -> &Vec<GrabbedPost> {
         &self.posts
     }
 }
@@ -166,7 +166,7 @@ impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
 const POST_SEARCH_LIMIT: u8 = 5;
 
 /// Grabs all posts under a set of searching tags.
-pub struct Grabber {
+pub(crate) struct Grabber {
     /// All grabbed posts.
     posts: Vec<PostCollection>,
     /// `RequestSender` for sending API calls.
@@ -179,7 +179,7 @@ pub struct Grabber {
 
 impl Grabber {
     /// Creates new instance of `Self`.
-    pub fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
+    pub(crate) fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
         Grabber {
             posts: vec![PostCollection::new("Single Posts", "", Vec::new())],
             request_sender,
@@ -188,23 +188,23 @@ impl Grabber {
         }
     }
 
-    pub fn posts(&self) -> &Vec<PostCollection> {
+    pub(crate) fn posts(&self) -> &Vec<PostCollection> {
         &self.posts
     }
 
     /// Sets the blacklist.
-    pub fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
+    pub(crate) fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
         }
     }
 
-    pub fn set_safe_mode(&mut self, mode: bool) {
+    pub(crate) fn set_safe_mode(&mut self, mode: bool) {
         self.safe_mode = mode;
     }
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
-    pub fn grab_favorites(&mut self) {
+    pub(crate) fn grab_favorites(&mut self) {
         let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
             let tag = format!("fav:{}", login.username());
@@ -219,7 +219,7 @@ impl Grabber {
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
-    pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
+    pub(crate) fn grab_posts_by_tags(&mut self, groups: &[Group]) {
         let tags: Vec<&Tag> = groups.iter().flat_map(|e| e.tags()).collect();
         for tag in tags {
             self.grab_by_tag_type(tag);

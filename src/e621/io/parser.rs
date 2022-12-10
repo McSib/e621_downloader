@@ -10,7 +10,7 @@ use crate::e621::io::emergency_exit;
 /// data in a minimalist, none-structural, none-grammatical way. This class has no use for large libraries meant for
 /// more typical syntax.
 #[derive(Default)]
-pub struct BaseParser {
+pub(crate) struct BaseParser {
     /// Current cursor position in the array of characters.
     pos: usize,
     /// Input used for parsing.
@@ -25,7 +25,7 @@ pub struct BaseParser {
 
 impl BaseParser {
     /// Creates a new `BaseParser` with the given input.
-    pub fn new(input: String) -> Self {
+    pub(crate) fn new(input: String) -> Self {
         let mut parser = BaseParser {
             input: input.trim().to_string(),
             total_len: input.len(),
@@ -37,12 +37,12 @@ impl BaseParser {
     }
 
     /// Consume and discard zero or more whitespace characters.
-    pub fn consume_whitespace(&mut self) {
+    pub(crate) fn consume_whitespace(&mut self) {
         self.consume_while(char::is_whitespace);
     }
 
     /// Consumes characters until `test` returns false.
-    pub fn consume_while<F>(&mut self, test: F) -> String
+    pub(crate) fn consume_while<F>(&mut self, test: F) -> String
     where
         F: Fn(char) -> bool,
     {
@@ -55,7 +55,7 @@ impl BaseParser {
     }
 
     /// Returns current char and pushes `self.pos` to the next char.
-    pub fn consume_char(&mut self) -> char {
+    pub(crate) fn consume_char(&mut self) -> char {
         let mut iter = self.get_current_input().char_indices();
         let (_, cur_char) = iter.next().unwrap();
         let (next_pos, next_char) = iter.next().unwrap_or((1, ' '));
@@ -70,29 +70,29 @@ impl BaseParser {
     }
 
     /// Read the current char without consuming it.
-    pub fn next_char(&mut self) -> char {
+    pub(crate) fn next_char(&mut self) -> char {
         self.get_current_input().chars().next().unwrap()
     }
 
     /// Checks if the current input starts with the given string.
-    pub fn starts_with(&self, s: &str) -> bool {
+    pub(crate) fn starts_with(&self, s: &str) -> bool {
         self.get_current_input().starts_with(s)
     }
 
     /// Gets current input from current `pos` onward.
-    pub fn get_current_input(&self) -> &str {
+    pub(crate) fn get_current_input(&self) -> &str {
         &self.input[self.pos..]
     }
 
     /// Checks whether or not `pos` is at end of file.
-    pub fn eof(&self) -> bool {
+    pub(crate) fn eof(&self) -> bool {
         self.pos >= self.input.len()
     }
 
     /// Reports an error to the parser so that it can exit gracefully.
     /// This will print a message to the console through the `error!` macro.
     /// After this, it will also attach the current character number and column number to the message.
-    pub fn report_error(&self, msg: &str) {
+    pub(crate) fn report_error(&self, msg: &str) {
         error!(
             "Error parsing file at character {} (column {}): {msg}",
             self.pos, self.current_column
