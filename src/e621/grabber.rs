@@ -358,7 +358,7 @@ impl Grabber {
             }
 
             filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
+            invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
@@ -394,7 +394,7 @@ impl Grabber {
             }
 
             filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
+            invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
@@ -430,7 +430,7 @@ impl Grabber {
     }
 
     /// Removes invalid posts, this is dependant on if the file url is null or if the post was deleted.
-    fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
+    fn remove_invalid_posts(posts: &mut Vec<PostEntry>) -> u16 {
         // Sometimes, even if a post is available, the url for it isn't;
         // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
