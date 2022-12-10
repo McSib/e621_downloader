@@ -13,7 +13,7 @@ pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
 #[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub enum TagCategory {
+pub enum TagSearchType {
     /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
     General,
     /// A special tag that is searched differently from general tags (artist and characters).
@@ -39,13 +39,13 @@ pub struct Tag {
     /// The name of the tag.
     name: String,
     /// The search type of the tag.
-    search_type: TagCategory,
+    search_type: TagSearchType,
     /// The tag type of the tag.
     tag_type: TagType,
 }
 
 impl Tag {
-    fn new(tag: &str, category: TagCategory, tag_type: TagType) -> Self {
+    fn new(tag: &str, category: TagSearchType, tag_type: TagType) -> Self {
         Tag {
             name: String::from(tag),
             search_type: category,
@@ -57,7 +57,7 @@ impl Tag {
         &self.name
     }
 
-    pub fn search_type(&self) -> &TagCategory {
+    pub fn search_type(&self) -> &TagSearchType {
         &self.search_type
     }
 
@@ -70,7 +70,7 @@ impl Default for Tag {
     fn default() -> Self {
         Tag {
             name: String::new(),
-            search_type: TagCategory::None,
+            search_type: TagSearchType::None,
             tag_type: TagType::Unknown,
         }
     }
@@ -164,10 +164,10 @@ impl TagIdentifier {
 
         // Tries to return any tag in the map with category special, return the last element otherwise.
         // If returning the last element fails, assume the tag is syntax only and default.
-        map.find(|e| e.search_type == TagCategory::Special)
+        map.find(|e| e.search_type == TagSearchType::Special)
             .unwrap_or_else(|| {
                 map.last()
-                    .unwrap_or_else(|| Tag::new(tags, TagCategory::General, TagType::General))
+                    .unwrap_or_else(|| Tag::new(tags, TagSearchType::General, TagType::General))
             })
     }
 
@@ -205,15 +205,15 @@ impl TagIdentifier {
                 const CHARACTER_CATEGORY: u8 = 4;
                 if tag_entry.category == CHARACTER_CATEGORY {
                     if tag_entry.post_count > 1500 {
-                        TagCategory::General
+                        TagSearchType::General
                     } else {
-                        TagCategory::Special
+                        TagSearchType::Special
                     }
                 } else {
-                    TagCategory::General
+                    TagSearchType::General
                 }
             }
-            TagType::Artist => TagCategory::Special,
+            TagType::Artist => TagSearchType::Special,
             _ => unreachable!(),
         };
 
@@ -307,7 +307,7 @@ impl TagParser {
                     }
                 };
 
-                Tag::new(&tag, TagCategory::Special, tag_type)
+                Tag::new(&tag, TagSearchType::Special, tag_type)
             }
         }
     }
