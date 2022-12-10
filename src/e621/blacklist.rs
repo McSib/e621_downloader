@@ -289,13 +289,11 @@ impl FlagWorker {
             match &tag.tag_type {
                 TagType::Rating(rating) => {
                     self.flag_rating(rating, post, tag.negated);
-                    continue;
                 }
                 TagType::Id(id) => {
                     if let Some(blacklisted_id) = id {
                         self.flag_id(*blacklisted_id, post.id, tag.negated);
                     }
-                    continue;
                 }
                 TagType::User(_) => {
                     let user_id = tag
@@ -307,7 +305,6 @@ impl FlagWorker {
                         })
                         .unwrap();
                     self.flag_user(user_id, post.uploader_id, tag.negated);
-                    continue;
                 }
                 TagType::None => {
                     if post_tags.iter().any(|e| e == tag.name.as_str()) {
