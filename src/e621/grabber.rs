@@ -13,8 +13,8 @@ use crate::e621::{
     },
 };
 
-pub trait ToVec<T> {
-    fn to_vec(value: T) -> Vec<Self>
+pub trait NewVec<T> {
+    fn new_vec(value: T) -> Vec<Self>
     where
         Self: Sized;
 }
@@ -43,16 +43,16 @@ impl GrabbedPost {
     }
 }
 
-impl ToVec<Vec<PostEntry>> for GrabbedPost {
-    fn to_vec(vec: Vec<PostEntry>) -> Vec<Self> {
+impl NewVec<Vec<PostEntry>> for GrabbedPost {
+    fn new_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
             .collect()
     }
 }
 
-impl ToVec<(Vec<PostEntry>, &str)> for GrabbedPost {
-    fn to_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
+impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
+    fn new_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
             .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
@@ -210,7 +210,7 @@ impl Grabber {
             self.posts.push(PostCollection::new(
                 &tag_str,
                 "",
-                GrabbedPost::to_vec(posts),
+                GrabbedPost::new_vec(posts),
             ));
             info!(
                 "{} grabbed!",
@@ -249,7 +249,7 @@ impl Grabber {
                         self.posts.push(PostCollection::new(
                             name,
                             "Pools",
-                            GrabbedPost::to_vec((posts, name.as_ref())),
+                            GrabbedPost::new_vec((posts, name.as_ref())),
                         ));
 
                         info!(
@@ -265,7 +265,7 @@ impl Grabber {
                         // Grabs posts from IDs in the set entry.
                         let posts = self.special_search(&format!("set:{}", entry.shortname));
                         self.posts
-                            .push(PostCollection::from((&entry, GrabbedPost::to_vec(posts))));
+                            .push(PostCollection::from((&entry, GrabbedPost::new_vec(posts))));
 
                         info!(
                             "{} grabbed!",
@@ -318,7 +318,7 @@ impl Grabber {
                         self.posts.push(PostCollection::new(
                             tag.name(),
                             "General Searches",
-                            GrabbedPost::to_vec(posts),
+                            GrabbedPost::new_vec(posts),
                         ));
                         info!(
                             "{} grabbed!",
