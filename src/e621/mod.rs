@@ -32,7 +32,7 @@ pub mod tui;
 /// # Important
 /// This is a large struct built on bringing the best performance possible without sacrificing any idiomatic code in the process.
 /// When editing this struct, be sure that the changes you bring do not harm the overall performance, and if it does, be sure to give good reason on why the change is needed.
-pub struct WebConnector {
+pub struct E621WebConnector {
     /// The sender used for all API calls.
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts.
@@ -45,10 +45,10 @@ pub struct WebConnector {
     blacklist: Rc<RefCell<Blacklist>>,
 }
 
-impl WebConnector {
+impl E621WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
     pub fn new(request_sender: &RequestSender) -> Self {
-        WebConnector {
+        E621WebConnector {
             request_sender: request_sender.clone(),
             download_directory: Config::get().download_directory().to_string(),
             progress_bar: ProgressBar::hidden(),

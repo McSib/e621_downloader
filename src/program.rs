@@ -10,7 +10,7 @@ use crate::e621::{
         Config, Login,
     },
     sender::RequestSender,
-    WebConnector,
+    E621WebConnector,
 };
 
 const NAME: &str = env!("CARGO_PKG_NAME");
@@ -67,7 +67,7 @@ impl Program {
         trace!("Login Download Favorites: {}", login.download_favorites());
 
         let request_sender = RequestSender::new(login);
-        let mut connector = WebConnector::new(&request_sender);
+        let mut connector = E621WebConnector::new(&request_sender);
         connector.should_enter_safe_mode();
 
         // Parses tag file.
