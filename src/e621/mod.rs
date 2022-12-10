@@ -235,7 +235,7 @@ impl E621WebConnector {
                 ProgressStyleBuilder::default()
                     .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}")
                     .progress_chars("=>-")
-                    .progress_style)
+                    .build())
             .draw_target(ProgressDrawTarget::stderr())
             .reset()
             .steady_tick(Duration::from_secs(1))

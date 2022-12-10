@@ -3,7 +3,7 @@ use std::time::Duration;
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 
 pub(crate) struct ProgressStyleBuilder {
-    pub(crate) progress_style: ProgressStyle,
+    progress_style: ProgressStyle,
 }
 
 impl ProgressStyleBuilder {
@@ -15,6 +15,10 @@ impl ProgressStyleBuilder {
     pub(crate) fn progress_chars(mut self, chars: &str) -> Self {
         self.progress_style = self.progress_style.progress_chars(chars);
         self
+    }
+
+    pub(crate) fn build(self) -> ProgressStyle {
+        self.progress_style
     }
 }
 
