@@ -4,7 +4,7 @@ use crate::e621::{
     blacklist::Blacklist,
     io::{
         emergency_exit,
-        tag::{Group, Tag, TagCategory, TagType},
+        tag::{Group, Tag, TagSearchType, TagType},
         Config, Login,
     },
     sender::{
@@ -163,6 +163,8 @@ impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
     }
 }
 
+const POST_SEARCH_LIMIT: u8 = 5;
+
 /// Grabs all posts under a set of searching tags.
 pub struct Grabber {
     /// All grabbed posts.
@@ -206,7 +208,7 @@ impl Grabber {
         let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
             let tag = format!("fav:{}", login.username());
-            let posts = self.special_search(tag.as_str());
+            let posts = self.search(&tag, &TagSearchType::Special);
             self.posts
                 .push(PostCollection::new(&tag, "", GrabbedPost::new_vec(posts)));
             info!(
@@ -291,7 +293,7 @@ impl Grabber {
             .get_entry_from_appended_id(tag.name(), "set");
 
         // Grabs posts from IDs in the set entry.
-        let posts = self.special_search(&format!("set:{}", entry.shortname));
+        let posts = self.search(&format!("set:{}", entry.shortname), &TagSearchType::Special);
         self.posts
             .push(PostCollection::from((&entry, GrabbedPost::new_vec(posts))));
 
@@ -308,7 +310,7 @@ impl Grabber {
             .request_sender
             .get_entry_from_appended_id(tag.name(), "pool");
         let name = &entry.name;
-        let mut posts = self.special_search(&format!("pool:{}", entry.id));
+        let mut posts = self.search(&format!("pool:{}", entry.id), &TagSearchType::Special);
 
         // Updates entry post ids in case any posts were filtered in the search.
         entry
@@ -341,31 +343,23 @@ impl Grabber {
 
     /// Grabs posts from general tag.
     fn get_posts_from_tag(&self, tag: &Tag) -> Vec<PostEntry> {
-        match tag.search_type() {
-            TagCategory::General => self.general_search(tag.name()),
-            TagCategory::Special => self.special_search(tag.name()),
-            TagCategory::None => unreachable!(),
-        }
+        self.search(tag.name(), tag.search_type())
     }
 
-    /// Performs a general search where it grabs only five pages of posts.
-    fn general_search(&self, searching_tag: &str) -> Vec<PostEntry> {
-        let limit: u16 = 5;
-        let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
+    /// Performs a search where it grabs posts.
+    fn search(&self, searching_tag: &str, tag_category: &TagSearchType) -> Vec<PostEntry> {
+        let mut posts: Vec<PostEntry> = Vec::new();
         let mut filtered = 0;
         let mut invalid_posts = 0;
-        for page in 1..limit {
-            let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page).posts;
-            if searched_posts.is_empty() {
-                break;
+        match tag_category {
+            TagSearchType::General => {
+                posts = Vec::with_capacity(320 * POST_SEARCH_LIMIT as usize);
+                self.general_search(searching_tag, &mut posts, &mut filtered, &mut invalid_posts);
             }
-
-            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
-
-            searched_posts.reverse();
-            posts.append(&mut searched_posts);
+            TagSearchType::Special => {
+                self.special_search(searching_tag, &mut posts, &mut filtered, &mut invalid_posts);
+            }
+            TagSearchType::None => {}
         }
 
         if filtered > 0 {
@@ -385,41 +379,52 @@ impl Grabber {
         posts
     }
 
-    /// Performs a special search that grabs all posts tied to the searching tag.
-    fn special_search(&self, searching_tag: &str) -> Vec<PostEntry> {
-        let mut page: u16 = 1;
-        let mut posts: Vec<PostEntry> = vec![];
-        let mut filtered = 0;
-        let mut invalid_posts = 0;
+    fn special_search(
+        &self,
+        searching_tag: &str,
+        posts: &mut Vec<PostEntry>,
+        filtered: &mut u16,
+        invalid_posts: &mut u16,
+    ) {
+        let mut page = 1;
+
         loop {
             let mut searched_posts = self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }
 
-            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
+            *filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            *invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
             page += 1;
         }
+    }
 
-        if filtered > 0 {
-            info!(
-                "Filtered {} total blacklisted posts from search...",
-                console::style(filtered).cyan().italic()
-            );
+    fn general_search(
+        &self,
+        searching_tag: &str,
+        posts: &mut Vec<PostEntry>,
+        filtered: &mut u16,
+        invalid_posts: &mut u16,
+    ) {
+        for page in 1..POST_SEARCH_LIMIT {
+            let mut searched_posts: Vec<PostEntry> = self
+                .request_sender
+                .bulk_search(searching_tag, page as u16)
+                .posts;
+            if searched_posts.is_empty() {
+                break;
+            }
+
+            *filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            *invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
+
+            searched_posts.reverse();
+            posts.append(&mut searched_posts);
         }
-
-        if invalid_posts > 0 {
-            info!(
-                "Filtered {} total invalid posts from search...",
-                console::style(invalid_posts).cyan().italic()
-            );
-        }
-
-        posts
     }
 
     /// Scans through array of posts and removes any that violets the blacklist.
