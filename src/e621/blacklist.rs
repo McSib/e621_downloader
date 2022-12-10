@@ -371,14 +371,18 @@ impl Blacklist {
 
     /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
     pub fn cache_users(&mut self) {
-        for blacklist_token in &mut self.blacklist_tokens.lines {
-            for tag in &mut blacklist_token.tags {
-                if let TagType::User(Some(username)) = &tag.tag_type {
-                    let user: UserEntry = self
-                        .request_sender
-                        .get_entry_from_appended_id(username, "user");
-                    tag.name = format!("{}", user.id);
-                }
+        let mut tags: Vec<&mut TagToken> = self
+            .blacklist_tokens
+            .lines
+            .iter_mut()
+            .flat_map(|e| &mut e.tags)
+            .collect();
+        for tag in tags {
+            if let TagType::User(Some(username)) = &tag.tag_type {
+                let user: UserEntry = self
+                    .request_sender
+                    .get_entry_from_appended_id(username, "user");
+                tag.name = format!("{}", user.id);
             }
         }
     }
