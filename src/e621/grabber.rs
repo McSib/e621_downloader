@@ -443,6 +443,12 @@ impl Grabber {
             }
         });
 
+        Self::log_invalid_posts(&invalid_posts);
+
+        invalid_posts
+    }
+
+    fn log_invalid_posts(invalid_posts: &u16) {
         match invalid_posts.cmp(&1) {
             Ordering::Less => {}
             Ordering::Equal => {
@@ -456,7 +462,5 @@ impl Grabber {
                 trace!("{} posts had to be filtered by e621/e926...", invalid_posts,);
             }
         }
-
-        invalid_posts
     }
 }
