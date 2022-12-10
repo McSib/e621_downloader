@@ -1,4 +1,5 @@
 use failure::ResultExt;
+use std::cmp::Ordering;
 
 use crate::e621::{
     io::parser::BaseParser,
@@ -416,10 +417,10 @@ impl Blacklist {
             });
         }
 
-        if filtered > 0 {
-            trace!("Filtered {filtered} posts with blacklist...");
-        } else {
-            trace!("No posts filtered...");
+        match filtered.cmp(&1) {
+            Ordering::Less => trace!("No posts filtered..."),
+            Ordering::Equal => trace!("Filtered {filtered} post with blacklist..."),
+            Ordering::Greater => trace!("Filtered {filtered} posts with blacklist..."),
         }
 
         filtered
