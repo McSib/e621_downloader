@@ -347,11 +347,11 @@ impl Grabber {
     }
 
     /// Performs a search where it grabs posts.
-    fn search(&self, searching_tag: &str, tag_category: &TagSearchType) -> Vec<PostEntry> {
+    fn search(&self, searching_tag: &str, tag_search_type: &TagSearchType) -> Vec<PostEntry> {
         let mut posts: Vec<PostEntry> = Vec::new();
         let mut filtered = 0;
         let mut invalid_posts = 0;
-        match tag_category {
+        match tag_search_type {
             TagSearchType::General => {
                 posts = Vec::with_capacity(320 * POST_SEARCH_LIMIT as usize);
                 self.general_search(searching_tag, &mut posts, &mut filtered, &mut invalid_posts);
