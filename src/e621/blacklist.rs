@@ -371,7 +371,7 @@ impl Blacklist {
 
     /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
     pub fn cache_users(&mut self) {
-        let mut tags: Vec<&mut TagToken> = self
+        let tags: Vec<&mut TagToken> = self
             .blacklist_tokens
             .lines
             .iter_mut()
