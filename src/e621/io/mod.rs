@@ -38,9 +38,10 @@ pub(crate) const LOGIN_NAME: &str = "login.json";
 /// Config that is used to do general setup.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub(crate) struct Config {
-    /// The location of the download directory
+    /// The location of the download directory.
     #[serde(rename = "downloadDirectory")]
     download_directory: String,
+    /// The file naming convention (e.g "md5", "id").
     #[serde(rename = "fileNamingConvention")]
     naming_convention: String,
 }
