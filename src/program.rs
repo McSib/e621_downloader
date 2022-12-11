@@ -29,8 +29,13 @@ use crate::e621::{
     E621WebConnector,
 };
 
+/// The name of the cargo package.
 const NAME: &str = env!("CARGO_PKG_NAME");
+
+/// The version of the cargo package.
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// The authors who created the package.
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
 pub(crate) struct Program;
