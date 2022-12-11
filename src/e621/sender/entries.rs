@@ -408,7 +408,7 @@ pub(crate) struct UserEntry {
     pub(crate) disable_mobile_gestures: Option<bool>,
     /// Whether or not safe mode is on/off.
     pub(crate) enable_safe_mode: Option<bool>,
-    /// Whether or not resposive mode is disabled.
+    /// Whether or not responsive mode is disabled.
     pub(crate) disable_responsive_mode: Option<bool>,
     /// Whether or not post tooltips is disabled.
     pub(crate) disable_post_tooltips: Option<bool>,

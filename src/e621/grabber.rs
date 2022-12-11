@@ -97,7 +97,7 @@ impl From<(PostEntry, &str)> for GrabbedPost {
 
 /// A trait for the shorten function, allows for multiple types to be configured for it.
 pub(crate) trait Shorten<T> {
-    /// Shortens a string by replacing a portion of it with a dilimeter of type `T` and then returning the new string.
+    /// Shortens a string by replacing a portion of it with a delimiter of type `T` and then returning the new string.
     fn shorten(&self, delimiter: T) -> String;
 }
 
