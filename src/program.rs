@@ -1,35 +1,30 @@
-use std::env::current_dir;
-use std::fs::write;
-use std::path::Path;
+use std::{env::current_dir, fs::write, path::Path};
 
 use console::Term;
 use failure::Error;
 
-use crate::e621::io::tag::{
-    parse_tag_file,
-    TAG_FILE_EXAMPLE,
-    TAG_NAME,
+use crate::e621::{
+    io::{
+        emergency_exit,
+        tag::{parse_tag_file, TAG_FILE_EXAMPLE, TAG_NAME},
+        Config, Login,
+    },
+    sender::RequestSender,
+    E621WebConnector,
 };
-use crate::e621::io::{
-    emergency_exit,
-    Config,
-    Login,
-};
-use crate::e621::sender::RequestSender;
-use crate::e621::WebConnector;
 
 const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
-pub struct Program {}
+pub(crate) struct Program;
 
 impl Program {
-    pub fn new() -> Self {
-        Program {}
+    pub(crate) fn new() -> Self {
+        Self
     }
 
-    pub fn run(&self) -> Result<(), Error> {
+    pub(crate) fn run(&self) -> Result<(), Error> {
         Term::stdout().set_title("e621 downloader");
         trace!("Starting e621 downloader...");
         trace!("Program Name: {}", NAME);
@@ -65,14 +60,14 @@ impl Program {
         }
 
         // Creates connector and requester to prepare for downloading posts.
-        let login = Login::load().unwrap();
+        let login = Login::get();
         trace!("Login information loaded...");
         trace!("Login Username: {}", login.username());
         trace!("Login API Key: {}", "*".repeat(login.api_key().len()));
         trace!("Login Download Favorites: {}", login.download_favorites());
 
-        let request_sender = RequestSender::new(&login);
-        let mut connector = WebConnector::new(&request_sender);
+        let request_sender = RequestSender::new(login);
+        let mut connector = E621WebConnector::new(&request_sender);
         connector.should_enter_safe_mode();
 
         // Parses tag file.

@@ -1,37 +1,19 @@
-use std::any::type_name;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{any::type_name, cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use failure::ResultExt;
-use reqwest::blocking::{
-    Client,
-    RequestBuilder,
-    Response,
-};
-use reqwest::header::{
-    AUTHORIZATION,
-    USER_AGENT,
+use reqwest::{
+    blocking::{Client, RequestBuilder, Response},
+    header::{AUTHORIZATION, USER_AGENT},
 };
 use serde::de::DeserializeOwned;
-use serde_json::{
-    from_value,
-    Value,
+use serde_json::{from_value, Value};
+
+use crate::e621::{
+    io::{emergency_exit, Login},
+    sender::entries::{AliasEntry, BulkPostEntry, PostEntry, TagEntry},
 };
 
-use crate::e621::io::{
-    emergency_exit,
-    Login,
-};
-use crate::e621::sender::entries::{
-    AliasEntry,
-    BulkPostEntry,
-    PostEntry,
-    TagEntry,
-};
-
-pub mod entries;
+pub(crate) mod entries;
 
 /// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
 #[macro_export]
@@ -69,10 +51,7 @@ struct SenderClient {
 impl SenderClient {
     /// Creates root client for the `SenderClient`.
     fn new(auth: String) -> Self {
-        trace!(
-            "SenderClient initializing with USER_AGENT_VALUE \"{}\"",
-            USER_AGENT_VALUE
-        );
+        trace!("SenderClient initializing with USER_AGENT_VALUE \"{USER_AGENT_VALUE}\"");
 
         SenderClient {
             client: Rc::new(SenderClient::build_client()),
@@ -91,12 +70,12 @@ impl SenderClient {
 
     /// A wrapping function that acts the exact same as `self.client.get` but will instead attach the user agent header before returning the `RequestBuilder`.
     /// This will ensure that all requests sent have the proper user agent info.
-    pub fn get(&self, url: &str) -> RequestBuilder {
+    pub(crate) fn get(&self, url: &str) -> RequestBuilder {
         self.client.get(url).header(USER_AGENT, USER_AGENT_VALUE)
     }
 
     /// This is the same as `self.get(url)` but will attach the authorization header with username and API hash.
-    pub fn get_with_auth(&self, url: &str) -> RequestBuilder {
+    pub(crate) fn get_with_auth(&self, url: &str) -> RequestBuilder {
         if self.auth.is_empty() {
             self.get(url)
         } else {
@@ -116,7 +95,7 @@ impl Clone for SenderClient {
 }
 
 /// The `RequestSender`, it handles all calls to the API, so every single instance in the program must adhere to the `RequestSender`.
-pub struct RequestSender {
+pub(crate) struct RequestSender {
     /// The client that will be used to send all requests.
     ///
     /// # Important
@@ -126,7 +105,7 @@ pub struct RequestSender {
 }
 
 impl RequestSender {
-    pub fn new(login: &Login) -> Self {
+    pub(crate) fn new(login: &Login) -> Self {
         let auth = if login.is_empty() {
             String::new()
         } else {
@@ -155,12 +134,12 @@ impl RequestSender {
     }
 
     /// If the client authenticated or not.
-    pub fn is_authenticated(&self) -> bool {
+    pub(crate) fn is_authenticated(&self) -> bool {
         !self.client.auth.is_empty()
     }
 
     /// Updates all the urls from e621 to e926.
-    pub fn update_to_safe(&mut self) {
+    pub(crate) fn update_to_safe(&mut self) {
         self.urls
             .borrow_mut()
             .iter_mut()
@@ -171,36 +150,39 @@ impl RequestSender {
     fn output_error(&self, error: &reqwest::Error) {
         error!(
             "Error occurred from sent request. \
-             Error: {}",
-            error
+             Error: {error}",
         );
         trace!("Url where error occurred: {:#?}", error.url());
 
         if let Some(status) = error.status() {
             let code = status.as_u16();
-            trace!("The response code from the server was: {}", code);
+            trace!("The response code from the server was: {code}");
 
+            const SERVER_INTERNAL: u16 = 500;
+            const SERVER_RATE_LIMIT: u16 = 503;
+            const CLIENT_FORBIDDEN: u16 = 403;
+            const CLIENT_THROTTLED: u16 = 421;
             match code {
-                500 => {
+                SERVER_INTERNAL => {
                     error!(
                         "There was an error that happened internally in the servers, \
                          please try using the downloader later until the issue is solved."
                     );
                 }
-                503 => {
+                SERVER_RATE_LIMIT => {
                     error!(
                         "Server could not handle the request, or the downloader has \
                          exceeded the rate-limit. Contact the developer immediately about this \
                          issue."
                     );
                 }
-                403 => {
+                CLIENT_FORBIDDEN => {
                     error!(
                         "The client was forbidden from accessing the api, contact the \
                          developer immediately if this error occurs."
                     );
                 }
-                421 => {
+                CLIENT_THROTTLED => {
                     error!(
                         "The user is throttled, thus the request is unsuccessful. \
                          Contact the developer immediately if this error occurs."
@@ -216,7 +198,7 @@ impl RequestSender {
     }
 
     /// Gets the response from a sent request and checks to ensure it was successful.
-    pub fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
+    pub(crate) fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
         match result {
             Ok(response) => response,
             Err(ref error) => {
@@ -227,14 +209,14 @@ impl RequestSender {
     }
 
     /// Sends request to download image.
-    pub fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
+    pub(crate) fn download_image(&self, url: &str, file_size: i64) -> Vec<u8> {
         let mut image_response = self.check_response(self.client.get(url).send());
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response
             .copy_to(&mut image_bytes)
             .with_context(|e| {
                 error!("Failed to download image!");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
 
@@ -242,12 +224,12 @@ impl RequestSender {
     }
 
     /// Appends base url with id/name before ending with `.json`.
-    pub fn append_url(&self, url: &str, append: &str) -> String {
-        format!("{}{}.json", url, append)
+    pub(crate) fn append_url(&self, url: &str, append: &str) -> String {
+        format!("{url}{append}.json")
     }
 
     /// Gets entry by type `T`, this is used for every request where the url needs to be appended to.
-    pub fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
+    pub(crate) fn get_entry_from_appended_id<T>(&self, id: &str, url_type_key: &str) -> T
     where
         T: DeserializeOwned,
     {
@@ -263,9 +245,9 @@ impl RequestSender {
                     "Json was unable to deserialize to \"{}\"!",
                     type_name::<Value>()
                 );
-                trace!("url_type_key: {}", url_type_key);
-                trace!("id: {}", id);
-                format!("{}", e)
+                trace!("url_type_key: {url_type_key}");
+                trace!("id: {id}");
+                format!("{e}")
             })
             .unwrap();
         match url_type_key {
@@ -278,7 +260,7 @@ impl RequestSender {
                     trace!(
                         "Unexpected error occurred when trying to perform conversion from value to entry type above."
                     );
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
             _ => from_value(value)
@@ -290,23 +272,23 @@ impl RequestSender {
                     trace!(
                         "Unexpected error occurred when trying to perform conversion from value to entry type above."
                     );
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
         }
     }
 
     /// Performs a bulk search for posts using tags to filter the response.
-    pub fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
-        debug!("Downloading page {} of tag {}", page, searching_tag);
+    pub(crate) fn bulk_search(&self, searching_tag: &str, page: u16) -> BulkPostEntry {
+        debug!("Downloading page {page} of tag {searching_tag}");
 
         self.check_response(
             self.client
                 .get_with_auth(&self.urls.borrow()["posts"])
                 .query(&[
                     ("tags", searching_tag),
-                    ("page", &format!("{}", page)),
-                    ("limit", &format!("{}", 320)),
+                    ("page", &format!("{page}")),
+                    ("limit", &320.to_string()),
                 ])
                 .send(),
         )
@@ -317,13 +299,13 @@ impl RequestSender {
                 type_name::<Vec<PostEntry>>()
             );
             trace!("Failed to perform bulk search...");
-            format!("{}", e)
+            format!("{e}")
         })
         .unwrap()
     }
 
     /// Gets tags by their name.
-    pub fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
+    pub(crate) fn get_tags_by_name(&self, tag: &str) -> Vec<TagEntry> {
         let result: Value = self
             .check_response(
                 self.client
@@ -338,8 +320,8 @@ impl RequestSender {
                     type_name::<Value>()
                 );
                 trace!("url_type_key: tag_bulk");
-                trace!("tag: {}", tag);
-                format!("{}", e)
+                trace!("tag: {tag}");
+                format!("{e}")
             })
             .unwrap();
         if result.is_object() {
@@ -352,14 +334,14 @@ impl RequestSender {
                         type_name::<Vec<TagEntry>>()
                     );
                     trace!("Failed to perform bulk search...");
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap()
         }
     }
 
     /// Queries aliases and returns response.
-    pub fn query_aliases(&self, tag: &str) -> Option<Vec<AliasEntry>> {
+    pub(crate) fn query_aliases(&self, tag: &str) -> Option<Vec<AliasEntry>> {
         let result = self
             .check_response(
                 self.client
@@ -376,7 +358,7 @@ impl RequestSender {
         match result {
             Ok(e) => Some(e),
             Err(e) => {
-                trace!("No alias was found for {}...", tag);
+                trace!("No alias was found for {tag}...");
                 trace!("Printing trace message for why None was returned...");
                 trace!("{}", e.to_string());
                 None

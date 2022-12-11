@@ -1,31 +1,30 @@
-use std::cell::RefCell;
-use std::fs::{
-    create_dir_all,
-    write,
+use std::{
+    cell::RefCell,
+    fs::{create_dir_all, write},
+    path::PathBuf,
+    rc::Rc,
+    time::Duration,
 };
-use std::path::PathBuf;
-use std::rc::Rc;
-use std::time::Duration;
 
-use blacklist::Blacklist;
 use dialoguer::Confirm;
 use failure::ResultExt;
+use indicatif::{ProgressBar, ProgressDrawTarget};
+
+use crate::e621::grabber::Shorten;
+use blacklist::Blacklist;
 use grabber::Grabber;
-use indicatif::{
-    ProgressBar,
-    ProgressDrawTarget,
-    ProgressStyle,
-};
-use io::tag::Group;
-use io::Config;
+use io::{tag::Group, Config};
 use sender::RequestSender;
 
 use crate::e621::sender::entries::UserEntry;
 
-pub mod blacklist;
-pub mod grabber;
-pub mod io;
-pub mod sender;
+use self::tui::{ProgressBarBuilder, ProgressStyleBuilder};
+
+pub(crate) mod blacklist;
+pub(crate) mod grabber;
+pub(crate) mod io;
+pub(crate) mod sender;
+pub(crate) mod tui;
 
 /// The `WebConnector` is the mother of all requests sent.
 /// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.
@@ -33,7 +32,7 @@ pub mod sender;
 /// # Important
 /// This is a large struct built on bringing the best performance possible without sacrificing any idiomatic code in the process.
 /// When editing this struct, be sure that the changes you bring do not harm the overall performance, and if it does, be sure to give good reason on why the change is needed.
-pub struct WebConnector {
+pub(crate) struct E621WebConnector {
     /// The sender used for all API calls.
     request_sender: RequestSender,
     /// The config which is modified when grabbing posts.
@@ -46,13 +45,12 @@ pub struct WebConnector {
     blacklist: Rc<RefCell<Blacklist>>,
 }
 
-impl WebConnector {
+impl E621WebConnector {
     /// Creates instance of `Self` for grabbing and downloading posts.
-    pub fn new(request_sender: &RequestSender) -> Self {
-        let config = Config::get_config().unwrap_or_default();
-        WebConnector {
+    pub(crate) fn new(request_sender: &RequestSender) -> Self {
+        E621WebConnector {
             request_sender: request_sender.clone(),
-            download_directory: config.download_directory().to_string(),
+            download_directory: Config::get().download_directory().to_string(),
             progress_bar: ProgressBar::hidden(),
             grabber: Grabber::new(request_sender.clone(), false),
             blacklist: Rc::new(RefCell::new(Blacklist::new(request_sender.clone()))),
@@ -61,7 +59,7 @@ impl WebConnector {
 
     /// Gets input and checks if the user wants to enter safe mode.
     /// If they do, the `RequestSender` will update the request urls for future sent requests.
-    pub fn should_enter_safe_mode(&mut self) {
+    pub(crate) fn should_enter_safe_mode(&mut self) {
         trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
             .with_prompt("Should enter safe mode?")
@@ -71,11 +69,11 @@ impl WebConnector {
             .with_context(|e| {
                 error!("Failed to setup confirmation prompt!");
                 trace!("Terminal unable to set up confirmation prompt...");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
 
-        trace!("Safe mode decision: {}", confirm_prompt);
+        trace!("Safe mode decision: {confirm_prompt}");
         if confirm_prompt {
             self.request_sender.update_to_safe();
             self.grabber.set_safe_mode(true);
@@ -83,7 +81,7 @@ impl WebConnector {
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.
-    pub fn process_blacklist(&mut self, username: &str) {
+    pub(crate) fn process_blacklist(&mut self, username: &str) {
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(username, "user");
@@ -100,7 +98,7 @@ impl WebConnector {
     }
 
     /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
-    pub fn grab_all(&mut self, groups: &[Group]) {
+    pub(crate) fn grab_all(&mut self, groups: &[Group]) {
         trace!("Grabbing posts...");
         self.grabber.grab_favorites();
         self.grabber.grab_posts_by_tags(groups);
@@ -112,10 +110,10 @@ impl WebConnector {
             .with_context(|e| {
                 error!("Failed to save image!");
                 trace!("A downloaded image was unable to be saved...");
-                format!("{}", e)
+                format!("{e}")
             })
             .unwrap();
-        trace!("Saved {}...", file_path);
+        trace!("Saved {file_path}...");
     }
 
     /// Removes invalid characters from directory name.
@@ -132,57 +130,66 @@ impl WebConnector {
     /// Processes `PostSet` and downloads all posts from it.
     fn download_collection(&mut self) {
         for collection in self.grabber.posts().iter() {
-            let short_collection_name = self.shorten_collection_name(collection.name(), "...");
+            let collection_name = collection.name();
+            let collection_category = collection.category();
+            let collection_posts = collection.posts();
+            let collection_count = collection_posts.len();
+            let short_collection_name = collection.shorten("...");
+
+            #[cfg(unix)]
+            let static_path: PathBuf = [
+                &self.download_directory,
+                collection.category(),
+                &self.remove_invalid_chars(collection_name),
+            ]
+            .iter()
+            .collect();
+
+            #[cfg(windows)]
             let mut static_path: PathBuf = [
                 &self.download_directory,
                 collection.category(),
-                &self.remove_invalid_chars(collection.name()),
+                &self.remove_invalid_chars(collection_name),
             ]
             .iter()
             .collect();
 
             // This is put here to attempt to shorten the length of the path if it passes window's
             // max path length.
-            #[cfg(target_os = "windows")]
+            #[cfg(windows)]
             const MAX_PATH: usize = 260; // Defined in Windows documentation.
 
-            #[cfg(target_os = "windows")]
-            let path_len = static_path.as_path().as_os_str().len();
+            #[cfg(windows)]
+            let start_path_len = static_path.as_os_str().len();
 
-            #[cfg(target_os = "windows")]
-            if path_len >= MAX_PATH {
+            #[cfg(windows)]
+            if start_path_len >= MAX_PATH {
                 static_path = [
                     &self.download_directory,
-                    collection.category(),
-                    &self.remove_invalid_chars(
-                        &self.shorten_collection_name(collection.name(), "_"),
-                    ),
+                    collection_category,
+                    &self.remove_invalid_chars(&collection.shorten('_')),
                 ]
                 .iter()
                 .collect();
 
-                if path_len >= MAX_PATH {
-                    error!("Path is too long and crosses the 256 char limit.\
+                let new_len = static_path.as_os_str().len();
+                if new_len >= MAX_PATH {
+                    error!("Path is too long and crosses the {MAX_PATH} char limit.\
                        Please relocate the program to a directory closer to the root drive directory.");
-                    trace!("Path length: {}", path_len);
+                    trace!("Path length: {new_len}");
                 }
             }
 
             trace!("Printing Collection Info:");
-            trace!("Collection Name:            \"{}\"", collection.name());
-            trace!("Collection Category:        \"{}\"", collection.category());
-            trace!(
-                "Collection Post Length:     \"{}\"",
-                collection.posts().len()
-            );
+            trace!("Collection Name:            \"{collection_name}\"");
+            trace!("Collection Category:        \"{collection_category}\"");
+            trace!("Collection Post Length:     \"{collection_count}\"");
             trace!(
                 "Static file path for this collection: \"{}\"",
                 static_path.to_str().unwrap()
             );
 
-            for post in collection.posts() {
-                self.progress_bar
-                    .set_message(format!("Downloading: {} ", short_collection_name));
+            for post in collection_posts {
                 let file_path: PathBuf = [
                     &static_path.to_str().unwrap().to_string(),
                     &self.remove_invalid_chars(post.name()),
@@ -190,23 +197,25 @@ impl WebConnector {
                 .iter()
                 .collect();
 
-                create_dir_all(file_path.parent().unwrap())
-                    .with_context(|e| {
-                        error!("Could not create directories for images!");
-                        trace!("Directory path unable to be created...");
-                        trace!(
-                            "Path: \"{}\"",
-                            file_path.parent().unwrap().to_str().unwrap()
-                        );
-                        format!("{}", e)
-                    })
-                    .unwrap();
                 if file_path.exists() {
                     self.progress_bar
                         .set_message("Duplicate found: skipping... ");
                     self.progress_bar.inc(post.file_size() as u64);
                     continue;
                 }
+
+                self.progress_bar
+                    .set_message(format!("Downloading: {short_collection_name} "));
+
+                let parent_path = file_path.parent().unwrap();
+                create_dir_all(parent_path)
+                    .with_context(|e| {
+                        error!("Could not create directories for images!");
+                        trace!("Directory path unable to be created...");
+                        trace!("Path: \"{}\"", parent_path.to_str().unwrap());
+                        format!("{e}")
+                    })
+                    .unwrap();
 
                 let bytes = self
                     .request_sender
@@ -215,35 +224,29 @@ impl WebConnector {
                 self.progress_bar.inc(post.file_size() as u64);
             }
 
-            trace!(
-                "Collection {} is finished downloading...",
-                collection.name()
-            );
+            trace!("Collection {collection_name} is finished downloading...");
         }
     }
 
     /// Initializes the progress bar for downloading process.
     fn initialize_progress_bar(&mut self, len: u64) {
-        self.progress_bar.set_length(len);
-        self.progress_bar.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}",
-                )
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        self.progress_bar
-            .set_draw_target(ProgressDrawTarget::stderr());
-        self.progress_bar.reset();
-        self.progress_bar.enable_steady_tick(Duration::from_millis(100));
+        self.progress_bar = ProgressBarBuilder::new(len)
+            .style(
+                ProgressStyleBuilder::default()
+                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}")
+                    .progress_chars("=>-")
+                    .build())
+            .draw_target(ProgressDrawTarget::stderr())
+            .reset()
+            .steady_tick(Duration::from_secs(1))
+            .build();
     }
 
     /// Downloads tuple of general posts and single posts.
-    pub fn download_posts(&mut self) {
+    pub(crate) fn download_posts(&mut self) {
         // Initializes the progress bar for downloading.
         let length = self.get_total_file_size();
-        trace!("Total file size for all images grabbed is {}KB", length);
+        trace!("Total file size for all images grabbed is {length}KB");
         self.initialize_progress_bar(length);
         self.download_collection();
         self.progress_bar.finish_and_clear();
@@ -256,15 +259,5 @@ impl WebConnector {
             .iter()
             .map(|e| e.posts().iter().map(|f| f.file_size() as u64).sum::<u64>())
             .sum()
-    }
-
-    fn shorten_collection_name(&self, name: &str, deliminator: &str) -> String {
-        if name.len() >= 25 {
-            let mut short_name = name[0..25].to_string();
-            short_name.push_str(deliminator);
-            short_name
-        } else {
-            name.to_string()
-        }
     }
 }

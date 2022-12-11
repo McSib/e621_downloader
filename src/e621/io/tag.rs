@@ -1,22 +1,19 @@
 use std::fs::read_to_string;
 
-use failure::{
-    Error,
-    ResultExt,
+use failure::{Error, ResultExt};
+
+use crate::e621::{
+    io::{emergency_exit, parser::BaseParser},
+    sender::{entries::TagEntry, RequestSender},
 };
 
-use crate::e621::io::emergency_exit;
-use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::entries::TagEntry;
-use crate::e621::sender::RequestSender;
-
 /// Constant of the tag file's name.
-pub const TAG_NAME: &str = "tags.txt";
-pub const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
+pub(crate) const TAG_NAME: &str = "tags.txt";
+pub(crate) const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
 #[derive(Debug, Clone, PartialOrd, PartialEq, Eq)]
-pub enum TagCategory {
+pub(crate) enum TagSearchType {
     /// A general tag that is used for everything except artist and sometimes character (depending on the amount of posts tied to it)
     General,
     /// A special tag that is searched differently from general tags (artist and characters).
@@ -27,7 +24,7 @@ pub enum TagCategory {
 
 /// The type a tag can be.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TagType {
+pub(crate) enum TagType {
     Pool,
     Set,
     General,
@@ -38,17 +35,17 @@ pub enum TagType {
 
 /// A tag that contains its name, search type, and tag type.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tag {
+pub(crate) struct Tag {
     /// The name of the tag.
     name: String,
     /// The search type of the tag.
-    search_type: TagCategory,
+    search_type: TagSearchType,
     /// The tag type of the tag.
     tag_type: TagType,
 }
 
 impl Tag {
-    fn new(tag: &str, category: TagCategory, tag_type: TagType) -> Self {
+    fn new(tag: &str, category: TagSearchType, tag_type: TagType) -> Self {
         Tag {
             name: String::from(tag),
             search_type: category,
@@ -56,15 +53,15 @@ impl Tag {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn search_type(&self) -> &TagCategory {
+    pub(crate) fn search_type(&self) -> &TagSearchType {
         &self.search_type
     }
 
-    pub fn tag_type(&self) -> &TagType {
+    pub(crate) fn tag_type(&self) -> &TagType {
         &self.tag_type
     }
 }
@@ -73,7 +70,7 @@ impl Default for Tag {
     fn default() -> Self {
         Tag {
             name: String::new(),
-            search_type: TagCategory::None,
+            search_type: TagSearchType::None,
             tag_type: TagType::Unknown,
         }
     }
@@ -81,7 +78,7 @@ impl Default for Tag {
 
 /// Group object generated from parsed code.
 #[derive(Debug, Clone)]
-pub struct Group {
+pub(crate) struct Group {
     /// The name of group.
     name: String,
     /// A `Vec` containing all the tags parsed.
@@ -89,31 +86,31 @@ pub struct Group {
 }
 
 impl Group {
-    pub fn new(name: String) -> Self {
+    pub(crate) fn new(name: String) -> Self {
         Group {
             name,
             tags: Vec::new(),
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn tags(&self) -> &Vec<Tag> {
+    pub(crate) fn tags(&self) -> &Vec<Tag> {
         &self.tags
     }
 }
 
 /// Creates instance of the parser and parses groups and tags.
-pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
+pub(crate) fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
     TagParser {
         parser: BaseParser::new(
             read_to_string(TAG_NAME)
                 .with_context(|e| {
                     error!("Unable to read tag file!");
                     trace!("Possible I/O block when trying to read tag file...");
-                    format!("{}", e)
+                    format!("{e}")
                 })
                 .unwrap(),
         ),
@@ -123,7 +120,7 @@ pub fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Erro
 }
 
 /// Identifier to help categorize tags.
-pub struct TagIdentifier {
+pub(crate) struct TagIdentifier {
     /// Request sender for making any needed API calls.
     request_sender: RequestSender,
 }
@@ -167,10 +164,10 @@ impl TagIdentifier {
 
         // Tries to return any tag in the map with category special, return the last element otherwise.
         // If returning the last element fails, assume the tag is syntax only and default.
-        map.find(|e| e.search_type == TagCategory::Special)
+        map.find(|e| e.search_type == TagSearchType::Special)
             .unwrap_or_else(|| {
                 map.last()
-                    .unwrap_or_else(|| Tag::new(tags, TagCategory::General, TagType::General))
+                    .unwrap_or_else(|| Tag::new(tags, TagSearchType::General, TagType::General))
             })
     }
 
@@ -195,9 +192,9 @@ impl TagIdentifier {
 
     /// Emergency exits if a tag isn't identified.
     fn exit_tag_failure(&self, tag: &str) {
-        error!("{} is invalid!", tag);
+        error!("{tag} is invalid!");
         info!("The tag may be a typo, be sure to double check and ensure that the tag is correct.");
-        emergency_exit(format!("The server API call was unable to find tag: {}!", tag).as_str());
+        emergency_exit(format!("The server API call was unable to find tag: {tag}!").as_str());
     }
 
     /// Processes the tag type and creates the appropriate tag for it.
@@ -208,15 +205,15 @@ impl TagIdentifier {
                 const CHARACTER_CATEGORY: u8 = 4;
                 if tag_entry.category == CHARACTER_CATEGORY {
                     if tag_entry.post_count > 1500 {
-                        TagCategory::General
+                        TagSearchType::General
                     } else {
-                        TagCategory::Special
+                        TagSearchType::Special
                     }
                 } else {
-                    TagCategory::General
+                    TagSearchType::General
                 }
             }
-            TagType::Artist => TagCategory::Special,
+            TagType::Artist => TagSearchType::Special,
             _ => unreachable!(),
         };
 
@@ -234,7 +231,7 @@ struct TagParser {
 
 impl TagParser {
     /// Parses each group with all tags tied to them before returning a vector with all groups in it.
-    pub fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
+    pub(crate) fn parse_groups(&mut self) -> Result<Vec<Group>, Error> {
         let mut groups: Vec<Group> = Vec::new();
         loop {
             self.parser.consume_whitespace();
@@ -310,7 +307,7 @@ impl TagParser {
                     }
                 };
 
-                Tag::new(&tag, TagCategory::Special, tag_type)
+                Tag::new(&tag, TagSearchType::Special, tag_type)
             }
         }
     }
@@ -348,7 +345,7 @@ fn valid_tag(c: char) -> bool {
 
 ///// Validates character for id.
 fn valid_id(c: char) -> bool {
-    matches!(c, '0'..='9')
+    c.is_ascii_digit()
 }
 
 /// Validates character for group

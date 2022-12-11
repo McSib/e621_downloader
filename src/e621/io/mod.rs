@@ -1,31 +1,25 @@
-use std::fs::{
-    read_to_string,
-    write,
+use once_cell::sync::OnceCell;
+use std::{
+    fs::{read_to_string, write},
+    io,
+    path::Path,
+    process::exit,
 };
-use std::io;
-use std::path::Path;
-use std::process::exit;
 
 use failure::Error;
-use serde::{
-    Deserialize,
-    Serialize,
-};
-use serde_json::{
-    from_str,
-    to_string_pretty,
-};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string_pretty};
 
-pub mod parser;
-pub mod tag;
+pub(crate) mod parser;
+pub(crate) mod tag;
 
 /// Name of the configuration file.
-pub const CONFIG_NAME: &str = "config.json";
-pub const LOGIN_NAME: &str = "login.json";
+pub(crate) const CONFIG_NAME: &str = "config.json";
+pub(crate) const LOGIN_NAME: &str = "login.json";
 
 /// Config that is used to do general setup.
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Config {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub(crate) struct Config {
     /// The location of the download directory
     #[serde(rename = "downloadDirectory")]
     download_directory: String,
@@ -33,17 +27,19 @@ pub struct Config {
     naming_convention: String,
 }
 
+static CONFIG: OnceCell<Config> = OnceCell::new();
+
 impl Config {
-    pub fn download_directory(&self) -> &str {
+    pub(crate) fn download_directory(&self) -> &str {
         &self.download_directory
     }
 
-    pub fn naming_convention(&self) -> &str {
+    pub(crate) fn naming_convention(&self) -> &str {
         &self.naming_convention
     }
 
     /// Checks config and ensure it isn't missing.
-    pub fn config_exists() -> bool {
+    pub(crate) fn config_exists() -> bool {
         if !Path::new(CONFIG_NAME).exists() {
             trace!("config.json: does not exist!");
             return false;
@@ -53,15 +49,20 @@ impl Config {
     }
 
     /// Creates config file.
-    pub fn create_config() -> Result<(), Error> {
+    pub(crate) fn create_config() -> Result<(), Error> {
         let json = to_string_pretty(&Config::default())?;
         write(Path::new(CONFIG_NAME), json)?;
 
         Ok(())
     }
 
+    /// Get the global instance of the `Config`.
+    pub(crate) fn get() -> &'static Self {
+        CONFIG.get_or_init(|| Self::get_config().unwrap())
+    }
+
     /// Loads and returns `config` for quick management and settings.
-    pub fn get_config() -> Result<Config, Error> {
+    fn get_config() -> Result<Self, Error> {
         let mut config: Config = from_str(&read_to_string(CONFIG_NAME).unwrap())?;
         config.naming_convention = config.naming_convention.to_lowercase();
         let convention = ["md5", "id"];
@@ -94,7 +95,7 @@ impl Default for Config {
 /// `Login` contains all login information for obtaining information about a certain user.
 /// This is currently only used for the blacklist.
 #[derive(Serialize, Deserialize, Clone)]
-pub struct Login {
+pub(crate) struct Login {
     /// Username of user.
     #[serde(rename = "Username")]
     username: String,
@@ -106,21 +107,32 @@ pub struct Login {
     download_favorites: bool,
 }
 
+static LOGIN: OnceCell<Login> = OnceCell::new();
+
 impl Login {
-    pub fn username(&self) -> &str {
+    pub(crate) fn username(&self) -> &str {
         &self.username
     }
 
-    pub fn api_key(&self) -> &str {
+    pub(crate) fn api_key(&self) -> &str {
         &self.api_key
     }
 
-    pub fn download_favorites(&self) -> bool {
+    pub(crate) fn download_favorites(&self) -> bool {
         self.download_favorites
     }
 
+    pub(crate) fn get() -> &'static Self {
+        LOGIN.get_or_init(|| Self::load().unwrap_or_else(|e| {
+            error!("Unable to load `login.json`. Error: {}", e);
+            warn!("The program will use default values, but it is highly recommended to check your login.json file to \
+			       ensure that everything is correct.");
+            Login::default()
+        }))
+    }
+
     /// Loads the login file or creates one if it doesn't exist.
-    pub fn load() -> Result<Self, Error> {
+    fn load() -> Result<Self, Error> {
         let mut login = Login::default();
         let login_path = Path::new(LOGIN_NAME);
         if login_path.exists() {
@@ -133,7 +145,7 @@ impl Login {
     }
 
     /// Checks if the login user and password is empty.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         if self.username.is_empty() || self.api_key.is_empty() {
             return true;
         }
@@ -171,8 +183,8 @@ impl Default for Login {
 }
 
 /// Exits the program after message explaining the error and prompting the user to press `ENTER`.
-pub fn emergency_exit(error: &str) {
-    info!("{}", error);
+pub(crate) fn emergency_exit(error: &str) {
+    info!("{error}");
     println!("Press ENTER to close the application...");
 
     let mut line = String::new();

@@ -1,11 +1,13 @@
 use failure::ResultExt;
+use std::cmp::Ordering;
 
-use crate::e621::io::parser::BaseParser;
-use crate::e621::sender::entries::{
-    PostEntry,
-    UserEntry,
+use crate::e621::{
+    io::parser::BaseParser,
+    sender::{
+        entries::{PostEntry, UserEntry},
+        RequestSender,
+    },
 };
-use crate::e621::sender::RequestSender;
 
 /// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
@@ -213,12 +215,12 @@ fn valid_user(c: char) -> bool {
 
 /// Validates character for rating.
 fn valid_rating(c: char) -> bool {
-    matches!(c, 'A'..='Z' | 'a'..='z')
+    c.is_ascii_alphabetic()
 }
 
 /// Validates character for id.
 fn valid_id(c: char) -> bool {
-    matches!(c, '0'..='9')
+    c.is_ascii_digit()
 }
 
 /// The flag worker flags and removes any grabbed post that matches with all of the tags in a `LineToken`.
@@ -229,7 +231,8 @@ fn valid_id(c: char) -> bool {
 /// When doing any modifications to the worker, be sure to test the blacklist on client and server-side.
 /// This will ensure that there aren't any unexpected behavior, or issues with the worker that weren't noticed.
 /// A good thing to focus on is how many posts are blacklisted in total.
-/// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted, it's safe to assume there is a problem with how the worker is blacklisting posts.
+/// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted,
+/// it's safe to assume there is a problem with how the worker is blacklisting posts.
 #[derive(Default)]
 struct FlagWorker {
     /// The number of flags raised by the worker
@@ -245,11 +248,6 @@ struct FlagWorker {
 }
 
 impl FlagWorker {
-    /// Resets the flag worker for the next post.
-    fn reset_worker(&mut self) {
-        *self = Self::default();
-    }
-
     /// Sets margin for how many flags need to be raised before the post is either blacklisted or considered safe.
     fn set_flag_margin(&mut self, tags: &[TagToken]) {
         tags.iter().for_each(|e| {
@@ -292,13 +290,11 @@ impl FlagWorker {
             match &tag.tag_type {
                 TagType::Rating(rating) => {
                     self.flag_rating(rating, post, tag.negated);
-                    continue;
                 }
                 TagType::Id(id) => {
                     if let Some(blacklisted_id) = id {
                         self.flag_id(*blacklisted_id, post.id, tag.negated);
                     }
-                    continue;
                 }
                 TagType::User(_) => {
                     let user_id = tag
@@ -306,11 +302,10 @@ impl FlagWorker {
                         .parse::<i64>()
                         .with_context(|e| {
                             error!("Failed to parse blacklisted user id: {}!", tag.name);
-                            format!("{}", e)
+                            format!("{e}")
                         })
                         .unwrap();
                     self.flag_user(user_id, post.uploader_id, tag.negated);
-                    continue;
                 }
                 TagType::None => {
                     if post_tags.iter().any(|e| e == tag.name.as_str()) {
@@ -320,11 +315,19 @@ impl FlagWorker {
             }
         }
 
-        if self.negated_margin != 0 && self.negated_flags == self.negated_margin {
+        if self.is_negated_margin_met() {
             self.flagged = false;
-        } else if self.flags == self.margin {
+        } else if self.is_margin_met() {
             self.flagged = true;
         }
+    }
+
+    fn is_negated_margin_met(&self) -> bool {
+        self.negated_margin != 0 && self.negated_flags == self.negated_margin
+    }
+
+    fn is_margin_met(&self) -> bool {
+        self.flags == self.margin
     }
 
     fn raise_flag(&mut self, negated: bool) {
@@ -343,7 +346,7 @@ impl FlagWorker {
 
 /// Blacklist that holds all of the blacklist entries.
 /// These entries will be looped through a parsed before being used for filtering posts that are blacklisted.
-pub struct Blacklist {
+pub(crate) struct Blacklist {
     /// The blacklist parser which parses the blacklist and tokenizes it.
     blacklist_parser: BlacklistParser,
     /// All of the blacklist tokens after being parsed.
@@ -353,7 +356,7 @@ pub struct Blacklist {
 }
 
 impl Blacklist {
-    pub fn new(request_sender: RequestSender) -> Self {
+    pub(crate) fn new(request_sender: RequestSender) -> Self {
         Blacklist {
             blacklist_parser: BlacklistParser::default(),
             blacklist_tokens: RootToken::default(),
@@ -361,28 +364,32 @@ impl Blacklist {
         }
     }
 
-    pub fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
+    pub(crate) fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
         self.blacklist_parser = BlacklistParser::new(user_blacklist);
         self.blacklist_tokens = self.blacklist_parser.parse_blacklist();
         self
     }
 
     /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
-    pub fn cache_users(&mut self) {
-        for blacklist_token in &mut self.blacklist_tokens.lines {
-            for tag in &mut blacklist_token.tags {
-                if let TagType::User(Some(username)) = &tag.tag_type {
-                    let user: UserEntry = self
-                        .request_sender
-                        .get_entry_from_appended_id(username, "user");
-                    tag.name = format!("{}", user.id);
-                }
+    pub(crate) fn cache_users(&mut self) {
+        let tags: Vec<&mut TagToken> = self
+            .blacklist_tokens
+            .lines
+            .iter_mut()
+            .flat_map(|e| &mut e.tags)
+            .collect();
+        for tag in tags {
+            if let TagType::User(Some(username)) = &tag.tag_type {
+                let user: UserEntry = self
+                    .request_sender
+                    .get_entry_from_appended_id(username, "user");
+                tag.name = format!("{}", user.id);
             }
         }
     }
 
     /// Checks of the blacklist is empty.
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.blacklist_tokens.lines.is_empty()
     }
 
@@ -393,12 +400,11 @@ impl Blacklist {
     /// * `posts`: Posts to filter through.
     ///
     /// returns: u16 of posts that were positively filtered
-    pub fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
+    pub(crate) fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
         let mut filtered: u16 = 0;
-        let mut flag_worker = FlagWorker::default();
         for blacklist_line in &self.blacklist_tokens.lines {
             posts.retain(|e| {
-                flag_worker.reset_worker();
+                let mut flag_worker = FlagWorker::default();
                 flag_worker.set_flag_margin(&blacklist_line.tags);
                 flag_worker.check_post(e, blacklist_line);
                 if flag_worker.is_flagged() {
@@ -411,10 +417,10 @@ impl Blacklist {
             });
         }
 
-        if filtered > 0 {
-            trace!("Filtered {} posts with blacklist...", filtered);
-        } else {
-            trace!("No posts filtered...");
+        match filtered.cmp(&1) {
+            Ordering::Less => trace!("No posts filtered..."),
+            Ordering::Equal => trace!("Filtered {filtered} post with blacklist..."),
+            Ordering::Greater => trace!("Filtered {filtered} posts with blacklist..."),
         }
 
         filtered

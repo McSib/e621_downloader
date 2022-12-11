@@ -1,28 +1,26 @@
-use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::rc::Rc;
+use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
-use crate::e621::blacklist::Blacklist;
-use crate::e621::io::tag::{
-    Group,
-    Tag,
-    TagCategory,
-    TagType,
+use crate::e621::{
+    blacklist::Blacklist,
+    io::{
+        emergency_exit,
+        tag::{Group, Tag, TagSearchType, TagType},
+        Config, Login,
+    },
+    sender::{
+        entries::{PoolEntry, PostEntry, SetEntry},
+        RequestSender,
+    },
 };
-use crate::e621::io::{
-    emergency_exit,
-    Config,
-    Login,
-};
-use crate::e621::sender::entries::{
-    PoolEntry,
-    PostEntry,
-    SetEntry,
-};
-use crate::e621::sender::RequestSender;
+
+pub(crate) trait NewVec<T> {
+    fn new_vec(value: T) -> Vec<Self>
+    where
+        Self: Sized;
+}
 
 /// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
-pub struct GrabbedPost {
+pub(crate) struct GrabbedPost {
     /// The url that leads to the file to download.
     url: String,
     /// The name of the file to download.
@@ -32,45 +30,48 @@ pub struct GrabbedPost {
 }
 
 impl GrabbedPost {
-    pub fn url(&self) -> &str {
+    pub(crate) fn url(&self) -> &str {
         &self.url
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn file_size(&self) -> i64 {
+    pub(crate) fn file_size(&self) -> i64 {
         self.file_size
     }
+}
 
-    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s.
-    pub fn entry_to_vec(vec: Vec<PostEntry>) -> Vec<GrabbedPost> {
-        let config = Config::get_config().unwrap();
+impl NewVec<Vec<PostEntry>> for GrabbedPost {
+    fn new_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
-            .map(|e| GrabbedPost::from(e, config.naming_convention()))
+            .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
             .collect()
     }
+}
 
-    /// Takes an array of `PostEntry`s and converts it into an array of `GrabbedPost`s for pools.
-    pub fn entry_to_pool_vec(vec: Vec<PostEntry>, pool_name: &str) -> Vec<GrabbedPost> {
+impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
+    fn new_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
-            .map(|(i, e)| GrabbedPost::from_entry_to_pool(e, pool_name, (i + 1) as u16))
+            .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
             .collect()
     }
+}
 
-    /// Converts `PostEntry` to `Self`.
-    pub fn from_entry_to_pool(post: &PostEntry, name: &str, current_page: u16) -> Self {
+impl From<(&PostEntry, &str, u16)> for GrabbedPost {
+    fn from((post, name, current_page): (&PostEntry, &str, u16)) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
             name: format!("{} Page_{:05}.{}", name, current_page, post.file.ext),
             file_size: post.file.size,
         }
     }
+}
 
-    /// Converts `PostEntry` to `Self`.
-    fn from(post: PostEntry, name_convention: &str) -> Self {
+impl From<(PostEntry, &str)> for GrabbedPost {
+    fn from((post, name_convention): (PostEntry, &str)) -> Self {
         match name_convention {
             "md5" => GrabbedPost {
                 url: post.file.url.clone().unwrap(),
@@ -94,8 +95,14 @@ impl GrabbedPost {
     }
 }
 
+/// A trait for the shorten function, allows for multiple types to be configured for it.
+pub(crate) trait Shorten<T> {
+    /// Shortens a string by replacing a portion of it with a delimiter of type `T` and then returning the new string.
+    fn shorten(&self, delimiter: T) -> String;
+}
+
 /// A set of posts with category and name.
-pub struct PostCollection {
+pub(crate) struct PostCollection {
     /// The name of the set.
     name: String,
     /// The category of the set.
@@ -105,7 +112,7 @@ pub struct PostCollection {
 }
 
 impl PostCollection {
-    pub fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
+    pub(crate) fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
         PostCollection {
             name: name.to_string(),
             category: category.to_string(),
@@ -113,26 +120,53 @@ impl PostCollection {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn category(&self) -> &str {
+    pub(crate) fn category(&self) -> &str {
         &self.category
     }
 
-    pub fn posts(&self) -> &Vec<GrabbedPost> {
+    pub(crate) fn posts(&self) -> &Vec<GrabbedPost> {
         &self.posts
     }
+}
 
-    /// Converts `SetEntry` to `Self`.
-    pub fn from_set(set: &SetEntry, posts: Vec<GrabbedPost>) -> Self {
+impl Shorten<&str> for PostCollection {
+    fn shorten(&self, delimiter: &str) -> String {
+        if self.name.len() >= 25 {
+            let mut short_name = self.name[0..25].to_string();
+            short_name.push_str(delimiter);
+            short_name
+        } else {
+            self.name.to_string()
+        }
+    }
+}
+
+impl Shorten<char> for PostCollection {
+    fn shorten(&self, delimiter: char) -> String {
+        if self.name.len() >= 25 {
+            let mut short_name = self.name[0..25].to_string();
+            short_name.push(delimiter);
+            short_name
+        } else {
+            self.name.to_string()
+        }
+    }
+}
+
+impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
+    fn from((set, posts): (&SetEntry, Vec<GrabbedPost>)) -> Self {
         PostCollection::new(&set.name, "Sets", posts)
     }
 }
 
+const POST_SEARCH_LIMIT: u8 = 5;
+
 /// Grabs all posts under a set of searching tags.
-pub struct Grabber {
+pub(crate) struct Grabber {
     /// All grabbed posts.
     posts: Vec<PostCollection>,
     /// `RequestSender` for sending API calls.
@@ -145,7 +179,7 @@ pub struct Grabber {
 
 impl Grabber {
     /// Creates new instance of `Self`.
-    pub fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
+    pub(crate) fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
         Grabber {
             posts: vec![PostCollection::new("Single Posts", "", Vec::new())],
             request_sender,
@@ -154,187 +188,178 @@ impl Grabber {
         }
     }
 
-    pub fn posts(&self) -> &Vec<PostCollection> {
+    pub(crate) fn posts(&self) -> &Vec<PostCollection> {
         &self.posts
     }
 
     /// Sets the blacklist.
-    pub fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
+    pub(crate) fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
         }
     }
 
-    pub fn set_safe_mode(&mut self, mode: bool) {
+    pub(crate) fn set_safe_mode(&mut self, mode: bool) {
         self.safe_mode = mode;
     }
 
     /// If the user supplies login information, this will grabbed the favorites from there account.
-    pub fn grab_favorites(&mut self) {
-        let login = Login::load().unwrap_or_else(|e| {
-			error!("Unable to load `login.json`. Error: {}", e);
-			warn!("The program will use default values, but it is highly recommended to check your login.json file to \
-			       ensure that everything is correct.");
-			Login::default()
-		});
+    pub(crate) fn grab_favorites(&mut self) {
+        let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
-            let tag_str = format!("fav:{}", login.username());
-            let posts = self.special_search(tag_str.as_str());
-            self.posts.push(PostCollection::new(
-                &tag_str,
-                "",
-                GrabbedPost::entry_to_vec(posts),
-            ));
+            let tag = format!("fav:{}", login.username());
+            let posts = self.search(&tag, &TagSearchType::Special);
+            self.posts
+                .push(PostCollection::new(&tag, "", GrabbedPost::new_vec(posts)));
             info!(
                 "{} grabbed!",
-                console::style(format!("\"{}\"", tag_str))
-                    .color256(39)
-                    .italic()
+                console::style(format!("\"{tag}\"")).color256(39).italic()
             );
         }
     }
 
     /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
-    pub fn grab_posts_by_tags(&mut self, groups: &[Group]) {
-        let config = Config::get_config().unwrap();
-        for group in groups {
-            for tag in group.tags() {
-                match tag.tag_type() {
-                    TagType::Pool => {
-                        let mut entry: PoolEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "pool");
-                        let name = &entry.name;
-                        let mut posts = self.special_search(&format!("pool:{}", entry.id));
+    pub(crate) fn grab_posts_by_tags(&mut self, groups: &[Group]) {
+        let tags: Vec<&Tag> = groups.iter().flat_map(|e| e.tags()).collect();
+        for tag in tags {
+            self.grab_by_tag_type(tag);
+        }
+    }
 
-                        // Updates entry post ids in case any posts were filtered in the search.
-                        entry
-                            .post_ids
-                            .retain(|id| posts.iter().any(|post| post.id == *id));
+    fn single_post_collection(&mut self) -> &mut PostCollection {
+        self.posts.first_mut().unwrap() // It is guaranteed that the first collection is the single post collection.
+    }
 
-                        // Sorts the pool to the original order given by entry.
-                        for (i, id) in entry.post_ids.iter().enumerate() {
-                            if posts[i].id != *id {
-                                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
-                                posts.swap(i, correct_index);
-                            }
-                        }
+    fn add_single_post(&mut self, entry: PostEntry, id: i64) {
+        let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
+        self.single_post_collection().posts.push(grabbed_post);
+        info!(
+            "Post with ID {} grabbed!",
+            console::style(format!("\"{id}\"")).color256(39).italic()
+        );
+    }
 
-                        self.posts.push(PostCollection::new(
-                            name,
-                            "Pools",
-                            GrabbedPost::entry_to_pool_vec(posts, name),
-                        ));
+    fn grab_by_tag_type(&mut self, tag: &Tag) {
+        match tag.tag_type() {
+            TagType::Pool => self.grab_pool(tag),
+            TagType::Set => self.grab_set(tag),
+            TagType::Post => self.grab_post(tag),
+            TagType::General | TagType::Artist => self.grab_general(tag),
+            TagType::Unknown => unreachable!(),
+        };
+    }
 
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{}\"", name))
-                                .color256(39)
-                                .italic()
-                        );
-                    }
-                    TagType::Set => {
-                        let entry: SetEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "set");
+    fn grab_general(&mut self, tag: &Tag) {
+        let posts = self.get_posts_from_tag(tag);
+        self.posts.push(PostCollection::new(
+            tag.name(),
+            "General Searches",
+            GrabbedPost::new_vec(posts),
+        ));
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{}\"", tag.name()))
+                .color256(39)
+                .italic()
+        );
+    }
 
-                        // Grabs posts from IDs in the set entry.
-                        let posts = self.special_search(&format!("set:{}", entry.shortname));
-                        self.posts.push(PostCollection::from_set(
-                            &entry,
-                            GrabbedPost::entry_to_vec(posts),
-                        ));
+    fn grab_post(&mut self, tag: &Tag) {
+        let entry: PostEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "single");
+        let id = entry.id;
 
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{}\"", entry.name))
-                                .color256(39)
-                                .italic()
-                        );
-                    }
-                    TagType::Post => {
-                        let mut add_post = |entry: PostEntry, id: i64| {
-                            self.posts
-                                .first_mut()
-                                .unwrap()
-                                .posts
-                                .push(GrabbedPost::from(entry, config.naming_convention()));
+        if self.safe_mode {
+            match entry.rating.as_str() {
+                "s" => {
+                    self.add_single_post(entry, id);
+                }
+                _ => {
+                    info!(
+                        "Skipping Post: {} due to being explicit or questionable",
+                        console::style(format!("\"{id}\"")).color256(39).italic()
+                    );
+                }
+            }
+        } else {
+            self.add_single_post(entry, id);
+        }
+    }
 
-                            info!(
-                                "Post with ID {} grabbed!",
-                                console::style(format!("\"{}\"", id)).color256(39).italic()
-                            );
-                        };
+    fn grab_set(&mut self, tag: &Tag) {
+        let entry: SetEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "set");
 
-                        let entry: PostEntry = self
-                            .request_sender
-                            .get_entry_from_appended_id(tag.name(), "single");
-                        let id = entry.id;
+        // Grabs posts from IDs in the set entry.
+        let posts = self.search(&format!("set:{}", entry.shortname), &TagSearchType::Special);
+        self.posts
+            .push(PostCollection::from((&entry, GrabbedPost::new_vec(posts))));
 
-                        if self.safe_mode {
-                            match entry.rating.as_str() {
-                                "s" => {
-                                    add_post(entry, id);
-                                }
-                                _ => {
-                                    info!(
-                                        "Skipping Post: {}",
-                                        console::style(format!("\"{}\"", id)).color256(39).italic()
-                                    );
-                                    info!("Post was found to be explicit or questionable...")
-                                }
-                            }
-                        } else {
-                            add_post(entry, id);
-                        }
-                    }
-                    TagType::General | TagType::Artist => {
-                        let posts = self.get_posts_from_tag(tag);
-                        self.posts.push(PostCollection::new(
-                            tag.name(),
-                            "General Searches",
-                            GrabbedPost::entry_to_vec(posts),
-                        ));
-                        info!(
-                            "{} grabbed!",
-                            console::style(format!("\"{}\"", tag.name()))
-                                .color256(39)
-                                .italic()
-                        );
-                    }
-                    TagType::Unknown => unreachable!(),
-                };
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{}\"", entry.name))
+                .color256(39)
+                .italic()
+        );
+    }
+
+    fn grab_pool(&mut self, tag: &Tag) {
+        let mut entry: PoolEntry = self
+            .request_sender
+            .get_entry_from_appended_id(tag.name(), "pool");
+        let name = &entry.name;
+        let mut posts = self.search(&format!("pool:{}", entry.id), &TagSearchType::Special);
+
+        // Updates entry post ids in case any posts were filtered in the search.
+        entry
+            .post_ids
+            .retain(|id| posts.iter().any(|post| post.id == *id));
+
+        // Sorts the pool to the original order given by entry.
+        Self::sort_pool_by_id(&entry, &mut posts);
+
+        self.posts.push(PostCollection::new(
+            name,
+            "Pools",
+            GrabbedPost::new_vec((posts, name.as_ref())),
+        ));
+
+        info!(
+            "{} grabbed!",
+            console::style(format!("\"{name}\"")).color256(39).italic()
+        );
+    }
+
+    fn sort_pool_by_id(entry: &PoolEntry, posts: &mut [PostEntry]) {
+        for (i, id) in entry.post_ids.iter().enumerate() {
+            if posts[i].id != *id {
+                let correct_index = posts.iter().position(|e| e.id == *id).unwrap();
+                posts.swap(i, correct_index);
             }
         }
     }
 
     /// Grabs posts from general tag.
     fn get_posts_from_tag(&self, tag: &Tag) -> Vec<PostEntry> {
-        match tag.search_type() {
-            TagCategory::General => self.general_search(tag.name()),
-            TagCategory::Special => self.special_search(tag.name()),
-            TagCategory::None => unreachable!(),
-        }
+        self.search(tag.name(), tag.search_type())
     }
 
-    /// Performs a general search where it grabs only five pages of posts.
-    fn general_search(&self, searching_tag: &str) -> Vec<PostEntry> {
-        let limit: u16 = 5;
-        let mut posts: Vec<PostEntry> = Vec::with_capacity(320 * limit as usize);
+    /// Performs a search where it grabs posts.
+    fn search(&self, searching_tag: &str, tag_search_type: &TagSearchType) -> Vec<PostEntry> {
+        let mut posts: Vec<PostEntry> = Vec::new();
         let mut filtered = 0;
         let mut invalid_posts = 0;
-        for page in 1..limit {
-            let mut searched_posts: Vec<PostEntry> =
-                self.request_sender.bulk_search(searching_tag, page).posts;
-            if searched_posts.is_empty() {
-                break;
+        match tag_search_type {
+            TagSearchType::General => {
+                posts = Vec::with_capacity(320 * POST_SEARCH_LIMIT as usize);
+                self.general_search(searching_tag, &mut posts, &mut filtered, &mut invalid_posts);
             }
-
-            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
-
-            searched_posts.reverse();
-            posts.append(&mut searched_posts);
+            TagSearchType::Special => {
+                self.special_search(searching_tag, &mut posts, &mut filtered, &mut invalid_posts);
+            }
+            TagSearchType::None => {}
         }
 
         if filtered > 0 {
@@ -354,41 +379,52 @@ impl Grabber {
         posts
     }
 
-    /// Performs a special search that grabs all posts tied to the searching tag.
-    fn special_search(&self, searching_tag: &str) -> Vec<PostEntry> {
-        let mut page: u16 = 1;
-        let mut posts: Vec<PostEntry> = vec![];
-        let mut filtered = 0;
-        let mut invalid_posts = 0;
+    fn special_search(
+        &self,
+        searching_tag: &str,
+        posts: &mut Vec<PostEntry>,
+        filtered: &mut u16,
+        invalid_posts: &mut u16,
+    ) {
+        let mut page = 1;
+
         loop {
             let mut searched_posts = self.request_sender.bulk_search(searching_tag, page).posts;
             if searched_posts.is_empty() {
                 break;
             }
 
-            filtered += self.filter_posts_with_blacklist(&mut searched_posts);
-            invalid_posts += self.remove_invalid_posts(&mut searched_posts);
+            *filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            *invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
 
             searched_posts.reverse();
             posts.append(&mut searched_posts);
             page += 1;
         }
+    }
 
-        if filtered > 0 {
-            info!(
-                "Filtered {} total blacklisted posts from search...",
-                console::style(filtered).cyan().italic()
-            );
+    fn general_search(
+        &self,
+        searching_tag: &str,
+        posts: &mut Vec<PostEntry>,
+        filtered: &mut u16,
+        invalid_posts: &mut u16,
+    ) {
+        for page in 1..POST_SEARCH_LIMIT {
+            let mut searched_posts: Vec<PostEntry> = self
+                .request_sender
+                .bulk_search(searching_tag, page as u16)
+                .posts;
+            if searched_posts.is_empty() {
+                break;
+            }
+
+            *filtered += self.filter_posts_with_blacklist(&mut searched_posts);
+            *invalid_posts += Self::remove_invalid_posts(&mut searched_posts);
+
+            searched_posts.reverse();
+            posts.append(&mut searched_posts);
         }
-
-        if invalid_posts > 0 {
-            info!(
-                "Filtered {} total invalid posts from search...",
-                console::style(invalid_posts).cyan().italic()
-            );
-        }
-
-        posts
     }
 
     /// Scans through array of posts and removes any that violets the blacklist.
@@ -403,12 +439,12 @@ impl Grabber {
     }
 
     /// Removes invalid posts, this is dependant on if the file url is null or if the post was deleted.
-    fn remove_invalid_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
+    fn remove_invalid_posts(posts: &mut Vec<PostEntry>) -> u16 {
         // Sometimes, even if a post is available, the url for it isn't;
         // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
         posts.retain(|e| {
-            if !e.flags.deleted && e.file.url != None {
+            if !e.flags.deleted && e.file.url.is_some() {
                 true
             } else {
                 invalid_posts += 1;
@@ -416,6 +452,12 @@ impl Grabber {
             }
         });
 
+        Self::log_invalid_posts(&invalid_posts);
+
+        invalid_posts
+    }
+
+    fn log_invalid_posts(invalid_posts: &u16) {
         match invalid_posts.cmp(&1) {
             Ordering::Less => {}
             Ordering::Equal => {
@@ -429,7 +471,5 @@ impl Grabber {
                 trace!("{} posts had to be filtered by e621/e926...", invalid_posts,);
             }
         }
-
-        invalid_posts
     }
 }
