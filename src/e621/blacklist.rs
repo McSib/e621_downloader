@@ -160,8 +160,15 @@ impl BlacklistParser {
 
     /// Parses special tag and updates token with the appropriate type and value.
     ///
-    /// # Panic
-    /// If identifier doesn't match with any of the match arms, it will fail and throw an `Error`.
+    /// # Arguments
+    ///
+    /// * `token`: The special [TagToken] to parse.
+    ///
+    /// returns: ()
+    ///
+    /// # Errors
+    /// An error can occur if 1) the `assert_eq` fails in its check or 2) if the [TagToken] name is not any of the matched
+    /// values.
     fn parse_special_tag(&mut self, token: &mut TagToken) {
         assert_eq!(self.base_parser.consume_char(), ':');
         match token.name.as_str() {
