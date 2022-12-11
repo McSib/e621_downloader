@@ -16,15 +16,10 @@
 
 use crate::e621::io::emergency_exit;
 
-/// The `BaseParser` is responsible for parsing files character-by-character without any inherit rule.
+/// A parser that's responsible for parsing files character-by-character without any inherit rule.
+///
 /// This is a thin blanket for other parsers to use and build rules, allowing for quick and easy
 /// parsing for any file.
-///
-/// # Note:
-/// This doesn't use advanced libraries for lexing and/or data storage. Serde, and any other library
-/// that generally tries to perform those tasks aren't useful for this class, which is meant to collect
-/// data in a minimalist, none-structural, none-grammatical way. This class has no use for large libraries meant for
-/// more typical syntax.
 #[derive(Default)]
 pub(crate) struct BaseParser {
     /// Current cursor position in the array of characters.
