@@ -15,7 +15,20 @@ use crate::e621::{
 
 pub(crate) mod entries;
 
-/// A simple hack to create a `HashMap` using tuples. This macro is similar to the example of the simplified `vec!` macro in its structure and usage.
+/// Creates a hashmap through similar syntax of the `vec` macro.
+///
+/// # Arguments
+/// * `x`: Represents multiple tuples being passed as parameter.
+///
+/// # Example
+///
+/// ```rust
+/// # use std::collections::hashmap;
+///
+/// let hashmap = hashmap![("Testing", "testing"), ("Example", "example")];
+///
+/// assert_eq!(hashmap["Testing"], String::from("testing"));
+/// ```
 #[macro_export]
 macro_rules! hashmap {
     ( $( $x:expr ),* ) => {
