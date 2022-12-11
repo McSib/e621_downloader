@@ -17,11 +17,11 @@ const NAME: &str = env!("CARGO_PKG_NAME");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
-pub(crate) struct Program {}
+pub(crate) struct Program;
 
 impl Program {
     pub(crate) fn new() -> Self {
-        Program {}
+        Self
     }
 
     pub(crate) fn run(&self) -> Result<(), Error> {
