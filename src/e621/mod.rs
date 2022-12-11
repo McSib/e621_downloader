@@ -42,12 +42,8 @@ pub(crate) mod io;
 pub(crate) mod sender;
 pub(crate) mod tui;
 
-/// The `WebConnector` is the mother of all requests sent.
-/// It manages how the API is called (through the `RequestSender`), how posts are grabbed (through calling its child `Grabber`), and how the posts are downloaded.
-///
-/// # Important
-/// This is a large struct built on bringing the best performance possible without sacrificing any idiomatic code in the process.
-/// When editing this struct, be sure that the changes you bring do not harm the overall performance, and if it does, be sure to give good reason on why the change is needed.
+/// A web connector that manages how the API is called (through the [RequestSender]), how posts are grabbed
+/// (through [Grabber]), and how the posts are downloaded.
 pub(crate) struct E621WebConnector {
     /// The sender used for all API calls.
     request_sender: RequestSender,
