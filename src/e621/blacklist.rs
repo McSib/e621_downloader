@@ -346,6 +346,13 @@ impl FlagWorker {
         self.flags == self.margin
     }
 
+    /// Raises either the `negated_flags` or `flags` by one depending on the value of `negated`.
+    ///
+    /// # Arguments
+    ///
+    /// * `negated`: The tag's negation.
+    ///
+    /// returns: ()
     fn raise_flag(&mut self, negated: bool) {
         if negated {
             self.negated_flags += 1;
