@@ -52,11 +52,19 @@ enum Rating {
     Explicit,
 }
 
+/// A enum that contains what type the [TagToken] is.
+///
+/// The tag can be seen as four types: [Rating](TagType::Rating), [Id](TagType::Id), [User](TagType::User), and
+/// [None](TagType::None).
 #[derive(Debug)]
 enum TagType {
+    /// A post rating type.
     Rating(Rating),
+    /// A post id type.
     Id(Option<i64>),
+    /// A user type.
     User(Option<String>),
+    /// No type.
     None,
 }
 
