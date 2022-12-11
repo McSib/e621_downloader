@@ -58,6 +58,8 @@ const USER_AGENT_VALUE: &str = concat!(
 struct SenderClient {
     /// `Client` wrapped in a `Rc` so only one instance of the client exists. This will prevent an overabundance of clients in the code.
     client: Rc<Client>,
+    /// The base64 encrypted username and password of the user. This is passed only through the `AUTHORIZATION` header
+    /// of the request and is a highly secured method of login through client.
     auth: Rc<String>,
 }
 
