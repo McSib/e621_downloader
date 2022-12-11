@@ -31,6 +31,8 @@ pub(crate) mod tag;
 
 /// Name of the configuration file.
 pub(crate) const CONFIG_NAME: &str = "config.json";
+
+/// Name of the login file.
 pub(crate) const LOGIN_NAME: &str = "login.json";
 
 /// Config that is used to do general setup.
