@@ -343,7 +343,7 @@ fn valid_tag(c: char) -> bool {
     }
 }
 
-///// Validates character for id.
+/// Validates character for id.
 fn valid_id(c: char) -> bool {
     c.is_ascii_digit()
 }
