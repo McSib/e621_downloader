@@ -96,6 +96,10 @@ impl SenderClient {
     /// Cookies aren't stored in the client, TCP_NODELAY is on, and timeout is changed from 30 seconds to 60.
     fn build_client() -> Client {
         Client::builder()
+            .use_rustls_tls()
+            .http2_prior_knowledge()
+            .tcp_keepalive(Duration::from_secs(30))
+            .tcp_nodelay(true)
             .timeout(Duration::from_secs(60))
             .build()
             .unwrap_or_else(|_| Client::new())
