@@ -101,7 +101,7 @@ impl Program {
         // Collects all grabbed posts and moves it to connector to start downloading.
         if !login.is_empty() {
             trace!("Parsing user blacklist...");
-            connector.process_blacklist(login.username());
+            connector.process_blacklist();
         } else {
             trace!("Skipping blacklist as user is not logged in...");
         }

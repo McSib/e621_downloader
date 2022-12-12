@@ -27,6 +27,7 @@ use failure::ResultExt;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
 use crate::e621::grabber::Shorten;
+use crate::e621::io::Login;
 use blacklist::Blacklist;
 use grabber::Grabber;
 use io::{tag::Group, Config};
@@ -93,7 +94,8 @@ impl E621WebConnector {
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.
-    pub(crate) fn process_blacklist(&mut self, username: &str) {
+    pub(crate) fn process_blacklist(&mut self) {
+        let username = Login::get().username();
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(username, "user");
