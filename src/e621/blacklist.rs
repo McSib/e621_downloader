@@ -254,16 +254,11 @@ fn valid_id(c: char) -> bool {
     c.is_ascii_digit()
 }
 
-/// The flag worker flags and removes any grabbed post that matches with all of the tags in a `LineToken`.
+/// A worker that checks and flags post based on a tag predicate, typically from the user's blacklist.
+///
+/// It works by comparing and removing any grabbed post that matches with all of the tags in a `LineToken`.
 /// The worker works with the supplied syntax and rules on e621's main site listed [here](https://e621.net/help/show/blacklist).
 /// This ensures that the client-side blacklist works exactly the same as the server-side blacklist.
-///
-/// # Important
-/// When doing any modifications to the worker, be sure to test the blacklist on client and server-side.
-/// This will ensure that there aren't any unexpected behavior, or issues with the worker that weren't noticed.
-/// A good thing to focus on is how many posts are blacklisted in total.
-/// If the site says 236 posts are blacklisted, and the program is saying only 195 are blacklisted,
-/// it's safe to assume there is a problem with how the worker is blacklisting posts.
 #[derive(Default)]
 struct FlagWorker {
     /// The number of flags raised by the worker
