@@ -362,7 +362,7 @@ impl TagParser {
         match group_name {
             "artists" | "general" => {
                 let tag = self.parser.consume_while(valid_tag);
-                TagIdentifier::id_tag(&tag, self.request_sender.clone())
+                TagIdentifier::id_tag(tag.trim(), self.request_sender.clone())
             }
             e => {
                 let tag = self.parser.consume_while(valid_id);
@@ -376,7 +376,7 @@ impl TagParser {
                     }
                 };
 
-                Tag::new(&tag, TagSearchType::Special, tag_type)
+                Tag::new(tag.trim(), TagSearchType::Special, tag_type)
             }
         }
     }
