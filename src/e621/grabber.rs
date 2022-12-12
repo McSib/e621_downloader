@@ -259,7 +259,7 @@ impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
 
 const POST_SEARCH_LIMIT: u8 = 5;
 
-/// Grabs all posts under a set of searching tags.
+/// Is a collector that grabs posts, categorizes them, and prepares them for the downloader to use in downloading.
 pub(crate) struct Grabber {
     /// All grabbed posts.
     posts: Vec<PostCollection>,
