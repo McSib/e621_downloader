@@ -29,6 +29,9 @@ use crate::e621::{
     },
 };
 
+/// A trait for implementing a conversion function for turning a type into a [Vec] of the same type
+///
+/// This can be used as a simple wrapping function for flattening an internal array of the type.
 pub(crate) trait NewVec<T> {
     fn new_vec(value: T) -> Vec<Self>
     where
@@ -70,15 +73,6 @@ impl NewVec<Vec<PostEntry>> for GrabbedPost {
     /// * `vec`: The vector to be consumed and converted.
     ///
     /// returns: Vec<GrabbedPost, Global>
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::collection::Vec;
-    ///
-    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
-    /// let grabbed_posts = GrabbedPost::new_vec(posts);
-    /// ```
     fn new_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
@@ -96,15 +90,6 @@ impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
     /// * `(vec, pool_name)`: A tuple containing the posts and the name of the pool associated with them.
     ///
     /// returns: Vec<GrabbedPost, Global>
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::collection::Vec;
-    ///
-    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
-    /// let grabbed_posts = GrabbedPost::new_vec((posts, "Amazing Pool"));
-    /// ```
     fn new_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
@@ -121,19 +106,6 @@ impl From<(&PostEntry, &str, u16)> for GrabbedPost {
     /// * `(post, name, current_page)`: A tuple containing the post, name, and current page number of post.
     ///
     /// returns: GrabbedPost
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::collection::Vec;
-    ///
-    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
-    /// let pool_name = "Amazing pool name";
-    /// let grabbed_posts = posts.iter()
-    ///             .enumerate()
-    ///             .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
-    ///             .collect();
-    /// ```
     fn from((post, name, current_page): (&PostEntry, &str, u16)) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
@@ -151,17 +123,6 @@ impl From<(PostEntry, &str)> for GrabbedPost {
     /// * `(post, name_convention)`: A tuple containing the post, and naming convention of post.
     ///
     /// returns: GrabbedPost
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use std::collection::Vec;
-    ///
-    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
-    /// let grabbed_posts = vec.into_iter()
-    ///             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
-    ///             .collect()
-    /// ```
     fn from((post, name_convention): (PostEntry, &str)) -> Self {
         match name_convention {
             "md5" => GrabbedPost {
@@ -203,6 +164,15 @@ pub(crate) struct PostCollection {
 }
 
 impl PostCollection {
+    /// Creates a new post collection.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`: Name of collection.
+    /// * `category`: Category of collection.
+    /// * `posts`: Posts for collection.
+    ///
+    /// returns: PostCollection
     pub(crate) fn new(name: &str, category: &str, posts: Vec<GrabbedPost>) -> Self {
         PostCollection {
             name: name.to_string(),
@@ -294,7 +264,14 @@ pub(crate) struct Grabber {
 }
 
 impl Grabber {
-    /// Creates new instance of `Self`.
+    /// Creates a grabber for searching and grabbing posts.
+    ///
+    /// # Arguments
+    ///
+    /// * `request_sender`: The client to perform the searches.
+    /// * `safe_mode`: Which mode the grabber will operate under.
+    ///
+    /// returns: Grabber
     pub(crate) fn new(request_sender: RequestSender, safe_mode: bool) -> Self {
         Grabber {
             posts: vec![PostCollection::new("Single Posts", "", Vec::new())],
@@ -310,18 +287,29 @@ impl Grabber {
     }
 
     /// Sets the blacklist.
+    ///
+    /// # Arguments
+    ///
+    /// * `blacklist`: The new blacklist
     pub(crate) fn set_blacklist(&mut self, blacklist: Rc<RefCell<Blacklist>>) {
         if !blacklist.borrow_mut().is_empty() {
             self.blacklist = Some(blacklist);
         }
     }
 
-    /// Sets safe mode on or off.
+    /// Sets safe mode.
+    ///
+    /// If set true, the grabber will go into safe mode and grab only safe posts,
+    /// false will grab questionable and explicit posts.
+    ///
+    /// # Arguments
+    ///
+    /// * `mode`: Which mode to run in
     pub(crate) fn set_safe_mode(&mut self, mode: bool) {
         self.safe_mode = mode;
     }
 
-    /// If the user supplies login information, this will grabbed the favorites from there account.
+    /// Grabs favorites from the user's favorites
     pub(crate) fn grab_favorites(&mut self) {
         let login = Login::get();
         if !login.username().is_empty() && login.download_favorites() {
@@ -336,7 +324,11 @@ impl Grabber {
         }
     }
 
-    /// Iterates through tags and perform searches for each, grabbing them and storing them for later download.
+    /// Grabs new posts by the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `groups`: The group of tags to search for.
     pub(crate) fn grab_posts_by_tags(&mut self, groups: &[Group]) {
         let tags: Vec<&Tag> = groups.iter().flat_map(|e| e.tags()).collect();
         for tag in tags {
@@ -497,12 +489,29 @@ impl Grabber {
         }
     }
 
-    /// Grabs posts from general tag.
+    /// Searches and grabs posts using the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to use for the search.
+    ///
+    /// returns: Vec<PostEntry, Global>
     fn get_posts_from_tag(&self, tag: &Tag) -> Vec<PostEntry> {
         self.search(tag.name(), tag.search_type())
     }
 
     /// Performs a search where it grabs posts.
+    ///
+    /// Depending on the given [TagSearchType], the way posts are grabs will be different.
+    /// - [General](TagSearchType::General) will search through pages only up to the [POST_SEARCH_LIMIT]
+    /// - [Special](TagSearchType::Special) will search repeatedly until there are no pages left to grab.
+    ///
+    /// # Arguments
+    ///
+    /// * `searching_tag`: The tag used for the search.
+    /// * `tag_search_type`: The type of search to happen.
+    ///
+    /// returns: Vec<PostEntry, Global>
     fn search(&self, searching_tag: &str, tag_search_type: &TagSearchType) -> Vec<PostEntry> {
         let mut posts: Vec<PostEntry> = Vec::new();
         let mut filtered = 0;
@@ -609,7 +618,13 @@ impl Grabber {
         }
     }
 
-    /// Scans through array of posts and removes any that violets the blacklist.
+    /// Checks through posts and removes any that violets the blacklist.
+    ///
+    /// # Arguments
+    ///
+    /// * `posts`: The posts to check
+    ///
+    /// returns: u16
     fn filter_posts_with_blacklist(&self, posts: &mut Vec<PostEntry>) -> u16 {
         if self.request_sender.is_authenticated() {
             if let Some(ref blacklist) = self.blacklist {
@@ -620,10 +635,18 @@ impl Grabber {
         0
     }
 
-    /// Removes invalid posts, this is dependant on if the file url is null or if the post was deleted.
+    /// Removes invalid posts (e.g posts with no urls, or invalid properties).
+    ///
+    /// Sometimes, even if a post is available, the url for it isn't; To handle this, the [Vec]<[PostEntry]> will retain only
+    /// the posts that has an available url. So far, the only check needed is the url check, since if the url is [None],
+    /// the entire post is [None].
+    ///
+    /// # Arguments
+    ///
+    /// * `posts`: Posts to check.
+    ///
+    /// returns: u16
     fn remove_invalid_posts(posts: &mut Vec<PostEntry>) -> u16 {
-        // Sometimes, even if a post is available, the url for it isn't;
-        // To handle this, the vector will retain only the posts that has an available url.
         let mut invalid_posts = 0;
         posts.retain(|e| {
             if !e.flags.deleted && e.file.url.is_some() {
@@ -640,6 +663,10 @@ impl Grabber {
     }
 
     /// Traces invalid posts to the log file.
+    ///
+    /// # Arguments
+    ///
+    /// * `invalid_posts`: The total count of invalid posts.
     fn log_invalid_posts(invalid_posts: &u16) {
         match invalid_posts.cmp(&1) {
             Ordering::Less => {}
