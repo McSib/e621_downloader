@@ -100,7 +100,7 @@ impl Default for Tag {
 pub(crate) struct Group {
     /// The name of group.
     name: String,
-    /// A `Vec` containing all the tags parsed.
+    /// A [Vec] containing all the tags parsed.
     tags: Vec<Tag>,
 }
 
@@ -112,10 +112,12 @@ impl Group {
         }
     }
 
+    /// The name of group.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// A [Vec] containing all the tags parsed.
     pub(crate) fn tags(&self) -> &Vec<Tag> {
         &self.tags
     }
