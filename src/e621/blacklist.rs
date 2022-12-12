@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-use failure::ResultExt;
+
 use std::cmp::Ordering;
 
-use crate::e621::{
-    io::parser::BaseParser,
-    sender::{
-        entries::{PostEntry, UserEntry},
-        RequestSender,
-    },
-};
+use failure::ResultExt;
+
+use crate::e621::io::parser::BaseParser;
+use crate::e621::sender::entries::{PostEntry, UserEntry};
+use crate::e621::sender::RequestSender;
 
 /// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
@@ -355,14 +353,14 @@ impl FlagWorker {
     }
 
     /// Returns true if the negated flags equals the negated margin, false otherwise.
-    /// 
+    ///
     /// Returns: bool
     fn is_negated_margin_met(&self) -> bool {
         self.negated_margin != 0 && self.negated_flags == self.negated_margin
     }
 
     /// Returns true if the total flags equals the margin, false otherwise.
-    /// 
+    ///
     /// Returns: bool
     fn is_margin_met(&self) -> bool {
         self.flags == self.margin
@@ -410,11 +408,11 @@ impl Blacklist {
     }
 
     /// Parses the user blacklist.
-    /// 
-    /// # Arguments 
-    /// 
+    ///
+    /// # Arguments
+    ///
     /// * `user_blacklist`: The user blacklist to parse
-    /// 
+    ///
     /// returns: &mut Blacklist
     pub(crate) fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
         self.blacklist_parser = BlacklistParser::new(user_blacklist);

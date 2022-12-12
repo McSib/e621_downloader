@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};

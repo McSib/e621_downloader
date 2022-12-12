@@ -14,28 +14,23 @@
  * limitations under the License.
  */
 
-use std::{
-    cell::RefCell,
-    fs::{create_dir_all, write},
-    path::PathBuf,
-    rc::Rc,
-    time::Duration,
-};
+use std::cell::RefCell;
+use std::fs::{create_dir_all, write};
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::time::Duration;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
-use crate::e621::grabber::Shorten;
-use crate::e621::io::Login;
-use blacklist::Blacklist;
-use grabber::Grabber;
-use io::{tag::Group, Config};
-use sender::RequestSender;
-
+use crate::e621::blacklist::Blacklist;
+use crate::e621::grabber::{Grabber, Shorten};
+use crate::e621::io::{Config, Login};
+use crate::e621::io::tag::Group;
 use crate::e621::sender::entries::UserEntry;
-
-use self::tui::{ProgressBarBuilder, ProgressStyleBuilder};
+use crate::e621::sender::RequestSender;
+use crate::e621::tui::{ProgressBarBuilder, ProgressStyleBuilder};
 
 pub(crate) mod blacklist;
 pub(crate) mod grabber;

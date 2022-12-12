@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 
-use std::{env::current_dir, fs::write, path::Path};
+use std::env::current_dir;
+use std::fs::write;
+use std::path::Path;
 
 use console::Term;
 use failure::Error;
 
-use crate::e621::{
-    io::{
-        emergency_exit,
-        tag::{parse_tag_file, TAG_FILE_EXAMPLE, TAG_NAME},
-        Config, Login,
-    },
-    sender::RequestSender,
-    E621WebConnector,
-};
+use crate::e621::E621WebConnector;
+use crate::e621::io::{Config, emergency_exit, Login};
+use crate::e621::io::tag::{parse_tag_file, TAG_FILE_EXAMPLE, TAG_NAME};
+use crate::e621::sender::RequestSender;
 
 /// The name of the cargo package.
 const NAME: &str = env!("CARGO_PKG_NAME");
