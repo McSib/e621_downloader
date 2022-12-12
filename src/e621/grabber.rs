@@ -35,7 +35,7 @@ pub(crate) trait NewVec<T> {
         Self: Sized;
 }
 
-/// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
+/// A collection of values taken from a [PostEntry].
 pub(crate) struct GrabbedPost {
     /// The url that leads to the file to download.
     url: String,
@@ -46,20 +46,39 @@ pub(crate) struct GrabbedPost {
 }
 
 impl GrabbedPost {
+    /// The url that leads to the file to download.
     pub(crate) fn url(&self) -> &str {
         &self.url
     }
 
+    /// The name of the file to download.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// The size of the file to download.
     pub(crate) fn file_size(&self) -> i64 {
         self.file_size
     }
 }
 
 impl NewVec<Vec<PostEntry>> for GrabbedPost {
+    /// Creates a new [Vec] of type [GrabbedPost] from Vec of type [PostEntry]
+    ///
+    /// # Arguments
+    ///
+    /// * `vec`: The vector to be consumed and converted.
+    ///
+    /// returns: Vec<GrabbedPost, Global>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
+    /// let grabbed_posts = GrabbedPost::new_vec(posts);
+    /// ```
     fn new_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
@@ -68,6 +87,24 @@ impl NewVec<Vec<PostEntry>> for GrabbedPost {
 }
 
 impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
+    /// Creates a new [Vec] of type [GrabbedPost] from tuple contains types ([PostEntry], &str)
+    ///
+    /// Compared to the other overload, this version sets the name of the [GrabbedPost] and numbers them.
+    ///
+    /// # Arguments
+    ///
+    /// * `(vec, pool_name)`: A tuple containing the posts and the name of the pool associated with them.
+    ///
+    /// returns: Vec<GrabbedPost, Global>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
+    /// let grabbed_posts = GrabbedPost::new_vec((posts, "Amazing Pool"));
+    /// ```
     fn new_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
@@ -77,6 +114,26 @@ impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
 }
 
 impl From<(&PostEntry, &str, u16)> for GrabbedPost {
+    /// Creates [GrabbedPost] from tuple of types (&[PostEntry], &str, u16)
+    ///
+    /// # Arguments
+    ///
+    /// * `(post, name, current_page)`: A tuple containing the post, name, and current page number of post.
+    ///
+    /// returns: GrabbedPost
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
+    /// let pool_name = "Amazing pool name";
+    /// let grabbed_posts = posts.iter()
+    ///             .enumerate()
+    ///             .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
+    ///             .collect();
+    /// ```
     fn from((post, name, current_page): (&PostEntry, &str, u16)) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
@@ -87,6 +144,24 @@ impl From<(&PostEntry, &str, u16)> for GrabbedPost {
 }
 
 impl From<(PostEntry, &str)> for GrabbedPost {
+    /// Creates [GrabbedPost] from tuple of types ([PostEntry], &str)
+    ///
+    /// # Arguments
+    ///
+    /// * `(post, name_convention)`: A tuple containing the post, and naming convention of post.
+    ///
+    /// returns: GrabbedPost
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
+    /// let grabbed_posts = vec.into_iter()
+    ///             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
+    ///             .collect()
+    /// ```
     fn from((post, name_convention): (PostEntry, &str)) -> Self {
         match name_convention {
             "md5" => GrabbedPost {
