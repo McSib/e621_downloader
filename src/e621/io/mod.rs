@@ -206,6 +206,10 @@ impl Default for Login {
 }
 
 /// Exits the program after message explaining the error and prompting the user to press `ENTER`.
+///
+/// # Arguments
+///
+/// * `error`: The error message to print.
 pub(crate) fn emergency_exit(error: &str) {
     info!("{error}");
     println!("Press ENTER to close the application...");

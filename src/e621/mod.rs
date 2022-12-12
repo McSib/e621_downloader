@@ -65,8 +65,7 @@ impl E621WebConnector {
         }
     }
 
-    /// Gets input and checks if the user wants to enter safe mode.
-    /// If they do, the `RequestSender` will update the request urls for future sent requests.
+    /// Gets input and enters safe depending on user choice.
     pub(crate) fn should_enter_safe_mode(&mut self) {
         trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
@@ -106,7 +105,12 @@ impl E621WebConnector {
         }
     }
 
-    /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
+    /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts
+    /// (posts grabbed by its ID).
+    ///
+    /// # Arguments
+    ///
+    /// * `groups`: The groups to grab from.
     pub(crate) fn grab_all(&mut self, groups: &[Group]) {
         trace!("Grabbing posts...");
         self.grabber.grab_favorites();
@@ -125,7 +129,13 @@ impl E621WebConnector {
         trace!("Saved {file_path}...");
     }
 
-    /// Removes invalid characters from directory name.
+    /// Removes invalid characters from directory path.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir_name`: Directory name to remove invalid chars from.
+    ///
+    /// returns: String
     fn remove_invalid_chars(&self, dir_name: &str) -> String {
         dir_name
             .chars()
@@ -238,6 +248,10 @@ impl E621WebConnector {
     }
 
     /// Initializes the progress bar for downloading process.
+    ///
+    /// # Arguments
+    ///
+    /// * `len`: The total bytes to download.
     fn initialize_progress_bar(&mut self, len: u64) {
         self.progress_bar = ProgressBarBuilder::new(len)
             .style(
