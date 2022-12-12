@@ -35,7 +35,7 @@ pub(crate) trait NewVec<T> {
         Self: Sized;
 }
 
-/// `PostEntry` that was grabbed and converted into `GrabbedPost`, it contains only the necessary information for downloading the post.
+/// A collection of values taken from a [PostEntry].
 pub(crate) struct GrabbedPost {
     /// The url that leads to the file to download.
     url: String,
@@ -46,14 +46,17 @@ pub(crate) struct GrabbedPost {
 }
 
 impl GrabbedPost {
+    /// The url that leads to the file to download.
     pub(crate) fn url(&self) -> &str {
         &self.url
     }
 
+    /// The name of the file to download.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// The size of the file to download.
     pub(crate) fn file_size(&self) -> i64 {
         self.file_size
     }
