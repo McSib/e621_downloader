@@ -63,6 +63,22 @@ impl GrabbedPost {
 }
 
 impl NewVec<Vec<PostEntry>> for GrabbedPost {
+    /// Creates a new [Vec] of type [GrabbedPost] from Vec of type [PostEntry]
+    ///
+    /// # Arguments
+    ///
+    /// * `vec`: The vector to be consumed and converted.
+    ///
+    /// returns: Vec<GrabbedPost, Global>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
+    /// let grabbed_posts = GrabbedPost::new_vec(posts);
+    /// ```
     fn new_vec(vec: Vec<PostEntry>) -> Vec<Self> {
         vec.into_iter()
             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
@@ -71,6 +87,24 @@ impl NewVec<Vec<PostEntry>> for GrabbedPost {
 }
 
 impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
+    /// Creates a new [Vec] of type [GrabbedPost] from tuple contains types ([PostEntry], &str)
+    ///
+    /// Compared to the other overload, this version sets the name of the [GrabbedPost] and numbers them.
+    ///
+    /// # Arguments
+    ///
+    /// * `(vec, pool_name)`: A tuple containing the posts and the name of the pool associated with them.
+    ///
+    /// returns: Vec<GrabbedPost, Global>
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // A vec of posts
+    /// let grabbed_posts = GrabbedPost::new_vec((posts, "Amazing Pool"));
+    /// ```
     fn new_vec((vec, pool_name): (Vec<PostEntry>, &str)) -> Vec<Self> {
         vec.iter()
             .enumerate()
