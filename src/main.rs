@@ -45,6 +45,7 @@ fn main() -> Result<(), Error> {
     program.run()
 }
 
+/// Initializes the logger with preset filtering.
 fn initialize_logger() {
     let mut config = ConfigBuilder::new();
     config.add_filter_allow_str("e621_downloader");
