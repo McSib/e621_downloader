@@ -49,10 +49,12 @@ pub(crate) struct Config {
 static CONFIG: OnceCell<Config> = OnceCell::new();
 
 impl Config {
+    /// The location of the download directory.
     pub(crate) fn download_directory(&self) -> &str {
         &self.download_directory
     }
 
+    /// The file naming convention (e.g "md5", "id").
     pub(crate) fn naming_convention(&self) -> &str {
         &self.naming_convention
     }
@@ -129,14 +131,17 @@ pub(crate) struct Login {
 static LOGIN: OnceCell<Login> = OnceCell::new();
 
 impl Login {
+    /// Username of user.
     pub(crate) fn username(&self) -> &str {
         &self.username
     }
 
+    /// The password hash (also known as the API key) for the user.
     pub(crate) fn api_key(&self) -> &str {
         &self.api_key
     }
 
+    /// Whether or not the user wishes to download their favorites.
     pub(crate) fn download_favorites(&self) -> bool {
         self.download_favorites
     }

@@ -211,14 +211,17 @@ impl PostCollection {
         }
     }
 
+    /// The name of the set.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// The category of the set.
     pub(crate) fn category(&self) -> &str {
         &self.category
     }
 
+    /// The posts in the set.
     pub(crate) fn posts(&self) -> &Vec<GrabbedPost> {
         &self.posts
     }
@@ -279,6 +282,7 @@ impl Grabber {
         }
     }
 
+    /// All grabbed posts.
     pub(crate) fn posts(&self) -> &Vec<PostCollection> {
         &self.posts
     }
@@ -290,6 +294,7 @@ impl Grabber {
         }
     }
 
+    /// Sets safe mode on or off.
     pub(crate) fn set_safe_mode(&mut self, mode: bool) {
         self.safe_mode = mode;
     }
