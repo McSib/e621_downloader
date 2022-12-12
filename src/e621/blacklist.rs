@@ -31,7 +31,7 @@ struct RootToken {
     lines: Vec<LineToken>,
 }
 
-/// Parsed line token that contains all collected [`TagToken`]s on single input line.
+/// A line token that contains all collected [`TagToken`]s from a parsed line.
 #[derive(Debug, Default)]
 struct LineToken {
     tags: Vec<TagToken>,
