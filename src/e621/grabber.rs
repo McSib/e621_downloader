@@ -114,6 +114,26 @@ impl NewVec<(Vec<PostEntry>, &str)> for GrabbedPost {
 }
 
 impl From<(&PostEntry, &str, u16)> for GrabbedPost {
+    /// Creates [GrabbedPost] from tuple of types (&[PostEntry], &str, u16)
+    ///
+    /// # Arguments
+    ///
+    /// * `(post, name, current_page)`: A tuple containing the post, name, and current page number of post.
+    ///
+    /// returns: GrabbedPost
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
+    /// let pool_name = "Amazing pool name";
+    /// let grabbed_posts = posts.iter()
+    ///             .enumerate()
+    ///             .map(|(i, e)| GrabbedPost::from((e, pool_name, (i + 1) as u16)))
+    ///             .collect();
+    /// ```
     fn from((post, name, current_page): (&PostEntry, &str, u16)) -> Self {
         GrabbedPost {
             url: post.file.url.clone().unwrap(),
@@ -124,6 +144,24 @@ impl From<(&PostEntry, &str, u16)> for GrabbedPost {
 }
 
 impl From<(PostEntry, &str)> for GrabbedPost {
+    /// Creates [GrabbedPost] from tuple of types ([PostEntry], &str)
+    ///
+    /// # Arguments
+    ///
+    /// * `(post, name_convention)`: A tuple containing the post, and naming convention of post.
+    ///
+    /// returns: GrabbedPost
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::collection::Vec;
+    ///
+    /// let posts: Vec<PostEntry> = vec![]; // Collection of posts
+    /// let grabbed_posts = vec.into_iter()
+    ///             .map(|e| GrabbedPost::from((e, Config::get().naming_convention())))
+    ///             .collect()
+    /// ```
     fn from((post, name_convention): (PostEntry, &str)) -> Self {
         match name_convention {
             "md5" => GrabbedPost {
