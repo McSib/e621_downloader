@@ -67,25 +67,6 @@ fn initialize_logger() {
 }
 
 /// Logs important information about the system being used.
-/// This is useful for debugging purposes.
-/// This function is called automatically by the `main` function.
-///
-/// # Example
-/// ```rust
-/// log_system_information();
-/// ```
-///
-/// # Output
-/// ```text
-/// OS: linux
-/// ARCH: x86_64
-/// FAMILY: unix
-/// DLL_EXTENSION: .so
-/// DLL_PREFIX: lib
-/// DLL_SUFFIX: .so
-/// EXE_EXTENSION: .so
-/// EXE_SUFFIX: .so
-/// ```
 fn log_system_information() {
     trace!("Printing system information out into log for debug purposes...");
     trace!("ARCH:           \"{}\"", ARCH);
