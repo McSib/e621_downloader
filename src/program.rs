@@ -38,13 +38,16 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The authors who created the package.
 const AUTHORS: &str = env!("CARGO_PKG_AUTHORS");
 
+/// A program class that handles the flow of the downloader user experience and steps of execution.
 pub(crate) struct Program;
 
 impl Program {
+    /// Creates a new instance of the program.
     pub(crate) fn new() -> Self {
         Self
     }
 
+    /// Runs the downloader program.
     pub(crate) fn run(&self) -> Result<(), Error> {
         Term::stdout().set_title("e621 downloader");
         trace!("Starting e621 downloader...");
