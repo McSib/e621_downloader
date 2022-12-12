@@ -52,7 +52,13 @@ impl BaseParser {
         self.consume_while(char::is_whitespace);
     }
 
-    /// Consumes characters until `test` returns false.
+    /// /// Consumes characters until `test` returns false.
+    ///
+    /// # Arguments
+    ///
+    /// * `test`: The function to test against.
+    ///
+    /// returns: String
     pub(crate) fn consume_while<F>(&mut self, test: F) -> String
     where
         F: Fn(char) -> bool,
@@ -86,6 +92,12 @@ impl BaseParser {
     }
 
     /// Checks if the current input starts with the given string.
+    ///
+    /// # Arguments
+    ///
+    /// * `s`: The string to compare the start of the current input with.
+    ///
+    /// returns: bool
     pub(crate) fn starts_with(&self, s: &str) -> bool {
         self.get_current_input().starts_with(s)
     }
@@ -101,8 +113,13 @@ impl BaseParser {
     }
 
     /// Reports an error to the parser so that it can exit gracefully.
+    ///
     /// This will print a message to the console through the `error!` macro.
     /// After this, it will also attach the current character number and column number to the message.
+    ///
+    /// # Arguments
+    ///
+    /// * `msg`: Error message to print.
     pub(crate) fn report_error(&self, msg: &str) {
         error!(
             "Error parsing file at character {} (column {}): {msg}",
