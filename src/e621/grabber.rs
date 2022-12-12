@@ -228,6 +228,13 @@ impl PostCollection {
 }
 
 impl Shorten<&str> for PostCollection {
+    /// Shortens [PostCollection] name if it's greater than 25 characters and attaches the delimiter at the end.
+    ///
+    /// # Arguments
+    ///
+    /// * `delimiter`: What to replace the excess characters with.
+    ///
+    /// returns: String
     fn shorten(&self, delimiter: &str) -> String {
         if self.name.len() >= 25 {
             let mut short_name = self.name[0..25].to_string();
@@ -240,6 +247,13 @@ impl Shorten<&str> for PostCollection {
 }
 
 impl Shorten<char> for PostCollection {
+    /// Shortens [PostCollection] name if it's greater than 25 characters and attaches the delimiter at the end.
+    ///
+    /// # Arguments
+    ///
+    /// * `delimiter`: What to replace the excess characters with.
+    ///
+    /// returns: String
     fn shorten(&self, delimiter: char) -> String {
         if self.name.len() >= 25 {
             let mut short_name = self.name[0..25].to_string();
@@ -252,11 +266,19 @@ impl Shorten<char> for PostCollection {
 }
 
 impl From<(&SetEntry, Vec<GrabbedPost>)> for PostCollection {
+    /// Creates [PostCollection] from tuple of types (&[SetEntry], [Vec]<[GrabbedPost]>).
+    ///
+    /// # Arguments
+    ///
+    /// * `(set, posts)`: The set and posts to make [PostCollection] from.
+    ///
+    /// returns: PostCollection
     fn from((set, posts): (&SetEntry, Vec<GrabbedPost>)) -> Self {
         PostCollection::new(&set.name, "Sets", posts)
     }
 }
 
+/// The total amount of pages the general search can search for.
 const POST_SEARCH_LIMIT: u8 = 5;
 
 /// Is a collector that grabs posts, categorizes them, and prepares them for the downloader to use in downloading.
@@ -322,10 +344,17 @@ impl Grabber {
         }
     }
 
+    /// Returns the single post [PostCollection].
     fn single_post_collection(&mut self) -> &mut PostCollection {
         self.posts.first_mut().unwrap() // It is guaranteed that the first collection is the single post collection.
     }
 
+    /// Adds a single post to the single post [PostCollection]
+    ///
+    /// # Arguments
+    ///
+    /// * `entry`: The entry to add to the collection.
+    /// * `id`: The id that's used for debugging.
     fn add_single_post(&mut self, entry: PostEntry, id: i64) {
         let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
         self.single_post_collection().posts.push(grabbed_post);
@@ -335,6 +364,11 @@ impl Grabber {
         );
     }
 
+    /// Searches and grabs post based on the tag given.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to search for.
     fn grab_by_tag_type(&mut self, tag: &Tag) {
         match tag.tag_type() {
             TagType::Pool => self.grab_pool(tag),
@@ -345,6 +379,11 @@ impl Grabber {
         };
     }
 
+    /// Grabs general posts based on the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to search for.
     fn grab_general(&mut self, tag: &Tag) {
         let posts = self.get_posts_from_tag(tag);
         self.posts.push(PostCollection::new(
@@ -360,6 +399,11 @@ impl Grabber {
         );
     }
 
+    /// Grabs single post based on the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to search for.
     fn grab_post(&mut self, tag: &Tag) {
         let entry: PostEntry = self
             .request_sender
@@ -383,6 +427,11 @@ impl Grabber {
         }
     }
 
+    /// Grabs a set based on the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to search for.
     fn grab_set(&mut self, tag: &Tag) {
         let entry: SetEntry = self
             .request_sender
@@ -401,6 +450,11 @@ impl Grabber {
         );
     }
 
+    /// Grabs pool based on the given tag.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: The tag to search for.
     fn grab_pool(&mut self, tag: &Tag) {
         let mut entry: PoolEntry = self
             .request_sender
@@ -428,6 +482,12 @@ impl Grabber {
         );
     }
 
+    /// Sorts a pool by id based on the supplied [PoolEntry].
+    ///
+    /// # Arguments
+    ///
+    /// * `entry`: The [PoolEntry] to check ids against
+    /// * `posts`: The [PostEntry] array to sort
     fn sort_pool_by_id(entry: &PoolEntry, posts: &mut [PostEntry]) {
         for (i, id) in entry.post_ids.iter().enumerate() {
             if posts[i].id != *id {
@@ -475,6 +535,19 @@ impl Grabber {
         posts
     }
 
+    /// Performs a special search to grab posts.
+    ///
+    /// The difference between special/general searches are this.
+    /// - Special searches aim to keep grabbing posts until there are not posts left to grab.
+    /// - General searches aim to grab only a few pages of posts (commonly 320 posts per page). You can refer to the
+    /// [POST_SEARCH_LIMIT] for the current search limit of the general search.
+    ///
+    /// # Arguments
+    ///
+    /// * `searching_tag`: The tag to search for.
+    /// * `posts`:  The posts [Vec] to add searched posts into.
+    /// * `filtered`: The total amount of posts filtered.
+    /// * `invalid_posts`: The total amount of posts invalid by the [Blacklist].
     fn special_search(
         &self,
         searching_tag: &str,
@@ -499,6 +572,19 @@ impl Grabber {
         }
     }
 
+    /// Performs a general search to grab posts.
+    ///
+    /// The difference between special/general searches are this.
+    /// - Special searches aim to keep grabbing posts until there are not posts left to grab.
+    /// - General searches aim to grab only a few pages of posts (commonly 320 posts per page). You can refer to the
+    /// [POST_SEARCH_LIMIT] for the current search limit of the general search.
+    ///
+    /// # Arguments
+    ///
+    /// * `searching_tag`: The tag to search for.
+    /// * `posts`:  The posts [Vec] to add searched posts into.
+    /// * `filtered`: The total amount of posts filtered.
+    /// * `invalid_posts`: The total amount of posts invalid by the [Blacklist].
     fn general_search(
         &self,
         searching_tag: &str,
@@ -553,6 +639,7 @@ impl Grabber {
         invalid_posts
     }
 
+    /// Traces invalid posts to the log file.
     fn log_invalid_posts(invalid_posts: &u16) {
         match invalid_posts.cmp(&1) {
             Ordering::Less => {}

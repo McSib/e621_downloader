@@ -146,6 +146,7 @@ impl Login {
         self.download_favorites
     }
 
+    /// Gets the global instance of [Login].
     pub(crate) fn get() -> &'static Self {
         LOGIN.get_or_init(|| Self::load().unwrap_or_else(|e| {
             error!("Unable to load `login.json`. Error: {}", e);

@@ -28,12 +28,14 @@ use crate::e621::{
 /// Root token which contains all the tokens of the blacklist.
 #[derive(Default, Debug)]
 struct RootToken {
+    /// The total [LineToken]s from the root.
     lines: Vec<LineToken>,
 }
 
 /// A line token that contains all collected [`TagToken`]s from a parsed line.
 #[derive(Debug, Default)]
 struct LineToken {
+    /// Total [TagToken] in the line.
     tags: Vec<TagToken>,
 }
 
@@ -46,9 +48,13 @@ impl LineToken {
 /// Enum that contains each possible option from `rating:` being in blacklist.
 #[derive(Debug, PartialEq)]
 enum Rating {
+    /// No rating.
     None,
+    /// Safe rating.
     Safe,
+    /// Questionable rating.
     Questionable,
+    /// Explicit rating.
     Explicit,
 }
 
@@ -348,10 +354,16 @@ impl FlagWorker {
         }
     }
 
+    /// Returns true if the negated flags equals the negated margin, false otherwise.
+    /// 
+    /// Returns: bool
     fn is_negated_margin_met(&self) -> bool {
         self.negated_margin != 0 && self.negated_flags == self.negated_margin
     }
 
+    /// Returns true if the total flags equals the margin, false otherwise.
+    /// 
+    /// Returns: bool
     fn is_margin_met(&self) -> bool {
         self.flags == self.margin
     }
@@ -397,6 +409,13 @@ impl Blacklist {
         }
     }
 
+    /// Parses the user blacklist.
+    /// 
+    /// # Arguments 
+    /// 
+    /// * `user_blacklist`: The user blacklist to parse
+    /// 
+    /// returns: &mut Blacklist
     pub(crate) fn parse_blacklist(&mut self, user_blacklist: String) -> &mut Blacklist {
         self.blacklist_parser = BlacklistParser::new(user_blacklist);
         self.blacklist_tokens = self.blacklist_parser.parse_blacklist();
