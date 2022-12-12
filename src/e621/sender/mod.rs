@@ -136,7 +136,8 @@ pub(crate) struct RequestSender {
 }
 
 impl RequestSender {
-    pub(crate) fn new(login: &Login) -> Self {
+    pub(crate) fn new() -> Self {
+        let login = Login::get();
         let auth = if login.is_empty() {
             String::new()
         } else {
