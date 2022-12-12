@@ -19,18 +19,13 @@ extern crate failure;
 #[macro_use]
 extern crate log;
 
-use std::{
-    env::consts::{
-        ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS,
-    },
-    fs::File,
-};
+
+use std::env::consts::{ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS};
+use std::fs::File;
 
 use failure::Error;
-use simplelog::{
-    ColorChoice, CombinedLogger, Config, ConfigBuilder, LevelFilter, TermLogger, TerminalMode,
-    WriteLogger,
-};
+use log::LevelFilter;
+use simplelog::{ColorChoice, CombinedLogger, Config, ConfigBuilder, TerminalMode, TermLogger, WriteLogger};
 
 use crate::program::Program;
 

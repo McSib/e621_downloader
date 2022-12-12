@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 
-use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
-use crate::e621::{
-    blacklist::Blacklist,
-    io::{
-        emergency_exit,
-        tag::{Group, Tag, TagSearchType, TagType},
-        Config, Login,
-    },
-    sender::{
-        entries::{PoolEntry, PostEntry, SetEntry},
-        RequestSender,
-    },
-};
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::rc::Rc;
+
+use crate::e621::blacklist::Blacklist;
+use crate::e621::io::{Config, emergency_exit, Login};
+use crate::e621::io::tag::{Group, Tag, TagSearchType, TagType};
+use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
+use crate::e621::sender::RequestSender;
 
 pub(crate) trait NewVec<T> {
     fn new_vec(value: T) -> Vec<Self>

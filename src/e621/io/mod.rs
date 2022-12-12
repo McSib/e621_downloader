@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-use once_cell::sync::OnceCell;
-use std::{
-    fs::{read_to_string, write},
-    io,
-    path::Path,
-    process::exit,
-};
+use std::fs::{read_to_string, write};
+use std::io;
+use std::path::Path;
+use std::process::exit;
 
 use failure::Error;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string_pretty};
 

@@ -18,10 +18,10 @@ use std::fs::read_to_string;
 
 use failure::{Error, ResultExt};
 
-use crate::e621::{
-    io::{emergency_exit, parser::BaseParser},
-    sender::{entries::TagEntry, RequestSender},
-};
+use crate::e621::io::emergency_exit;
+use crate::e621::io::parser::BaseParser;
+use crate::e621::sender::entries::TagEntry;
+use crate::e621::sender::RequestSender;
 
 /// Constant of the tag file's name.
 pub(crate) const TAG_NAME: &str = "tags.txt";
