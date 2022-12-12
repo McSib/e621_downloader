@@ -69,14 +69,17 @@ impl Tag {
         }
     }
 
+    /// The name of the tag.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// The search type of the tag.
     pub(crate) fn search_type(&self) -> &TagSearchType {
         &self.search_type
     }
 
+    /// The tag type of the tag.
     pub(crate) fn tag_type(&self) -> &TagType {
         &self.tag_type
     }
