@@ -75,7 +75,6 @@ enum TagType {
 }
 
 /// Tag token that contains essential information about what is blacklisted.
-/// Whether the post is a rating, ID, user, or just a plain tag, this token keeps all the information and ensures that you know everything about this tag.
 #[derive(Debug)]
 struct TagToken {
     /// If the tag is negated or not
@@ -129,7 +128,7 @@ impl BlacklistParser {
         RootToken { lines }
     }
 
-    /// Parses each tag and collects them before return a [`LineToken`].
+    /// Parses each tag and collects them into a [`LineToken`].
     fn parse_line(&mut self) -> LineToken {
         let mut tags: Vec<TagToken> = Vec::new();
         loop {
@@ -181,6 +180,7 @@ impl BlacklistParser {
     /// returns: ()
     ///
     /// # Errors
+    ///
     /// An error can occur if 1) the `assert_eq` fails in its check or 2) if the [TagToken] name is not any of the matched
     /// values.
     fn parse_special_tag(&mut self, token: &mut TagToken) {
@@ -209,7 +209,13 @@ impl BlacklistParser {
         };
     }
 
-    /// Checks parsed value and returns the correct rating for it.
+    /// Checks the value and create a new [Rating] from it.
+    ///
+    /// # Arguments
+    ///
+    /// * `value`: The value to check.
+    ///
+    /// returns: Rating
     fn get_rating(&self, value: &str) -> Rating {
         match value.to_lowercase().as_str() {
             "safe" | "s" => Rating::Safe,
@@ -221,6 +227,12 @@ impl BlacklistParser {
 }
 
 /// Validates character for tag.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_tag(c: char) -> bool {
     match c {
         '!'..='9' | ';'..='~' => true,
@@ -236,6 +248,12 @@ fn valid_tag(c: char) -> bool {
 }
 
 /// Validates character for user.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_user(c: char) -> bool {
     match c {
         '!'..='9' | ';'..='~' => true,
@@ -251,11 +269,23 @@ fn valid_user(c: char) -> bool {
 }
 
 /// Validates character for rating.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_rating(c: char) -> bool {
     c.is_ascii_alphabetic()
 }
 
 /// Validates character for id.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_id(c: char) -> bool {
     c.is_ascii_digit()
 }
@@ -281,6 +311,10 @@ struct FlagWorker {
 
 impl FlagWorker {
     /// Sets margin for how many flags need to be raised before the post is either blacklisted or considered safe.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags`: The tags to calibrate flags for.
     fn set_flag_margin(&mut self, tags: &[TagToken]) {
         tags.iter().for_each(|e| {
             if e.negated {
@@ -292,7 +326,15 @@ impl FlagWorker {
     }
 
     /// Flags post based on blacklisted rating.
+    ///
+    /// # Arguments
+    ///
+    /// * `rating`: The blacklisted rating.
+    /// * `post`: The post to check against.
+    /// * `negated`: Whether the blacklisted rating is negated or not (this will determine if the rating whitelists the
+    /// post or adds towards removing it from the download pool).
     fn flag_rating(&mut self, rating: &Rating, post: &PostEntry, negated: bool) {
+        // A nice tuple hack to get around some massive nesting.
         match (rating, post.rating.as_str()) {
             (Rating::Safe, "s") | (Rating::Questionable, "q") | (Rating::Explicit, "e") => {
                 self.raise_flag(negated);
@@ -301,21 +343,40 @@ impl FlagWorker {
         }
     }
 
-    /// Raises the flag and immediately blacklists the post if its ID matches with the blacklisted ID.
+    /// Raises the flag and blacklists the post if its ID matches with the blacklisted ID.
+    ///
+    /// # Arguments
+    ///
+    /// * `id`: The blacklisted id to compare.
+    /// * `post_id`: The post id to check against.
+    /// * `negated`: Whether the blacklisted rating is negated or not (this will determine if the rating whitelists the
+    /// post or adds towards removing it from the download pool).
     fn flag_id(&mut self, id: i64, post_id: i64, negated: bool) {
         if post_id == id {
             self.raise_flag(negated);
         }
     }
 
-    /// Raises the flag and immediately blacklists the post if the user who uploaded it is blacklisted.
+    /// Raises the flag and blacklists the post if the user who uploaded it is blacklisted.
+    ///
+    /// # Arguments
+    ///
+    /// * `user_id`: The blacklisted user id.
+    /// * `uploader_id`: The user id to check against.
+    /// * `negated`: Whether the blacklisted rating is negated or not (this will determine if the rating whitelists the
+    /// post or adds towards removing it from the download pool).
     fn flag_user(&mut self, user_id: i64, uploader_id: i64, negated: bool) {
         if user_id == uploader_id {
             self.raise_flag(negated);
         }
     }
 
-    /// Checks if a single post is blacklisted or safe.
+    /// Checks if a single post is blacklisted.
+    ///
+    /// # Arguments
+    ///
+    /// * `post`: The post to check.
+    /// * `blacklist_line`: The blacklist tags to check the post against.
     fn check_post(&mut self, post: &PostEntry, blacklist_line: &LineToken) {
         let post_tags = post.tags.clone().combine_tags();
         for tag in &blacklist_line.tags {
@@ -355,15 +416,11 @@ impl FlagWorker {
     }
 
     /// Returns true if the negated flags equals the negated margin, false otherwise.
-    /// 
-    /// Returns: bool
     fn is_negated_margin_met(&self) -> bool {
         self.negated_margin != 0 && self.negated_flags == self.negated_margin
     }
 
     /// Returns true if the total flags equals the margin, false otherwise.
-    /// 
-    /// Returns: bool
     fn is_margin_met(&self) -> bool {
         self.flags == self.margin
     }
@@ -373,8 +430,6 @@ impl FlagWorker {
     /// # Arguments
     ///
     /// * `negated`: The tag's negation.
-    ///
-    /// returns: ()
     fn raise_flag(&mut self, negated: bool) {
         if negated {
             self.negated_flags += 1;
@@ -422,7 +477,7 @@ impl Blacklist {
         self
     }
 
-    /// Goes through all of the blacklisted users and obtains there ID for the flagging system to cross examine with posts.
+    /// Caches user id into the tag name for quicker access during the blacklist checks.
     pub(crate) fn cache_users(&mut self) {
         let tags: Vec<&mut TagToken> = self
             .blacklist_tokens
@@ -440,7 +495,7 @@ impl Blacklist {
         }
     }
 
-    /// Checks of the blacklist is empty.
+    /// Checks if the blacklist is empty.
     pub(crate) fn is_empty(&self) -> bool {
         self.blacklist_tokens.lines.is_empty()
     }
@@ -451,7 +506,7 @@ impl Blacklist {
     ///
     /// * `posts`: Posts to filter through.
     ///
-    /// returns: u16 of posts that were positively filtered
+    /// returns: u16
     pub(crate) fn filter_posts(&self, posts: &mut Vec<PostEntry>) -> u16 {
         let mut filtered: u16 = 0;
         for blacklist_line in &self.blacklist_tokens.lines {
