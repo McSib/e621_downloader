@@ -300,8 +300,8 @@ pub(crate) struct SetEntry {
     pub(crate) updated_at: String,
     /// The ID of the user that created the set.
     pub(crate) creator_id: i64,
-    /// If the set is pub(crate) ic and visible.
-    pub(crate) is_pubic: bool,
+    /// If the set is public and visible.
+    pub(crate) is_public: bool,
     /// The name of the set.
     pub(crate) name: String,
     /// The short name of the set.
