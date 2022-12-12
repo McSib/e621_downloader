@@ -70,14 +70,13 @@ pub(crate) struct TagEntry {
     pub(crate) related_tags_updated_at: String,
     /// The type of tag it is.
     ///
-    /// # Important
     /// This tag can be the following types:
-    /// `0`: General;
-    /// `1`: Artist;
-    /// `2`: Nil (This used to be something, but was removed);
-    /// `3`: Copyright;
-    /// `4`: Character;
-    /// `5`: Species;
+    /// - `0`: General;
+    /// - `1`: Artist;
+    /// - `2`: Nil (This used to be something, but was removed);
+    /// - `3`: Copyright;
+    /// - `4`: Character;
+    /// - `5`: Species;
     pub(crate) category: u8,
     /// Whether or not the tag is locked.
     pub(crate) is_locked: bool,
@@ -89,6 +88,7 @@ pub(crate) struct TagEntry {
 
 impl TagEntry {
     /// Constrains the `TagType` enum to a tags type specifically.
+    ///
     /// This can only be `TagType::General` or `TagType::Artist`.
     pub(crate) fn to_tag_type(&self) -> TagType {
         match self.category {
@@ -105,6 +105,7 @@ impl TagEntry {
 /// Wrapper struct that holds the return of bulk searches.
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub(crate) struct BulkPostEntry {
+    /// All posts in the bulk.
     pub(crate) posts: Vec<PostEntry>,
 }
 
@@ -131,8 +132,7 @@ pub(crate) struct PostEntry {
     pub(crate) locked_tags: Vec<String>,
     /// An ID that increases for every post alteration on E6 (explained below)
     ///
-    /// # Explanation
-    /// change_seq is a number that is increased every time a post is changed on the site.
+    /// `change_seq` is a number that is increased every time a post is changed on the site.
     /// It gets updated whenever a post has any of these values change:
     ///
     /// - `tag_string`
