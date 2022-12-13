@@ -294,7 +294,7 @@ fn valid_user(c: char) -> bool {
 ///
 /// returns: bool
 fn valid_rating(c: char) -> bool {
-    c.is_ascii_digit()
+    c.is_ascii_alphabetic()
 }
 
 /// Validates character for ordering.
