@@ -356,13 +356,19 @@ impl FlagWorker {
     ///
     /// * `tags`: The tags to calibrate flags for.
     fn set_flag_margin(&mut self, tags: &[TagToken]) {
-        tags.iter().for_each(|e| {
-            if e.negated {
+        for tag in tags {
+            if tag.negated {
+                if let TagType::Score(_, _) = tag.tag_type {
+                    // This is done because e621's blacklist itself doesn't handle scores that are negated, at
+                    // least from my testing.
+                    continue;
+                }
+
                 self.negated_margin += 1;
             } else {
                 self.margin += 1;
             }
-        });
+        }
     }
 
     /// Flags post based on blacklisted rating.
