@@ -146,7 +146,7 @@ dependencies = [
 
 [[package]]
 name = "e621_downloader"
-version = "1.7.1"
+version = "1.7.2-dev"
 dependencies = [
  "base64-url",
  "console",
@@ -163,7 +163,6 @@ dependencies = [
  "simplelog",
  "smallvec",
  "tokio",
- "url",
 ]
 
 [[package]]

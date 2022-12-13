@@ -68,6 +68,8 @@ enum TagType {
     Id(Option<i64>),
     /// A user type.
     User(Option<String>),
+    /// The blacklisted score
+    Score(Ordering, i32),
     /// No type.
     None,
 }
@@ -199,6 +201,14 @@ impl BlacklistParser {
             "user" => {
                 token.tag_type = TagType::User(Some(self.base_parser.consume_while(valid_user)));
             }
+            "score" => {
+                let ordering = self.get_ordering();
+                let score = self.base_parser.consume_while(valid_score);
+                token.tag_type = TagType::Score(
+                    ordering,
+                    score.parse::<i32>().unwrap(),
+                );
+            }
             _ => {
                 self.base_parser.report_error(
                     format!("Unknown special tag identifier: {}", token.name).as_str(),
@@ -220,6 +230,16 @@ impl BlacklistParser {
             "questionable" | "q" => Rating::Questionable,
             "explicit" | "e" => Rating::Explicit,
             _ => Rating::None,
+        }
+    }
+
+    /// Gets the ordering of the score.
+    fn get_ordering(&mut self) -> Ordering {
+        let order = self.base_parser.consume_while(valid_ordering);
+        match order.as_str() {
+            "<" => Ordering::Less,
+            ">=" => Ordering::Greater, // This is greater than or equal, but ordering has no combination for that.
+            _ => Ordering::Equal // Defaults to equal (e.g nothing happens).
         }
     }
 }
@@ -274,7 +294,29 @@ fn valid_user(c: char) -> bool {
 ///
 /// returns: bool
 fn valid_rating(c: char) -> bool {
-    c.is_ascii_alphabetic()
+    c.is_ascii_digit()
+}
+
+/// Validates character for ordering.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
+fn valid_ordering(c: char) -> bool {
+    matches!(c, '<' | '>' | '=')
+}
+
+/// Validates character for score.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
+fn valid_score(c: char) -> bool {
+    c.is_ascii_digit()
 }
 
 /// Validates character for id.
@@ -369,6 +411,29 @@ impl FlagWorker {
         }
     }
 
+    /// Flags post based on it's score.
+    ///
+    /// # Arguments
+    ///
+    /// * `ordering`: The ordering of the score blacklisted (e.g <, >=).
+    /// * `score`: The score to check and blacklist.
+    /// * `post_score`: The post score to check against.
+    fn flag_score(&mut self, ordering: &Ordering, score: &i32, post_score: i64, negated: bool) {
+        match ordering {
+            Ordering::Less => {
+                if post_score < *score as i64 {
+                    self.raise_flag(negated);
+                }
+            }
+            Ordering::Greater => {
+                if post_score >= *score as i64 {
+                    self.raise_flag(negated);
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Checks if a single post is blacklisted.
     ///
     /// # Arguments
@@ -397,6 +462,9 @@ impl FlagWorker {
                         })
                         .unwrap();
                     self.flag_user(user_id, post.uploader_id, tag.negated);
+                }
+                TagType::Score(ordering, score) => {
+                    self.flag_score(ordering, score, post.score.total, tag.negated);
                 }
                 TagType::None => {
                     if post_tags.iter().any(|e| e == tag.name.as_str()) {
