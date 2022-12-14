@@ -14,27 +14,23 @@
  * limitations under the License.
  */
 
-use std::{
-    cell::RefCell,
-    fs::{create_dir_all, write},
-    path::PathBuf,
-    rc::Rc,
-    time::Duration,
-};
+use std::cell::RefCell;
+use std::fs::{create_dir_all, write};
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::time::Duration;
 
 use dialoguer::Confirm;
 use failure::ResultExt;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
-use crate::e621::grabber::Shorten;
-use blacklist::Blacklist;
-use grabber::Grabber;
-use io::{tag::Group, Config};
-use sender::RequestSender;
-
+use crate::e621::blacklist::Blacklist;
+use crate::e621::grabber::{Grabber, Shorten};
+use crate::e621::io::{Config, Login};
+use crate::e621::io::tag::Group;
 use crate::e621::sender::entries::UserEntry;
-
-use self::tui::{ProgressBarBuilder, ProgressStyleBuilder};
+use crate::e621::sender::RequestSender;
+use crate::e621::tui::{ProgressBarBuilder, ProgressStyleBuilder};
 
 pub(crate) mod blacklist;
 pub(crate) mod grabber;
@@ -69,8 +65,7 @@ impl E621WebConnector {
         }
     }
 
-    /// Gets input and checks if the user wants to enter safe mode.
-    /// If they do, the `RequestSender` will update the request urls for future sent requests.
+    /// Gets input and enters safe depending on user choice.
     pub(crate) fn should_enter_safe_mode(&mut self) {
         trace!("Prompt for safe mode...");
         let confirm_prompt = Confirm::new()
@@ -93,7 +88,8 @@ impl E621WebConnector {
     }
 
     /// Processes the blacklist and tokenizes for use when grabbing posts.
-    pub(crate) fn process_blacklist(&mut self, username: &str) {
+    pub(crate) fn process_blacklist(&mut self) {
+        let username = Login::get().username();
         let user: UserEntry = self
             .request_sender
             .get_entry_from_appended_id(username, "user");
@@ -109,7 +105,12 @@ impl E621WebConnector {
         }
     }
 
-    /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts (posts grabbed by its ID).
+    /// Creates `Grabber` and grabs all posts before returning a tuple containing all general posts and single posts
+    /// (posts grabbed by its ID).
+    ///
+    /// # Arguments
+    ///
+    /// * `groups`: The groups to grab from.
     pub(crate) fn grab_all(&mut self, groups: &[Group]) {
         trace!("Grabbing posts...");
         self.grabber.grab_favorites();
@@ -128,7 +129,13 @@ impl E621WebConnector {
         trace!("Saved {file_path}...");
     }
 
-    /// Removes invalid characters from directory name.
+    /// Removes invalid characters from directory path.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir_name`: Directory name to remove invalid chars from.
+    ///
+    /// returns: String
     fn remove_invalid_chars(&self, dir_name: &str) -> String {
         dir_name
             .chars()
@@ -241,11 +248,15 @@ impl E621WebConnector {
     }
 
     /// Initializes the progress bar for downloading process.
+    ///
+    /// # Arguments
+    ///
+    /// * `len`: The total bytes to download.
     fn initialize_progress_bar(&mut self, len: u64) {
         self.progress_bar = ProgressBarBuilder::new(len)
             .style(
                 ProgressStyleBuilder::default()
-                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}")
+                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {binary_bytes_per_sec} {eta}")
                     .progress_chars("=>-")
                     .build())
             .draw_target(ProgressDrawTarget::stderr())

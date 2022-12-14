@@ -14,15 +14,13 @@
  * limitations under the License.
  */
 
-use once_cell::sync::OnceCell;
-use std::{
-    fs::{read_to_string, write},
-    io,
-    path::Path,
-    process::exit,
-};
+use std::fs::{read_to_string, write};
+use std::io;
+use std::path::Path;
+use std::process::exit;
 
 use failure::Error;
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string_pretty};
 
@@ -49,10 +47,12 @@ pub(crate) struct Config {
 static CONFIG: OnceCell<Config> = OnceCell::new();
 
 impl Config {
+    /// The location of the download directory.
     pub(crate) fn download_directory(&self) -> &str {
         &self.download_directory
     }
 
+    /// The file naming convention (e.g "md5", "id").
     pub(crate) fn naming_convention(&self) -> &str {
         &self.naming_convention
     }
@@ -129,18 +129,22 @@ pub(crate) struct Login {
 static LOGIN: OnceCell<Login> = OnceCell::new();
 
 impl Login {
+    /// Username of user.
     pub(crate) fn username(&self) -> &str {
         &self.username
     }
 
+    /// The password hash (also known as the API key) for the user.
     pub(crate) fn api_key(&self) -> &str {
         &self.api_key
     }
 
+    /// Whether or not the user wishes to download their favorites.
     pub(crate) fn download_favorites(&self) -> bool {
         self.download_favorites
     }
 
+    /// Gets the global instance of [Login].
     pub(crate) fn get() -> &'static Self {
         LOGIN.get_or_init(|| Self::load().unwrap_or_else(|e| {
             error!("Unable to load `login.json`. Error: {}", e);
@@ -202,6 +206,10 @@ impl Default for Login {
 }
 
 /// Exits the program after message explaining the error and prompting the user to press `ENTER`.
+///
+/// # Arguments
+///
+/// * `error`: The error message to print.
 pub(crate) fn emergency_exit(error: &str) {
     info!("{error}");
     println!("Press ENTER to close the application...");

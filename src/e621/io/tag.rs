@@ -18,13 +18,15 @@ use std::fs::read_to_string;
 
 use failure::{Error, ResultExt};
 
-use crate::e621::{
-    io::{emergency_exit, parser::BaseParser},
-    sender::{entries::TagEntry, RequestSender},
-};
+use crate::e621::io::emergency_exit;
+use crate::e621::io::parser::BaseParser;
+use crate::e621::sender::entries::TagEntry;
+use crate::e621::sender::RequestSender;
 
 /// Constant of the tag file's name.
 pub(crate) const TAG_NAME: &str = "tags.txt";
+
+/// An example file for newly created tag files.
 pub(crate) const TAG_FILE_EXAMPLE: &str = include_str!("tags.txt");
 
 /// A tag that can be either general or special.
@@ -69,14 +71,17 @@ impl Tag {
         }
     }
 
+    /// The name of the tag.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// The search type of the tag.
     pub(crate) fn search_type(&self) -> &TagSearchType {
         &self.search_type
     }
 
+    /// The tag type of the tag.
     pub(crate) fn tag_type(&self) -> &TagType {
         &self.tag_type
     }
@@ -97,7 +102,7 @@ impl Default for Tag {
 pub(crate) struct Group {
     /// The name of group.
     name: String,
-    /// A `Vec` containing all the tags parsed.
+    /// A [Vec] containing all the tags parsed.
     tags: Vec<Tag>,
 }
 
@@ -109,16 +114,24 @@ impl Group {
         }
     }
 
+    /// The name of group.
     pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
+    /// A [Vec] containing all the tags parsed.
     pub(crate) fn tags(&self) -> &Vec<Tag> {
         &self.tags
     }
 }
 
-/// Creates instance of the parser and parses groups and tags.
+/// Parses the tag file and returns the serialized form of it.
+///
+/// # Arguments
+///
+/// * `request_sender`: The sender to use for the API call (this is used for tag and alias checks).
+///
+/// returns: Result<Vec<Group, Global>, Error>
 pub(crate) fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group>, Error> {
     TagParser {
         parser: BaseParser::new(
@@ -147,13 +160,26 @@ impl TagIdentifier {
         TagIdentifier { request_sender }
     }
 
-    /// Identifies tag and returns `Tag`.
+    /// Identifies tags to ensure they exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags`: Tags to id.
+    /// * `request_sender`: The sender to use for the API calls.
+    ///
+    /// returns: Tag
     fn id_tag(tags: &str, request_sender: RequestSender) -> Tag {
         let identifier = TagIdentifier::new(request_sender);
         identifier.search_for_tag(tags)
     }
 
     /// Search for tag on e621.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags`: Tags to search for.
+    ///
+    /// returns: Tag
     fn search_for_tag(&self, tags: &str) -> Tag {
         // Splits the tags and cycles through each one, checking if they are valid and searchable tags
         // If the tag isn't searchable, the tag will default and consider itself invalid. Which will
@@ -188,6 +214,12 @@ impl TagIdentifier {
     }
 
     /// Checks if the tag is an alias and searches for the tag it is aliased to, returning it.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: Alias to check for.
+    ///
+    /// returns: Option<TagEntry>
     fn get_tag_from_alias(&self, tag: &str) -> Option<TagEntry> {
         let entry = match self.request_sender.query_aliases(tag) {
             Some(e) => e.first().unwrap().clone(),
@@ -207,6 +239,10 @@ impl TagIdentifier {
     }
 
     /// Emergency exits if a tag isn't identified.
+    ///
+    /// # Arguments
+    ///
+    /// * `tag`: Tag to log for.
     fn exit_tag_failure(&self, tag: &str) {
         error!("{tag} is invalid!");
         info!("The tag may be a typo, be sure to double check and ensure that the tag is correct.");
@@ -214,6 +250,13 @@ impl TagIdentifier {
     }
 
     /// Processes the tag type and creates the appropriate tag for it.
+    ///
+    /// # Arguments
+    ///
+    /// * `tags`: Tags to use.
+    /// * `tag_entry`: The tag entry related to the tags.
+    ///
+    /// returns: Tag
     fn create_tag(&self, tags: &str, tag_entry: &TagEntry) -> Tag {
         let tag_type = tag_entry.to_tag_type();
         let category = match tag_type {
@@ -282,6 +325,10 @@ impl TagParser {
     }
 
     /// Parses all tags for a group and stores it.
+    ///
+    /// # Arguments
+    ///
+    /// * `group`: The group to parse.
     fn parse_tags(&mut self, group: &mut Group) {
         let mut tags: Vec<Tag> = Vec::new();
         loop {
@@ -305,11 +352,17 @@ impl TagParser {
     }
 
     /// Parses a single tag and identifies it before returning the result.
+    ///
+    /// # Arguments
+    ///
+    /// * `group_name`:  Group name to parse the tag for.
+    ///
+    /// returns: Tag
     fn parse_tag(&mut self, group_name: &str) -> Tag {
         match group_name {
             "artists" | "general" => {
                 let tag = self.parser.consume_while(valid_tag);
-                TagIdentifier::id_tag(&tag, self.request_sender.clone())
+                TagIdentifier::id_tag(tag.trim(), self.request_sender.clone())
             }
             e => {
                 let tag = self.parser.consume_while(valid_id);
@@ -323,7 +376,7 @@ impl TagParser {
                     }
                 };
 
-                Tag::new(&tag, TagSearchType::Special, tag_type)
+                Tag::new(tag.trim(), TagSearchType::Special, tag_type)
             }
         }
     }
@@ -345,6 +398,12 @@ impl TagParser {
 }
 
 /// Validates character for tag.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_tag(c: char) -> bool {
     match c {
         ' '..='\"' | '$'..='~' => true,
@@ -360,16 +419,34 @@ fn valid_tag(c: char) -> bool {
 }
 
 /// Validates character for id.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_id(c: char) -> bool {
     c.is_ascii_digit()
 }
 
 /// Validates character for group
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_group(c: char) -> bool {
     matches!(c, 'A'..='Z' | 'a'..='z' | '-')
 }
 
 /// Validates character for comment.
+///
+/// # Arguments
+///
+/// * `c`: The character to check.
+///
+/// returns: bool
 fn valid_comment(c: char) -> bool {
     match c {
         ' '..='~' => true,
