@@ -256,7 +256,7 @@ impl E621WebConnector {
         self.progress_bar = ProgressBarBuilder::new(len)
             .style(
                 ProgressStyleBuilder::default()
-                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {bytes_per_sec} {eta}")
+                    .template("{msg} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} {binary_bytes_per_sec} {eta}")
                     .progress_chars("=>-")
                     .build())
             .draw_target(ProgressDrawTarget::stderr())
