@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Duration;
 
-use failure::ResultExt;
+use anyhow::{Context, Result};
 use reqwest::blocking::{Client, RequestBuilder, Response};
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use serde::de::DeserializeOwned;
@@ -285,9 +285,8 @@ impl RequestSender {
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response
             .copy_to(&mut image_bytes)
-            .with_context(|e| {
-                error!("Failed to download image!");
-                format!("{e}")
+            .with_context(|| {
+                "Failed to download image!".to_string()
             })
             .unwrap();
 
@@ -325,39 +324,32 @@ impl RequestSender {
                     .send(),
             )
             .json()
-            .with_context(|e| {
-                error!(
-                    "Json was unable to deserialize to \"{}\"!",
-                    type_name::<Value>()
-                );
-                trace!("url_type_key: {url_type_key}");
-                trace!("id: {id}");
-                format!("{e}")
+            .with_context(|| {
+                format!(
+                    "Json was unable to deserialize to \"{}\"!\n\
+                     url_type_key: {}\n\
+                     id: {}",
+                    type_name::<Value>(), url_type_key, id
+                )
             })
             .unwrap();
         match url_type_key {
             "single" => from_value(value.get("post").unwrap().clone())
-                .with_context(|e| {
+                .with_context(|| {
                     error!(
                         "Could not convert single post to type \"{}\"!",
                         type_name::<T>()
                     );
-                    trace!(
-                        "Unexpected error occurred when trying to perform conversion from value to entry type above."
-                    );
-                    format!("{e}")
+                    "Unexpected error occurred when trying to perform conversion from value to entry type above.".to_string()
                 })
                 .unwrap(),
             _ => from_value(value)
-                .with_context(|e| {
+                .with_context(|| {
                     error!(
                         "Could not convert entry to type \"{}\"!",
                         type_name::<T>()
                     );
-                    trace!(
-                        "Unexpected error occurred when trying to perform conversion from value to entry type above."
-                    );
-                    format!("{e}")
+                    "Unexpected error occurred when trying to perform conversion from value to entry type above.".to_string()
                 })
                 .unwrap(),
         }
@@ -385,13 +377,12 @@ impl RequestSender {
                 .send(),
         )
         .json()
-        .with_context(|e| {
+        .with_context(|| {
             error!(
                 "Unable to deserialize json to \"{}\"!",
                 type_name::<Vec<PostEntry>>()
             );
-            trace!("Failed to perform bulk search...");
-            format!("{e}")
+            "Failed to perform bulk search...".to_string()
         })
         .unwrap()
     }
@@ -412,27 +403,25 @@ impl RequestSender {
                     .send(),
             )
             .json()
-            .with_context(|e| {
-                error!(
-                    "Json was unable to deserialize to \"{}\"!",
-                    type_name::<Value>()
-                );
-                trace!("url_type_key: tag_bulk");
-                trace!("tag: {tag}");
-                format!("{e}")
+            .with_context(|| {
+                format!(
+                    "Json was unable to deserialize to \"{}\"!\n\
+                     url_type_key: tag_bulk\n\
+                     tag: {}",
+                    type_name::<Value>(), tag
+                )
             })
             .unwrap();
         if result.is_object() {
             vec![]
         } else {
             from_value::<Vec<TagEntry>>(result)
-                .with_context(|e| {
+                .with_context(|| {
                     error!(
                         "Unable to deserialize Value to \"{}\"!",
                         type_name::<Vec<TagEntry>>()
                     );
-                    trace!("Failed to perform bulk search...");
-                    format!("{e}")
+                    "Failed to perform bulk search...".to_string()
                 })
                 .unwrap()
         }
