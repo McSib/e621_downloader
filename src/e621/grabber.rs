@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::{Config, emergency_exit, Login};
 use crate::e621::io::tag::{Group, Tag, TagSearchType, TagType};
+use crate::e621::io::{emergency_exit, Config, Login};
 use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::sender::RequestSender;
 
@@ -344,6 +343,14 @@ impl Grabber {
     /// * `entry`: The entry to add to the collection.
     /// * `id`: The id that's used for debugging.
     fn add_single_post(&mut self, entry: PostEntry, id: i64) {
+        if entry.file.url.is_none() {
+            warn!(
+                "Post with ID {} has no URL!",
+                console::style(format!("\"{id}\"")).color256(39).italic()
+            );
+            return;
+        }
+
         let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
         self.single_post_collection().posts.push(grabbed_post);
         info!(
