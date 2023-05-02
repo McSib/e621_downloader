@@ -261,7 +261,7 @@ impl RequestSender {
     /// * `result`: The result to check.
     ///
     /// returns: Response
-    pub(crate) fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
+    fn check_response(&self, result: Result<Response, reqwest::Error>) -> Response {
         match result {
             Ok(response) => response,
             Err(ref error) => {
@@ -335,35 +335,26 @@ impl RequestSender {
 
         const CONVERSION_ERR_MSG: &str =
             "Unexpected error occurred when trying to perform conversion from value to entry type above.";
-        match url_type_key {
-            "single" => {
-                let post = value
-                    .get("post")
-                    .unwrap_or_else(|| {
-                        emergency_exit(&format!(
-                            "Post was not found! Post ID ({}) is invalid or post was deleted.",
-                            id
-                        ));
-                        unreachable!()
-                    })
-                    .to_owned();
-                from_value(post)
-                    .with_context(|| {
-                        error!(
-                            "Could not convert single post to type \"{}\"!",
-                            type_name::<T>()
-                        );
-                        CONVERSION_ERR_MSG.to_string()
-                    })
-                    .unwrap()
-            }
-            _ => from_value(value)
-                .with_context(|| {
-                    error!("Could not convert entry to type \"{}\"!", type_name::<T>());
-                    CONVERSION_ERR_MSG.to_string()
+        let value = match url_type_key {
+            "single" => value
+                .get("post")
+                .unwrap_or_else(|| {
+                    emergency_exit(&format!(
+                        "Post was not found! Post ID ({}) is invalid or post was deleted.",
+                        id
+                    ));
+                    unreachable!()
                 })
-                .unwrap(),
-        }
+                .to_owned(),
+            _ => value,
+        };
+
+        from_value(value)
+            .with_context(|| {
+                error!("Could not convert entry to type \"{}\"!", type_name::<T>());
+                CONVERSION_ERR_MSG.to_string()
+            })
+            .unwrap()
     }
 
     /// Performs a bulk search for posts using tags to filter the response.
