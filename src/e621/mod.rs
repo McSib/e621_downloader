@@ -20,14 +20,14 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
-use dialoguer::Confirm;
 use anyhow::Context;
+use dialoguer::Confirm;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
 use crate::e621::blacklist::Blacklist;
 use crate::e621::grabber::{Grabber, Shorten};
-use crate::e621::io::{Config, Login};
 use crate::e621::io::tag::Group;
+use crate::e621::io::{Config, Login};
 use crate::e621::sender::entries::UserEntry;
 use crate::e621::sender::RequestSender;
 use crate::e621::tui::{ProgressBarBuilder, ProgressStyleBuilder};
@@ -75,7 +75,7 @@ impl E621WebConnector {
             .interact()
             .with_context(|| {
                 error!("Failed to setup confirmation prompt!");
-                format!("Terminal unable to set up confirmation prompt...")
+                "Terminal unable to set up confirmation prompt..."
             })
             .unwrap();
 
@@ -121,7 +121,7 @@ impl E621WebConnector {
         write(file_path, bytes)
             .with_context(|| {
                 error!("Failed to save image!");
-                format!("A downloaded image was unable to be saved...")
+                "A downloaded image was unable to be saved..."
             })
             .unwrap();
         trace!("Saved {file_path}...");
@@ -228,7 +228,10 @@ impl E621WebConnector {
                 create_dir_all(parent_path)
                     .with_context(|| {
                         error!("Could not create directories for images!");
-                        format!("Directory path unable to be created...\nPath: \"{}\"", parent_path.to_str().unwrap())
+                        format!(
+                            "Directory path unable to be created...\nPath: \"{}\"",
+                            parent_path.to_str().unwrap()
+                        )
                     })
                     .unwrap();
 

@@ -138,7 +138,7 @@ pub(crate) fn parse_tag_file(request_sender: &RequestSender) -> Result<Vec<Group
             read_to_string(TAG_NAME)
                 .with_context(|| {
                     error!("Unable to read tag file!");
-                    format!("Possible I/O block when trying to read tag file...")
+                    "Possible I/O block when trying to read tag file..."
                 })
                 .unwrap(),
         ),
