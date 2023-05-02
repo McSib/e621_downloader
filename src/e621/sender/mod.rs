@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 use std::any::type_name;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -285,9 +284,7 @@ impl RequestSender {
         let mut image_bytes: Vec<u8> = Vec::with_capacity(file_size as usize);
         image_response
             .copy_to(&mut image_bytes)
-            .with_context(|| {
-                "Failed to download image!".to_string()
-            })
+            .with_context(|| "Failed to download image!".to_string())
             .unwrap();
 
         image_bytes
@@ -329,27 +326,41 @@ impl RequestSender {
                     "Json was unable to deserialize to \"{}\"!\n\
                      url_type_key: {}\n\
                      id: {}",
-                    type_name::<Value>(), url_type_key, id
+                    type_name::<Value>(),
+                    url_type_key,
+                    id
                 )
             })
             .unwrap();
+
+        const CONVERSION_ERR_MSG: &str =
+            "Unexpected error occurred when trying to perform conversion from value to entry type above.";
         match url_type_key {
-            "single" => from_value(value.get("post").unwrap().clone())
-                .with_context(|| {
-                    error!(
-                        "Could not convert single post to type \"{}\"!",
-                        type_name::<T>()
-                    );
-                    "Unexpected error occurred when trying to perform conversion from value to entry type above.".to_string()
-                })
-                .unwrap(),
+            "single" => {
+                let post = value
+                    .get("post")
+                    .unwrap_or_else(|| {
+                        emergency_exit(&format!(
+                            "Post was not found! Post ID ({}) is invalid or post was deleted.",
+                            id
+                        ));
+                        unreachable!()
+                    })
+                    .to_owned();
+                from_value(post)
+                    .with_context(|| {
+                        error!(
+                            "Could not convert single post to type \"{}\"!",
+                            type_name::<T>()
+                        );
+                        CONVERSION_ERR_MSG.to_string()
+                    })
+                    .unwrap()
+            }
             _ => from_value(value)
                 .with_context(|| {
-                    error!(
-                        "Could not convert entry to type \"{}\"!",
-                        type_name::<T>()
-                    );
-                    "Unexpected error occurred when trying to perform conversion from value to entry type above.".to_string()
+                    error!("Could not convert entry to type \"{}\"!", type_name::<T>());
+                    CONVERSION_ERR_MSG.to_string()
                 })
                 .unwrap(),
         }
@@ -408,7 +419,8 @@ impl RequestSender {
                     "Json was unable to deserialize to \"{}\"!\n\
                      url_type_key: tag_bulk\n\
                      tag: {}",
-                    type_name::<Value>(), tag
+                    type_name::<Value>(),
+                    tag
                 )
             })
             .unwrap();
