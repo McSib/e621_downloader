@@ -333,8 +333,6 @@ impl RequestSender {
             })
             .unwrap();
 
-        const CONVERSION_ERR_MSG: &str =
-            "Unexpected error occurred when trying to perform conversion from value to entry type above.";
         let value = match url_type_key {
             "single" => value
                 .get("post")
@@ -352,7 +350,9 @@ impl RequestSender {
         from_value(value)
             .with_context(|| {
                 error!("Could not convert entry to type \"{}\"!", type_name::<T>());
-                CONVERSION_ERR_MSG.to_string()
+                "Unexpected error occurred when trying to perform conversion from value to entry \
+                type above."
+                    .to_string()
             })
             .unwrap()
     }
