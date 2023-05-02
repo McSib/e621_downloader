@@ -21,7 +21,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use dialoguer::Confirm;
-use failure::ResultExt;
+use anyhow::Context;
 use indicatif::{ProgressBar, ProgressDrawTarget};
 
 use crate::e621::blacklist::Blacklist;
@@ -73,10 +73,9 @@ impl E621WebConnector {
             .show_default(true)
             .default(false)
             .interact()
-            .with_context(|e| {
+            .with_context(|| {
                 error!("Failed to setup confirmation prompt!");
-                trace!("Terminal unable to set up confirmation prompt...");
-                format!("{e}")
+                format!("Terminal unable to set up confirmation prompt...")
             })
             .unwrap();
 
@@ -120,10 +119,9 @@ impl E621WebConnector {
     /// Saves image to download directory.
     fn save_image(&self, file_path: &str, bytes: &[u8]) {
         write(file_path, bytes)
-            .with_context(|e| {
+            .with_context(|| {
                 error!("Failed to save image!");
-                trace!("A downloaded image was unable to be saved...");
-                format!("{e}")
+                format!("A downloaded image was unable to be saved...")
             })
             .unwrap();
         trace!("Saved {file_path}...");
@@ -228,11 +226,9 @@ impl E621WebConnector {
 
                 let parent_path = file_path.parent().unwrap();
                 create_dir_all(parent_path)
-                    .with_context(|e| {
+                    .with_context(|| {
                         error!("Could not create directories for images!");
-                        trace!("Directory path unable to be created...");
-                        trace!("Path: \"{}\"", parent_path.to_str().unwrap());
-                        format!("{e}")
+                        format!("Directory path unable to be created...\nPath: \"{}\"", parent_path.to_str().unwrap())
                     })
                     .unwrap();
 
