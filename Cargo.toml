@@ -12,6 +12,7 @@ tokio = "1.28.0"
 rustls = "0.21.0"
 h2 = "0.3.18"
 bumpalo = "3.12.1"
+remove_dir_all = "0.8.2"
 
 once_cell = "1.17.1"
 base64-url = "2.0.0"
