@@ -19,7 +19,7 @@ use std::fs::write;
 use std::path::Path;
 
 use console::Term;
-use failure::Error;
+use anyhow::Error;
 
 use crate::e621::E621WebConnector;
 use crate::e621::io::{Config, emergency_exit, Login};
