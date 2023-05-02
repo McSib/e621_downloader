@@ -336,12 +336,16 @@ impl Grabber {
         self.posts.first_mut().unwrap() // It is guaranteed that the first collection is the single post collection.
     }
 
-    /// Adds a single post to the single post [PostCollection]
+    /// Adds a single post to the single post [PostCollection].
     ///
     /// # Arguments
     ///
     /// * `entry`: The entry to add to the collection.
     /// * `id`: The id that's used for debugging.
+    ///
+    /// # Warning
+    ///
+    /// This function will not add the single post provided if it has no direct valid URL.
     fn add_single_post(&mut self, entry: PostEntry, id: i64) {
         match entry.file.url {
             None => warn!(
