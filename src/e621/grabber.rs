@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::e621::blacklist::Blacklist;
-use crate::e621::io::{Config, emergency_exit, Login};
 use crate::e621::io::tag::{Group, Tag, TagSearchType, TagType};
+use crate::e621::io::{emergency_exit, Config, Login};
 use crate::e621::sender::entries::{PoolEntry, PostEntry, SetEntry};
 use crate::e621::sender::RequestSender;
 
@@ -337,19 +336,31 @@ impl Grabber {
         self.posts.first_mut().unwrap() // It is guaranteed that the first collection is the single post collection.
     }
 
-    /// Adds a single post to the single post [PostCollection]
+    /// Adds a single post to the single post [PostCollection].
     ///
     /// # Arguments
     ///
     /// * `entry`: The entry to add to the collection.
     /// * `id`: The id that's used for debugging.
+    ///
+    /// # Warning
+    ///
+    /// This function will not add the single post provided if it has no direct valid URL.
     fn add_single_post(&mut self, entry: PostEntry, id: i64) {
-        let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
-        self.single_post_collection().posts.push(grabbed_post);
-        info!(
-            "Post with ID {} grabbed!",
-            console::style(format!("\"{id}\"")).color256(39).italic()
-        );
+        match entry.file.url {
+            None => warn!(
+                "Post with ID {} has no URL!",
+                console::style(format!("\"{id}\"")).color256(39).italic()
+            ),
+            Some(_) => {
+                let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
+                self.single_post_collection().posts.push(grabbed_post);
+                info!(
+                    "Post with ID {} grabbed!",
+                    console::style(format!("\"{id}\"")).color256(39).italic()
+                );
+            }
+        }
     }
 
     /// Searches and grabs post based on the tag given.
