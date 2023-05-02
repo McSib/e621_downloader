@@ -15,17 +15,18 @@
  */
 
 #[macro_use]
-extern crate anyhow;
-#[macro_use]
 extern crate log;
 
-
-use std::env::consts::{ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS};
+use std::env::consts::{
+    ARCH, DLL_EXTENSION, DLL_PREFIX, DLL_SUFFIX, EXE_EXTENSION, EXE_SUFFIX, FAMILY, OS,
+};
 use std::fs::File;
 
 use anyhow::Error;
 use log::LevelFilter;
-use simplelog::{ColorChoice, CombinedLogger, Config, ConfigBuilder, TerminalMode, TermLogger, WriteLogger};
+use simplelog::{
+    ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+};
 
 use crate::program::Program;
 
