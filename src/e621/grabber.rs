@@ -343,20 +343,20 @@ impl Grabber {
     /// * `entry`: The entry to add to the collection.
     /// * `id`: The id that's used for debugging.
     fn add_single_post(&mut self, entry: PostEntry, id: i64) {
-        if entry.file.url.is_none() {
-            warn!(
+        match entry.file.url {
+            None => warn!(
                 "Post with ID {} has no URL!",
                 console::style(format!("\"{id}\"")).color256(39).italic()
-            );
-            return;
+            ),
+            Some(_) => {
+                let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
+                self.single_post_collection().posts.push(grabbed_post);
+                info!(
+                    "Post with ID {} grabbed!",
+                    console::style(format!("\"{id}\"")).color256(39).italic()
+                );
+            }
         }
-
-        let grabbed_post = GrabbedPost::from((entry, Config::get().naming_convention()));
-        self.single_post_collection().posts.push(grabbed_post);
-        info!(
-            "Post with ID {} grabbed!",
-            console::style(format!("\"{id}\"")).color256(39).italic()
-        );
     }
 
     /// Searches and grabs post based on the tag given.
