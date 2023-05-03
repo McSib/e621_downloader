@@ -364,6 +364,11 @@ impl TagParser {
                 TagIdentifier::id_tag(tag.trim(), self.request_sender.clone())
             }
             e => {
+                let temp_char = self.parser.next_char();
+                if !char::is_ascii_digit(&temp_char) && temp_char != '#' {
+                    panic!("Invalid tag type! Pools, sets, and single-post tags must be a number!");
+                }
+
                 let tag = self.parser.consume_while(valid_id);
                 let tag_type = match e {
                     "pools" => TagType::Pool,
